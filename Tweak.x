@@ -1,3 +1,10 @@
+// ThreadsPulse: hooks for Threads (com.burbn.barcelona).
+//
+// Class and selector names come from a class-dump of the Threads executable. Many of them
+// are Swift classes, hooked by their mangled names. When Threads renames something the hook
+// simply stops matching, so a broken feature fails quietly instead of crashing. Debug Hints
+// in the settings shows which hooks are still firing.
+
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <malloc/malloc.h>
@@ -12,6 +19,8 @@
 #import "TPSideloadFix.h"
 #import "TPWelcomeViewController.h"
 
+// Swift classes have no usable headers, so methods called on them are declared here and
+// `self` is cast to id or UIView * before use.
 @interface NSObject (TPDecl)
 - (void)tp_threeFingerLongPress:(id)gesture;
 - (void)setPlaybackSpeed:(float)speed;
@@ -63,6 +72,9 @@ static NSArray *TPCleanItems(NSArray *items) {
     return out;
 }
 
+// Ads are blocked at three stages: the ad request, the sponsored items that come back, and
+// the insertion into the feed. Any one stage is enough; the others cover Threads changing
+// which path it uses.
 %group Ads
 
 %hook _TtC15IGBCNAdsManager15IGBCNAdsManager
@@ -172,6 +184,10 @@ static BOOL TPInsideFeedMediaCell(UIView *v) {
     return NO;
 }
 
+// Single-video download button.
+// IGVideoView is a Swift class whose methods Threads calls directly, bypassing ObjC dispatch.
+// The button is attached from UIKit methods that always go through ObjC (didMoveToWindow,
+// layoutSubviews), and the video URL is only resolved when the button is tapped.
 static const void *kTPButtonKey = &kTPButtonKey;
 static const void *kTPPlayerKey = &kTPPlayerKey;
 
@@ -260,6 +276,7 @@ static void TPEnsureVideoButton(UIView *host) {
 
 %end
 
+// Batch download for a whole post (photos and videos).
 static const void *kTPImgBtnKey   = &kTPImgBtnKey;
 static const void *kTPBatchBtnKey = &kTPBatchBtnKey;
 
@@ -458,6 +475,9 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromModel(UIView *cellRoot) {
     return items;
 }
 
+// Media is read from the carousel cell's `items` (BCNFeedMediaViewModel -> IGPhoto / IGVideo)
+// rather than from visible cells, so items that are scrolled away or reused are still found.
+// The view model's `kind` is a Swift enum; pointers and classes are validated before reading it.
 static NSSet<NSValue *> *TPClassFamily(NSString *baseName) {
     Class base = NSClassFromString(baseName);
     if (!base) return [NSSet set];
@@ -624,6 +644,8 @@ static NSArray<NSDictionary *> *TPCollectPostMedia(UIView *cellRoot) {
     return items.count ? items : TPCollectPostMediaFromModel(cellRoot);
 }
 
+// Original-size photos: the app only receives resized versions, so the post page on
+// threads.com is fetched and the largest candidate is matched by file name.
 static NSString *TPShortcodeFromPK(NSString *pk) {
     pk = [[pk componentsSeparatedByString:@"_"] firstObject];
     unsigned long long n = strtoull(pk.UTF8String, NULL, 10);
@@ -1059,6 +1081,8 @@ static void TPEnsureLightboxButton(UIView *host) {
 
 %end
 
+// Default playback speed. Threads resets the rate to 1.0 when a long-press 2x ends;
+// that reset is redirected to the chosen speed.
 static float TPSpeedForIndex(NSInteger i) {
     static const float table[] = {1.0f, 1.25f, 1.5f, 2.0f};
     return (i >= 0 && i <= 3) ? table[i] : 1.0f;
@@ -1066,6 +1090,11 @@ static float TPSpeedForIndex(NSInteger i) {
 
 static const void *kTPPlayerInitKey = &kTPPlayerInitKey;
 
+// Disable Autoplay.
+// Simply refusing to play leaves the cell without its sound icon and playback UI. Instead,
+// Threads is allowed to start (reason 1 = scrolled into view), the underlying FNFPlayer plays
+// muted until the first frame and pauses, and later play calls are ignored. A tap (a touch
+// that barely moved) releases the hold. Other reasons, such as full screen, play normally.
 static const void *kTPUserStartedKey = &kTPUserStartedKey;
 static const void *kTPTouchStartKey  = &kTPTouchStartKey;
 static const void *kTPHeldKey = &kTPHeldKey;
@@ -1217,6 +1246,8 @@ static BOOL TPFNFShouldSkipPlay(id fnf) {
 
 %end
 
+// Exact post times: Threads builds "3h" style labels through NSDate's relative-date category,
+// so those methods return absolute dates instead.
 static NSString *TPExactString(NSDate *date) {
     NSInteger mode = [TPPrefs integerForKey:TPKeyExactTime];
     if (mode == 0 || ![date isKindOfClass:[NSDate class]]) return nil;
@@ -1300,6 +1331,10 @@ static NSString *TPExactString(NSDate *date) {
 
 %end
 
+// Like Confirmation. The UFI row is the Swift BCNUFIButton, but taps reach it through an ObjC
+// target-action, so they can be intercepted. Its `type` is a payload-free enum stored in one
+// byte: comment = 0, repost = 1, like = 2. `toggledState` is YES when already liked, and
+// unliking is never confirmed.
 static void TPConfirm(NSString *title, NSString *actionTitle, void (^go)(void)) {
     UIAlertController *a = [UIAlertController alertControllerWithTitle:title message:nil
                                                         preferredStyle:UIAlertControllerStyleAlert];
@@ -1414,6 +1449,8 @@ static void TPEnsureAvatarButton(UIViewController *vc) {
     if (host.subviews.lastObject != b) [host bringSubviewToFront:b];
 }
 
+// Copy Profile Info: long-press gestures on the profile picture, name, username and bio.
+// When the feature is off the gestures refuse to begin, so Threads' own long-presses still work.
 static const void *kTPProfilePressKey = &kTPProfilePressKey;
 static Class gTPProfileHeaderClass;
 
@@ -1555,8 +1592,13 @@ static void TPEnsureProfilePress(UIView *header) {
 
 %end
 
+// Ways to open the settings: the Pulse button in Threads' settings, a three-finger long-press,
+// and a long-press on the Home tab.
 static const void *kTPGestureKey3 = &kTPGestureKey3;
 
+// The three-finger gesture recognizes alongside everything else. Once it begins, the other
+// recognizers on the same touches are disabled and re-enabled, which cancels them; otherwise
+// lifting the fingers would also trigger whatever button was touched first.
 @interface TPThreeFingerHelper : NSObject <UIGestureRecognizerDelegate>
 @end
 
@@ -1672,6 +1714,9 @@ static void TPTintEntryButton(UIButton *b) {
 
 %end
 
+// Copied-link detection. detectPatternsForPatterns: only reports whether the clipboard holds a
+// URL, so no paste prompt appears until the user taps Open (or chose Auto-open). The link is
+// handed to Threads as an NSUserActivity so Threads routes it itself.
 static BOOL TPIsThreadsURL(NSURL *u) {
     NSString *host = u.host.lowercaseString;
     if (![u.scheme.lowercaseString hasPrefix:@"http"]) return NO;
@@ -1778,6 +1823,11 @@ static void TPScheduleClipboardCheckAfterSwitch(void) {
 
 %end
 
+// Keep Feed Position. Coming back from the background, Threads decides how long the app was
+// away from three places: IGWarmStartListener's applicationWillWarmStartWithTimeInterval...
+// (home feed and BCNAppViewController), the feed's own lastBgTime, and the server thresholds
+// in IGFeedRefreshInstructionsStore. Within the keep time all three report a short absence.
+// Pull to refresh and cold launches are unaffected.
 static CFAbsoluteTime gTPBackgroundedAt = 0;
 
 static double TPKeepFeedLimitSeconds(void) {
@@ -1859,6 +1909,13 @@ static NSNumber *TPKeepFeedThreshold(NSNumber *orig) {
 
 %end
 
+// Home tab taps: Threads scrolls to top when the feed is scrolled down, and refreshes when it
+// is already at the top.
+// - New tab bar (BCNLucentTabBarCoordinator): the decision happens in ObjC methods, so the tap
+//   is simply not passed on.
+// - Legacy tab bar (BCNLegacyTabBarController): the decision is in Swift and can't be reached.
+//   The tap time is recorded and upward scrolls / refreshes of the feed are blocked for 1 s.
+//   These fallback hooks are only installed the first time the legacy tab bar is tapped.
 static Class gTPMainFeedClass;
 static __weak UIViewController *gTPMainFeedVC;
 
@@ -2026,6 +2083,8 @@ static BOOL TPTabSelectSuppressed(void) { return CFAbsoluteTimeGetCurrent() < gT
 
 %end
 
+// The follow-suggestion sheet is BCNUserRecommendationsViewController. Only the presented
+// (sheet) form is blocked; the same controller pushed from a profile still opens.
 static Class gTPUserRecsClass;
 
 static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
@@ -2064,6 +2123,9 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 
 %end
 
+// The new tab bar slides away based on the distance accumulated in scrollViewDidScroll: and
+// scrollViewDidEndScrolling:. Those calls are withheld from the coordinator. The native iOS 26
+// tab bar's minimize behavior is also set to never.
 %group PinTabBar
 
 %hook _TtC26BCNLucentTabBarCoordinator26BCNLucentTabBarCoordinator
@@ -2088,6 +2150,11 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 
 %end
 
+// Suggestions are IGListKit sections; returning 0 items hides a section without leaving a gap.
+// BCNAYMFSectionController ("Suggested for you") is split by its `placement`:
+// 0 home feed, 1 activity, 2 search, 3 profile chaining, 4 / 5 communities.
+// 0 and 3 follow Suggested Accounts, 2 follows Search Suggestions, the rest are left alone.
+// BCNSuggestedUser is only hidden for surface 1 (shown after following someone).
 %group HideFeedSuggestions
 
 %hook _TtC26BCNVerticalsSuggestionUnit43BCNVerticalsSuggestionUnitSectionController
@@ -2150,6 +2217,7 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 }
 %end
 
+// "Are you interested in this post?" appears as a row under a post and as a batched section.
 %hook _TtC29BCNFeedItemSeeMoreSeeLessCell29BCNFeedItemSeeMoreSeeLessCell
 - (CGSize)sizeThatFits:(CGSize)fits {
     if ([TPPrefs boolForKey:TPKeyHidePostFeedback]) return CGSizeMake(fits.width, 0);
@@ -2167,6 +2235,7 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 
 %end
 
+// Threads learns about screenshots and screen recordings through IGScreenshotObserver.
 %group BlockScreenshotDetection
 
 %hook IGScreenshotObserver
@@ -2182,6 +2251,10 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 
 %end
 
+// Block Analytics. Usage events are collected by FBAnalyticsCoreLogger and uploaded by
+// IGAnalyticsNetworkConfigurator. New events are dropped at collection, and anything already
+// stored is uploaded through Meta's own FBAnalyticsNoOpNetworkConfigurator, which sends nothing.
+// Normal API traffic (login, posting, loading the feed) does not use this path.
 static int gTPAnalyticsDropped;
 
 static NSMutableDictionary<NSString *, NSNumber *> *gTPAnaCounts;
@@ -2189,6 +2262,8 @@ static NSMutableDictionary<NSString *, NSDictionary *> *gTPAnaLast;
 static NSUInteger gTPAnaTotal;
 static const NSUInteger kTPAnaRecentMax = 10;
 
+// Analytics Log. Only names are counted for every event; the latest event object of each kind
+// is kept and its payload is only read when the log is opened. Nothing is written to disk.
 static void TPRecordAnalytics(id event, BOOL blocked) {
     if (!event) return;
     NSString *name = nil;
@@ -2217,6 +2292,8 @@ static NSString *TPAnaPayloadString(id event) {
     return s;
 }
 
+// Plain-language descriptions, observed from real Threads traffic. Unknown names fall back to a
+// word-by-word translation, which is skipped when more than half the words are unknown.
 static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaKnownEvents(void) {
     static NSDictionary *d; static dispatch_once_t once;
     dispatch_once(&once, ^{ d = @{
@@ -2455,6 +2532,8 @@ static BOOL tp_AnalyticsPerform(id self, SEL _cmd, id context, void *requestCont
     return orig_TPAnalyticsPerform(self, _cmd, context, requestContext);
 }
 
+// The upload method takes a large struct, passed by pointer on arm64, so the replacement is
+// only installed when both implementations have identical type encodings.
 static void TPInstallAnalyticsUploadBlock(void) {
     SEL sel = NSSelectorFromString(@"performRequestWithContext:requestContext:");
     Class noop = objc_getClass("FBAnalyticsNoOpNetworkConfigurator");
@@ -2467,6 +2546,8 @@ static void TPInstallAnalyticsUploadBlock(void) {
     orig_TPAnalyticsPerform = (TPPerformIMP)method_setImplementation(rm, (IMP)tp_AnalyticsPerform);
 }
 
+// Links in posts and bios go through BCNLinkHandlerImpl (an ObjC protocol, so calls use ObjC
+// dispatch). threads.com / threads.net and non-web links keep the default behavior.
 static NSURL *TPExternalBrowserURL(id url) {
     if (![TPPrefs boolForKey:TPKeyExternalBrowser] || ![url isKindOfClass:[NSURL class]]) return nil;
     NSURL *target = url;
@@ -2505,6 +2586,10 @@ static BOOL TPOpenExternally(id url) {
 
 %end
 
+// Profile header buttons are lazy properties of BCNProfileViewController:
+// $__lazy_storage_$_searchButton and $__lazy_storage_$_appSwitcherButton (Instagram).
+// Outside a stack view the remaining buttons are shifted with a transform. When both are
+// hidden, a button that would be shifted twice takes the larger shift, not the sum.
 static const void *kTPHiddenProfileViewsKey = &kTPHiddenProfileViewsKey;
 
 static UIView *TPIGButtonSlot(UIView *button) {
@@ -2588,6 +2673,8 @@ static void TPApplyHideIGButton(UIViewController *vc) {
 
 %end
 
+// Long-press on the Home tab. Every tab long-press (e.g. switching accounts on the profile tab)
+// goes through handleTabBarLongPress:; only presses that begin on the first tab are taken.
 static void TPCollectTabButtons(UIView *v, NSMutableArray<UIView *> *out, int depth) {
     if (depth > 8) return;
     for (UIView *s in v.subviews) {
@@ -2655,6 +2742,12 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
 
 %end
 
+// Hide Seen Status.
+// Threads marks a chat as read with BCNSlideMDCoreMarkThreadReadMutationBuilder, carrying the
+// timestamp read up to. When blocked, that timestamp is replaced with the position this chat
+// has already shown to the other person (the watermark), or 0. Sending 0 after a Seen was
+// shown would move the server's read position backwards and make that Seen disappear.
+// Chat ids arrive as NSString, NSNumber or wrapped values, so they are normalized here.
 static NSString *TPThreadKey(id fbid) {
     if (!fbid) return nil;
     if ([fbid isKindOfClass:[NSString class]]) return fbid;
@@ -2706,6 +2799,9 @@ static void TPSetChatShowsSeen(NSString *key, BOOL show) {
     [[NSUserDefaults standardUserDefaults] setObject:list forKey:kTPSeenChatsKey];
 }
 
+// Sending Seen on reply (or when the eye is turned on) rebuilds the read request from the last
+// blocked arguments and sends it through the same GraphQL service and method Threads used,
+// which are recorded from Threads' own read requests below.
 static const void *kTPMarkReadTag = &kTPMarkReadTag;
 static NSMutableDictionary<NSString *, NSDictionary *> *gTPLastReadArgs;
 static __weak id gTPGQLService;
@@ -2720,6 +2816,7 @@ static id TPTagMarkRead(id b) {
 static NSMutableDictionary<NSString *, NSNumber *> *gTPSeenSentAt;
 static NSMutableDictionary<NSString *, NSNumber *> *gTPSeenWatermark;
 
+// Messages held until the server accepts the Seen (released on response, at most 0.8 s).
 static NSMutableDictionary<NSString *, NSMutableArray *> *gTPHeldMessages;
 
 static void TPReleaseHeldMessages(NSString *k) {
@@ -2842,6 +2939,9 @@ static void TPSendSeenNow(NSString *k) {
 }
 %end
 
+// If Seen arrives together with the reply, the reply becomes the last message on the other
+// person's screen and Seen has nowhere to show. A message sent right after a Seen is held
+// until the server accepts the Seen.
 %hook MDCoreSendService
 - (void)sendMutationWithAppDataModel:(id)model offlineThreadingId:(id)otid optimisticImages:(id)images syncGroupId:(int)group {
     Ivar iv = model && [TPPrefs boolForKey:TPKeyNoSeen] ? class_getInstanceVariable(object_getClass(model), "_outgoingMessagePayload") : NULL;
@@ -2863,6 +2963,8 @@ static void TPSendSeenNow(NSString *k) {
 }
 %end
 
+// A reply is detected when Threads builds an outgoing message or a message action. Detecting it
+// in MDCoreSendService was wrong: most mutations there are thread updates such as reads.
 %hook BCNSlideOutgoingMessagePayload
 - (id)initWithOfflineThreadingId:(id)otid threadFbid:(id)fbid senderFbid:(id)sender sendDate:(id)date content:(id)content navChain:(id)chain forwardedMessageId:(id)fwd sendAttribution:(id)attr promptSessionId:(id)ps qnaQuestionId:(id)qid qnaQuestion:(id)q {
     id me = %orig;
@@ -2905,6 +3007,8 @@ static NSString *TPChatKeyOf(UIViewController *chat) {
     return thread ? TPThreadKey(thread) : nil;
 }
 
+// Per-chat eye button, placed left of the "..." (moreButton) in
+// BCNSlideMessageListNavBarTitleView so it appears and transitions with the title bar.
 static UIButton *TPMakeSeenButton(void) {
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
     objc_setAssociatedObject(btn, kTPSeenButtonKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -2956,6 +3060,8 @@ static UIButton *TPMakeSeenButton(void) {
 %end
 %end
 
+// Hide Typing Status. The activity status is always sent as 0 (stopped typing). Changing the
+// thread id instead made the request fail and broke live delivery of new messages.
 %group NoTyping
 %hook BCNTypingIndicatorPublishEventMutationBuilder
 + (id)builderWithActivityStatus:(id)status threadId:(id)tid {
@@ -2969,6 +3075,10 @@ static UIButton *TPMakeSeenButton(void) {
 
 static const void *kTPApplierNameKey = &kTPApplierNameKey;
 
+// Keep Unsent Messages. An unsend is applied by the Swift BCNSlideDeleteMessageHandler through
+// MDCoreDeltaApplyingBridge, which is created with the handler's type name. Delete commands
+// produced for that handler are dropped, so the message stays in the local store.
+// MDCoreMutationCommand is an enum wrapper; its match method exposes the delete payload.
 static id TPDeleteCommandPayload(id cmd) {
     SEL sel = NSSelectorFromString(@"matchUpsertCommand:deleteCommand:updateCommand:deleteAllCommand:deleteFolderCommand:");
     if (![cmd respondsToSelector:sel]) return nil;
@@ -2994,6 +3104,8 @@ static NSMutableArray<NSString *> *TPUnsentList(void) {
 
 static NSHashTable<UIView *> *gTPMessageCells;
 
+// Visible message cells are tracked weakly so the "Unsent" label appears immediately, without
+// leaving and reopening the chat. The label is shown even after the setting is turned off.
 static void TPRefreshMessageCells(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         for (UIView *cell in gTPMessageCells.allObjects) if (cell.window) [cell setNeedsLayout];
@@ -3023,6 +3135,8 @@ static BOOL TPIsUnsentMessageId(NSString *mid) {
     return NO;
 }
 
+// Reads a 16-byte Swift String. Only small strings, native strings and bridged NSStrings are
+// accepted, and every address is checked before it is read.
 static NSString *TPReadSwiftString(const uint8_t *p) {
     if (!p) return nil;
     uint64_t w0, w1;
