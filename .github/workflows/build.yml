@@ -20,16 +20,16 @@ jobs:
     outputs:
       version: ${{ steps.theos.outputs.version }}
     steps:
-      - name: 取得原始碼
+      - name: Check out source
         uses: actions/checkout@v4
 
-      - name: 安裝 Theos
+      - name: Install Theos
         id: theos
         uses: ./.github/actions/setup-theos
         with:
           sdk-version: ${{ env.SDK_VERSION }}
 
-      - name: 編譯
+      - name: Build
         env:
           VERSION: ${{ steps.theos.outputs.version }}
         run: |
@@ -63,7 +63,7 @@ jobs:
 
           ls -la dist
 
-      - name: 上傳 Artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ThreadsPulse_${{ steps.theos.outputs.version }}
@@ -76,13 +76,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: 下載編譯結果
+      - name: Download build output
         uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
 
-      - name: 建立 Release
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           name: ThreadsPulse ${{ needs.build.outputs.version }}
