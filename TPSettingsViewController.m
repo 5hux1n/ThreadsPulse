@@ -10,10 +10,8 @@
 
 #import "TPVersion.h"
 
-extern NSString *TPAnalyticsLogReport(void);   // Tweak.x
+extern NSString *TPAnalyticsLogReport(void);
 static NSString *const kTPDonateURL = @"https://ko-fi.com/mumuisdog";
-
-#pragma mark - 樣式（霧面卡片）
 
 static UIColor *TPDyn(UIColor *light, UIColor *dark) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
@@ -28,12 +26,9 @@ static UIColor *TPHairlineColor(void) {
 static UIColor *TPKofiColor(void) {
     return [UIColor colorWithRed:1.00 green:0.37 blue:0.36 alpha:1];
 }
-/// 主題色（開關、分段選中、完成按鈕、操作文字），依「插件主題色」設定
 static UIColor *TPAccent(void) { return [TPUI accent]; }
-/// 圖示用的主題色：深色模式稍亮，淺色模式稍深，兩邊都清楚
 static UIColor *TPAccentIcon(void) { return [TPUI accentIcon]; }
 
-/// 細線條圖示（顏色由主題色決定）
 static UIImage *TPLineIcon(NSString *symbol) {
     UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:17 weight:UIImageSymbolWeightRegular];
     return [UIImage systemImageNamed:symbol withConfiguration:cfg] ?: [UIImage systemImageNamed:@"circle" withConfiguration:cfg];
@@ -46,20 +41,16 @@ static void TPApplyIcon(UIListContentConfiguration *c, NSString *symbol, UIColor
     c.imageToTextPadding = 12;
 }
 
-/// 卡片底：半透明霧面
 static void TPApplyCardBackground(UITableViewCell *cell) {
     UIBackgroundConfiguration *bg = [UIBackgroundConfiguration listGroupedCellConfiguration];
     bg.backgroundColor = TPCardColor();
     cell.backgroundConfiguration = bg;
 }
 
-/// 「串文時間格式」的範例：以 3 小時前的時間示範三種顯示方式
 static NSString *TPTimePreview(NSInteger mode) {
     NSDate *sample = [NSDate dateWithTimeIntervalSinceNow:-3 * 3600 - 17 * 60 - 42];
     NSString *text;
     if (mode == 0) {
-        // 用 Threads 自己的相對時間方法（NSDate+RelativeDate），範例才會和串文上的寫法一致，例如「3小時」。
-        // 此時設定已是「相對時間」，插件的精確時間 hook 會直接放行原本的結果。
         SEL sel = NSSelectorFromString(@"shortenedFormattedDateRelativeToNow");
         id r = nil;
         if ([sample respondsToSelector:sel]) {
@@ -75,12 +66,8 @@ static NSString *TPTimePreview(NSInteger mode) {
     return [NSString stringWithFormat:TPL(@"Example: %@"), text];
 }
 
-#pragma mark - 頂部狀態卡
-
-/// 最上方的狀態卡：Pulse 圖示、版本號、運作中・已開啟幾項功能
 @interface TPSettingsHeaderView : UIView
 - (void)setEnabledCount:(NSInteger)count;
-/// 點了主題色圓點（已經存好設定、發出通知），設定頁用來重新套用顏色
 @property (nonatomic, copy) void (^onThemeChange)(void);
 @end
 
@@ -92,7 +79,7 @@ static NSString *TPTimePreview(NSInteger mode) {
     UILabel *_title;
     UILabel *_subtitle;
     UIView *_dot;
-    UIView *_sep;                     // 資訊卡下半部：主題色
+    UIView *_sep;
     UILabel *_themeLabel;
     NSArray<UIButton *> *_swatches;
 }
@@ -192,7 +179,7 @@ static NSString *TPTimePreview(NSInteger mode) {
     CGFloat w = self.bounds.size.width, inset = 16, d = 46;
     _card.frame = CGRectMake(inset, 6, w - inset * 2, self.bounds.size.height - 12);
     _gradient.frame = _card.bounds;
-    CGFloat cw = _card.bounds.size.width, h = 80;               // 上半部：插件資訊；下半部（44pt）：主題色
+    CGFloat cw = _card.bounds.size.width, h = 80;
     _sep.frame = CGRectMake(14, h, cw - 28, 0.5);
     CGFloat sd = 24, gap = 10, sx = cw - 14 - (sd * _swatches.count + gap * (_swatches.count - 1));
     _themeLabel.frame = CGRectMake(14, h + 1, MAX(0, sx - 22), 43);
@@ -207,8 +194,6 @@ static NSString *TPTimePreview(NSInteger mode) {
 }
 @end
 
-#pragma mark - 設定頁
-
 @interface TPSettingsViewController () <UIDocumentPickerDelegate>
 @end
 
@@ -217,13 +202,12 @@ static NSString *TPTimePreview(NSInteger mode) {
     CGFloat _headerWidth;
     UIButton *_doneButton;
     TPSettingsHeaderView *_header;
-    NSArray<NSDictionary *> *_allSections;   // 全部分類（主頁用來算數量）
-    NSInteger _category;                      // -1 = 主頁；否則是這一頁顯示的分類
-    BOOL _showAbout;                          // 「進階」頁最後加上版本與重設
-    NSMutableDictionary<NSNumber *, NSArray *> *_shownRows;   // 每個區塊目前畫面上的列（顯示／隱藏條件列時比對用）
+    NSArray<NSDictionary *> *_allSections;
+    NSInteger _category;
+    BOOL _showAbout;
+    NSMutableDictionary<NSNumber *, NSArray *> *_shownRows;
 }
 
-/// 主頁的分類分組（值是分類標題的英文 key）
 static NSArray<NSArray<NSString *> *> *TPRootGroups(void) {
     return @[ @[@"Ads & Privacy", @"Media Download", @"Player", @"Home Feed"],
               @[@"Hidden Items", @"Links", @"Messages", @"Interface & Interactions"],
@@ -239,7 +223,6 @@ static NSString *TPCategoryIcon(NSString *header) {
     return m[header] ?: @"circle";
 }
 
-/// 分類圖示：圓角方塊底色＋白色圖案（像 iOS 設定）
 static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     CGFloat d = 30;
     UIImage *glyph = [[UIImage systemImageNamed:symbol withConfiguration:
@@ -271,7 +254,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     return nil;
 }
 
-/// 分類裡的開關：開了幾個／共幾個（沒有開關的分類回傳 nil）
 - (NSString *)summaryForSection:(NSDictionary *)sec {
     if ([sec[@"header"] isEqualToString:@"Advanced"]) return nil;
     NSInteger on = 0, total = 0;
@@ -288,13 +270,12 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
         UIViewController *top = TPTopViewController();
         if (!top) return;
         if ([top isKindOfClass:[UINavigationController class]] &&
-            [[(UINavigationController *)top viewControllers].firstObject isKindOfClass:self]) return; // 已開啟
+            [[(UINavigationController *)top viewControllers].firstObject isKindOfClass:self]) return;
         TPSettingsViewController *vc = [[self alloc] initWithStyle:UITableViewStyleInsetGrouped];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
         nav.modalPresentationStyle = UIModalPresentationPageSheet;
         nav.navigationBar.tintColor = TPAccent();
         nav.view.tintColor = TPAccent();
-        // 導覽列用不透明的頁面底色：透明的話，切換頁面時會透出上一頁的內容
         UINavigationBarAppearance *ap = [UINavigationBarAppearance new];
         [ap configureWithOpaqueBackground];
         ap.backgroundColor = TPPageColor();
@@ -314,7 +295,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // 完成按鈕自己畫（主題色圓底＋白色勾勾）：Threads 會用全域外觀改掉導覽列按鈕的顏色，深色、淺色模式都可能看不清楚
     UIButton *doneButton = [UIButton buttonWithType:UIButtonTypeCustom];
     _doneButton = doneButton;
     doneButton.frame = CGRectMake(0, 0, 32, 32);
@@ -335,7 +315,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     self.tableView.separatorColor = TPHairlineColor();
     self.tableView.sectionHeaderTopPadding = 6;
 
-    // TP_MODEL_BEGIN — 這裡的文字都是「英文 key」，顯示時才經 TPL() 轉成目前語系
     _sections = @[
         @{ @"header": @"Ads & Privacy",
            @"footer": @"Turning ad blocking on or off takes effect after refreshing the feed or restarting the app.",
@@ -398,7 +377,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"arrow.clockwise" },
            ]},
         @{ @"header": @"Hidden Items",
-           @"groups": @[@"Suggested Content", @"Interface Buttons"],   // 分類頁裡再分成兩張卡片
+           @"groups": @[@"Suggested Content", @"Interface Buttons"],
            @"rows": @[
                @{ @"type": @"switch", @"group": @"Suggested Content", @"key": TPKeyHideFeedSuggest, @"title": @"Suggested Accounts",
                   @"detail": @"Hide \"Suggested for you\" in the feed & on profiles",
@@ -503,7 +482,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"cup.and.saucer.fill" },
            ]},
     ];
-    // TP_MODEL_END
     _allSections = _sections;
     if (self.isRoot) {
         _sections = @[];
@@ -513,7 +491,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     } else {
         NSDictionary *sec = _allSections[_category];
         _sections = @[sec];
-        // 分類裡再分組的（例如「隱藏項目」）：每組一張卡片，卡片上方用主題色標題
         NSArray *groups = sec[@"groups"];
         if (groups.count) {
             NSMutableArray *parts = [NSMutableArray array];
@@ -532,13 +509,13 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    if (self.isRoot) [self applyTheme];   // 從分類頁回來：數量、主題色都要更新
+    if (self.isRoot) [self applyTheme];
 }
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     CGFloat w = self.tableView.bounds.size.width;
-    if (!self.isRoot && w > 0 && w != _headerWidth) {         // 分類頁：表格最上方放大標題（跟著表格捲動，不靠導覽列的大標題）
+    if (!self.isRoot && w > 0 && w != _headerWidth) {
         _headerWidth = w;
         UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 56)];
         UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(20, 4, w - 40, 44)];
@@ -548,7 +525,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
         [box addSubview:l];
         self.tableView.tableHeaderView = box;
     }
-    if (self.isRoot && w > 0 && w != _headerWidth) {          // 寬度改變才重設，避免無限重排
+    if (self.isRoot && w > 0 && w != _headerWidth) {
         _headerWidth = w;
         _header = [[TPSettingsHeaderView alloc] initWithFrame:CGRectMake(0, 0, w, 136)];
         [_header setEnabledCount:[self enabledFeatureCount]];
@@ -560,7 +537,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 
 - (void)close { [self dismissViewControllerAnimated:YES completion:nil]; }
 
-/// 已開啟的功能數（所有開關，不含「除錯提示」）
 - (NSInteger)enabledFeatureCount {
     NSInteger n = 0;
     for (NSDictionary *sec in _allSections)
@@ -570,7 +546,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     return n;
 }
 
-/// 換主題後：重畫狀態卡、完成按鈕和所有列
 - (void)applyTheme {
     self.navigationController.navigationBar.tintColor = TPAccent();
     self.navigationController.view.tintColor = TPAccent();
@@ -580,8 +555,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     [self.view setNeedsLayout];
     [self.tableView reloadData];
 }
-
-#pragma mark - Table
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tv {
     if (self.isRoot) return TPRootGroups().count;
@@ -600,11 +573,10 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 - (NSString *)tableView:(UITableView *)tv titleForHeaderInSection:(NSInteger)s {
     if (self.isRoot) return nil;
     if (s >= (NSInteger)_sections.count) return TPL(@"About");
-    NSString *g = _sections[s][@"groupTitle"];                       // 分組標題；分類本身的標題已經在最上方
+    NSString *g = _sections[s][@"groupTitle"];
     return g.length ? TPL(g) : nil;
 }
 
-/// 分組標題用主題色粗體，比一般灰色小標題明顯
 - (void)tableView:(UITableView *)tv willDisplayHeaderView:(UIView *)view forSection:(NSInteger)s {
     if (self.isRoot || s >= (NSInteger)_sections.count || ![_sections[s][@"groupTitle"] length]) return;
     if (![view isKindOfClass:[UITableViewHeaderFooterView class]]) return;
@@ -625,7 +597,6 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     return f.length ? TPL(f) : nil;
 }
 
-/// 條件格式：@[key, 值]，或多個條件 @[@[key, 值], @[key, 值]]（全部成立才算）
 static NSArray<NSArray *> *TPConditions(NSArray *cond) {
     if (cond.count == 2 && [cond[0] isKindOfClass:[NSString class]]) return @[cond];
     return cond ?: @[];
@@ -640,7 +611,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     return NO;
 }
 
-/// 這個區塊目前要顯示的列（有 showIf 的列，只在條件成立時顯示）
 - (NSArray<NSDictionary *> *)visibleRowsInSection:(NSInteger)s {
     NSMutableArray *out = [NSMutableArray array];
     for (NSDictionary *row in _sections[s][@"rows"]) {
@@ -652,8 +622,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
 
 - (NSDictionary *)rowAt:(NSIndexPath *)ip { return [self visibleRowsInSection:ip.section][ip.row]; }
 
-/// 某個設定改變後，依賴它的列要顯示或隱藏（例如「提示位置」只在「詢問」時出現）
-///   只插入／移除有變的列，其他列原地不動。整個區塊重新載入的話，新舊畫面交疊淡入淡出，會看到殘影
 - (void)refreshConditionalRowsForKey:(NSString *)key {
     for (NSInteger sec = 0; sec < (NSInteger)_sections.count; sec++) {
         BOOL footerAffected = TPConditionUsesKey(_sections[sec][@"footerIf"], key);
@@ -677,7 +645,7 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
         [self.tableView performBatchUpdates:^{
             if (deletes.count) [self.tableView deleteRowsAtIndexPaths:deletes withRowAnimation:UITableViewRowAnimationFade];
             if (inserts.count) [self.tableView insertRowsAtIndexPaths:inserts withRowAnimation:UITableViewRowAnimationFade];
-            if (footerAffected && fv) { fv.textLabel.text = footer; [fv setNeedsLayout]; }   // 說明文字直接換，不重新載入
+            if (footerAffected && fv) { fv.textLabel.text = footer; [fv setNeedsLayout]; }
         } completion:^(BOOL finished) {
             if (footerNeedsReload)
                 [UIView performWithoutAnimation:^{ [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:sec] withRowAnimation:UITableViewRowAnimationNone]; }];
@@ -685,7 +653,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     }
 }
 
-/// 區塊內的小標題（例如「點首頁標籤時」），對齊下面各列的標題
 - (UITableViewCell *)captionCellForRow:(NSDictionary *)row {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -706,7 +673,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     return cell;
 }
 
-/// 分段選項列：標題在上、分段按鈕在下，整列是一張霧面卡片
 - (UITableViewCell *)segmentCellForRow:(NSDictionary *)row {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -750,7 +716,7 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
         preview.translatesAutoresizingMaskIntoConstraints = NO;
         [cv addSubview:preview];
     }
-    if (!preview && [row[@"note"] length]) {                 // 分段選項下方的固定說明
+    if (!preview && [row[@"note"] length]) {
         preview = [UILabel new];
         preview.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
         preview.textColor = UIColor.secondaryLabelColor;
@@ -830,7 +796,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     if (self.isRoot) return [self rootCellAt:ip];
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
 
-    // ---- 關於 ----
     if (ip.section >= (NSInteger)_sections.count) {
         if (ip.row == 0) {
             UIListContentConfiguration *c = [UIListContentConfiguration valueCellConfiguration];
@@ -933,8 +898,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     }
 }
 
-#pragma mark - 贊助連結
-
 - (void)openLink:(NSString *)urlString {
     NSURL *url = [NSURL URLWithString:urlString];
     if (!url) return;
@@ -943,8 +906,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     sf.dismissButtonStyle = SFSafariViewControllerDismissButtonStyleClose;
     [self presentViewController:sf animated:YES completion:nil];
 }
-
-#pragma mark - 重設
 
 - (void)confirmReset {
     UIAlertController *a = [UIAlertController alertControllerWithTitle:TPL(@"Reset All Settings?") message:nil
@@ -958,14 +919,12 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     [self presentViewController:a animated:YES completion:nil];
 }
 
-/// 分析回傳紀錄：本次啟動 Threads 收集了哪些使用紀錄（排行＋最近幾筆的內容）
 - (void)showAnalyticsLog {
     NSString *r = TPAnalyticsLogReport();
     if (!r) { [TPHUD toast:TPL(@"No analytics recorded yet")]; return; }
     [TPDownloader showReport:r];
 }
 
-/// 個別聊天室的「看過」設定全部清掉，所有聊天室回到跟總開關一樣（不顯示）
 - (void)confirmResetSeenChats {
     NSArray *list = [[NSUserDefaults standardUserDefaults] arrayForKey:@"tp_seen_allowed_chats"];
     if (!list.count) { [TPHUD toast:TPL(@"No chats set to show Seen")]; return; }
@@ -979,8 +938,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     }]];
     [self presentViewController:a animated:YES completion:nil];
 }
-
-#pragma mark - 匯出／匯入
 
 - (void)exportSettingsFrom:(UIView *)source {
     NSData *data = [TPPrefs exportJSONData];
@@ -1006,7 +963,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
     NSData *data = urls.firstObject ? [NSData dataWithContentsOfURL:urls.firstObject] : nil;
     NSInteger n = [TPPrefs importJSONData:data];
-    // 匯入的設定可能換了主題：重畫整頁（含狀態卡的功能數），Pulse 入口也跟著變色
     [[NSNotificationCenter defaultCenter] postNotificationName:TPThemeDidChangeNotification object:nil];
     [self applyTheme];
     if (n < 0) { [TPUI hapticError];   [TPHUD toast:TPL(@"Invalid settings file")]; }
