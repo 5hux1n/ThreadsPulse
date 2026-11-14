@@ -1,15 +1,12 @@
-
 (() => {
     "use strict";
 
-    // Prevent duplicate initialization
     if (window.__openThreadsInitialized) return;
     window.__openThreadsInitialized = true;
 
     let attemptedUrl = null;
     let redirecting = false;
 
-    // Check Threads domains
     function isThreadsHost(hostname) {
         const host = hostname.toLowerCase();
 
@@ -21,7 +18,6 @@
         );
     }
 
-    // Normalize Threads URL
     function canonicalThreadsUrl(locationUrl) {
         try {
             const url = new URL(locationUrl);
@@ -55,13 +51,11 @@
         }
     }
 
-    // Extract post shortcode
     function getPostShortcode(url) {
         const segments = url.pathname
             .split("/")
             .filter(Boolean);
 
-        // /@username/post/POST_ID
         const postIndex = segments.indexOf("post");
 
         if (
@@ -71,7 +65,6 @@
             return segments[postIndex + 1];
         }
 
-        // /t/POST_ID
         if (
             segments[0] === "t" &&
             segments[1]
@@ -82,13 +75,11 @@
         return null;
     }
 
-    // Extract username
     function getUsername(url) {
         const segments = url.pathname
             .split("/")
             .filter(Boolean);
 
-        // /@username
         if (
             segments.length === 1 &&
             segments[0].startsWith("@")
@@ -101,11 +92,9 @@
         return null;
     }
 
-    // Build native Threads URL
     function buildAppUrl(url) {
         const shortcode = getPostShortcode(url);
 
-        // Open specific post
         if (shortcode) {
             return (
                 "barcelona://media?shortcode=" +
@@ -115,7 +104,6 @@
 
         const username = getUsername(url);
 
-        // Open specific user profile
         if (username) {
             return (
                 "barcelona://user?username=" +
@@ -123,7 +111,6 @@
             );
         }
 
-        // Fallback for other Threads URLs
         const webUrl = url.toString();
         const encoded = encodeURIComponent(webUrl);
 
@@ -137,7 +124,6 @@
         );
     }
 
-    // Open Threads App
     function openInThreads() {
         if (redirecting) return;
 
@@ -149,7 +135,6 @@
 
         const webUrl = url.toString();
 
-        // Prevent duplicate redirects
         if (attemptedUrl === webUrl) return;
 
         const appUrl = buildAppUrl(url);
@@ -163,11 +148,9 @@
             appUrl
         );
 
-        // Launch native Threads app
         window.location.href = appUrl;
     }
 
-    // Handle SPA navigation
     function handleNavigation() {
         const url = canonicalThreadsUrl(
             window.location.href
@@ -183,10 +166,8 @@
         openInThreads();
     }
 
-    // Initial execution
     openInThreads();
 
-    // Monitor pushState
     const originalPushState = history.pushState;
 
     history.pushState = function (...args) {
@@ -200,7 +181,6 @@
         return result;
     };
 
-    // Monitor replaceState
     const originalReplaceState = history.replaceState;
 
     history.replaceState = function (...args) {
@@ -214,14 +194,11 @@
         return result;
     };
 
-    // Browser back / forward
     window.addEventListener("popstate", () => {
         setTimeout(handleNavigation, 0);
     });
 
-    // Page restored from browser cache
     window.addEventListener("pageshow", () => {
         setTimeout(handleNavigation, 0);
     });
-
 })();
