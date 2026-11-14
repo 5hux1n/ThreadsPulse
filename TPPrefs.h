@@ -16,8 +16,15 @@ extern NSString *const TPKeyBlockScreenshotDetect; // 停用截圖偵測
 extern NSString *const TPKeyBlockAnalytics;  // 阻擋分析回傳
 extern NSString *const TPKeyExternalBrowser; // 連結用外部瀏覽器開啟
 extern NSString *const TPKeyHideIGButton;    // 隱藏個人檔案的 Instagram 按鈕
+extern NSString *const TPKeyNoSeen;          // 私訊：不顯示「看過」
+extern NSString *const TPKeyKeepUnsent;      // 私訊：防止訊息收回
+extern NSString *const TPKeyNoTyping;        // 私訊：不顯示輸入中
+extern NSString *const TPKeyHideProfileSearch; // 隱藏個人檔案的搜尋按鈕
+extern NSString *const TPKeyHideSearchSuggest; // 隱藏搜尋頁的「追蹤建議」
+extern NSString *const TPKeyHidePostFeedback;  // 隱藏「你對這則貼文有興趣嗎？」詢問
+extern NSString *const TPKeySeenOnReply;     // 私訊：回覆後顯示看過（不顯示看過的子選項）
 extern NSString *const TPKeyHomeLongPress;   // 長按首頁標籤開啟設定
-extern NSString *const TPKeyTheme;           // 插件主題配色（0 珊瑚 … 5 琥珀）
+extern NSString *const TPKeyTheme;           // 插件主題色（0 珊瑚 … 5 琥珀）
 extern NSString *const TPKeySideloadFix;     // 側載相容修正（重新簽名後的鑰匙圈／App 群組）
 extern NSString *const TPKeyCopyProfile;     // 個人檔案長按可複製用戶名稱／個人簡介
 extern NSString *const TPKeyPinTabBar;       // 固定底部標籤列（捲動時不隱藏）
@@ -39,6 +46,8 @@ extern NSString *const TPKeyKeepFeedLimit;   // 0:10 分鐘 1:30 分鐘 2:不限
 + (NSInteger)integerForKey:(NSString *)key;
 + (void)setInteger:(NSInteger)value forKey:(NSString *)key;
 + (void)resetAll;
+/// 插件自己的設定檔（獨立於 Threads；登出清資料時不會被清掉），給診斷紀錄用
++ (NSUserDefaults *)defaults;
 
 /// 匯出／匯入（備份用）
 + (NSData *)exportJSONData;
