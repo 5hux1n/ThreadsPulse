@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: 'Direct download link to a decrypted Threads IPA (leave empty to use the DECRYPTED_IPA_URL secret)｜已解密 Threads IPA 的直接下載網址（留空則使用 Secret：DECRYPTED_IPA_URL）'
+        description: 'Direct download link to a decrypted Threads IPA (leave empty to use the DECRYPTED_IPA_URL secret)'
         required: false
         default: ''
       variant:
-        description: 'sideload = certificate signing (with Safari extension); noplugins = SideStore / AltStore free account｜sideload＝證書簽名（含 Safari 延伸功能）；noplugins＝SideStore / AltStore 免費帳號'
+        description: 'sideload = certificate signing (with Safari extension); noplugins = SideStore / AltStore free account'
         type: choice
         options:
           - both
@@ -27,44 +27,44 @@ jobs:
   build-ipa:
     runs-on: macos-latest
     steps:
-      - name: 取得原始碼
+      - name: Check out source
         uses: actions/checkout@v4
 
-      - name: 確認 IPA 網址
+      - name: Check IPA link
         env:
           INPUT_URL: ${{ inputs.ipa_url }}
           SECRET_URL: ${{ secrets.DECRYPTED_IPA_URL }}
         run: |
           URL="${INPUT_URL:-$SECRET_URL}"
           if [ -z "$URL" ]; then
-            echo "::error::請在「ipa_url」填入已解密 Threads IPA 的下載網址，或設定 Secret：DECRYPTED_IPA_URL"
+            echo "::error::Enter a download link to a decrypted Threads IPA in ipa_url, or set the DECRYPTED_IPA_URL secret"
             exit 1
           fi
           echo "::add-mask::$URL"
           echo "IPA_URL=$URL" >> "$GITHUB_ENV"
 
-      - name: 下載 Threads IPA
+      - name: Download Threads IPA
         run: |
           curl -fL --retry 3 -o Threads.ipa "$IPA_URL"
           if ! unzip -l Threads.ipa | grep -q 'Payload/.*\.app/Info.plist'; then
-            echo "::error::下載的檔案不是 IPA。請確認網址是「直接下載」連結，不是網頁。"
+            echo "::error::The downloaded file is not an IPA. Make sure the link downloads the file directly instead of opening a web page."
             exit 1
           fi
           ls -lh Threads.ipa
 
-      - name: 安裝 Theos
+      - name: Install Theos
         id: theos
         uses: ./.github/actions/setup-theos
         with:
           sdk-version: ${{ env.SDK_VERSION }}
 
-      - name: 編譯 ThreadsPulse 與 Safari 延伸功能
+      - name: Build ThreadsPulse and Safari extension
         run: |
           MAKE="gmake FINALPACKAGE=1 TARGET=iphone:clang:${SDK_VERSION}:${MIN_IOS}"
           $MAKE
           $MAKE -C OpenThreadsSafariExtension
 
-      - name: 注入 IPA
+      - name: Inject IPA
         id: inject
         env:
           VARIANT: ${{ inputs.variant }}
@@ -86,7 +86,7 @@ jobs:
             inject noplugins --no-plugins
           fi
 
-      - name: 整理檔名
+      - name: Rename files
         env:
           TP_VERSION: ${{ steps.theos.outputs.version }}
           THREADS_VERSION: ${{ steps.inject.outputs.threads_version }}
@@ -98,7 +98,7 @@ jobs:
           rm -f ../Threads.ipa
           ls -la
 
-      - name: 上傳 sideload 版
+      - name: Upload sideload variant
         if: inputs.variant != 'noplugins'
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +107,7 @@ jobs:
           retention-days: 3
           compression-level: 0
 
-      - name: 上傳 noplugins 版
+      - name: Upload noplugins variant
         if: inputs.variant != 'sideload'
         uses: actions/upload-artifact@v4
         with:
