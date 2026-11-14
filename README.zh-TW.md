@@ -2,7 +2,7 @@
 
 [English](README.md) | **繁體中文**
 
-Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.20.2**
+Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0**
 
 不需要越獄：用 GitHub Actions 就能編譯出注入好的 Threads IPA，再用自己的簽名工具安裝。
 
@@ -12,34 +12,45 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.20.2
 |---|---|---|
 | 廣告與隱私 | 去除廣告 | 隱藏動態裡的贊助串文 |
 | | 停用截圖偵測 | 截圖或錄影時，Threads 不會偵測到 |
-| | 阻擋分析回傳 | 不讓 Threads 回傳你看了什麼、停留多久、點了什麼等使用紀錄。推薦內容可能會變得比較不準（預設關閉） |
-| | 移除網址追蹤碼 | 複製／分享／開啟連結時清除 `xmt`、`igshid`、`utm_*` 等參數，並解開 `l.threads.com` 跳轉 |
-| 下載 | 下載按鈕 | 串文右上角 ↓：點一下下載整則串文的圖片和影片；長按可選只下載圖片或只下載影片 |
-| | 下載原始尺寸圖片 | 從 threads.com 網頁版取得原始解析度；WebP 會轉成 JPEG 存入照片 |
-| | 下載原始尺寸大頭貼 | 在個人檔案長按大頭貼，或點開全螢幕後按 ↓ |
-| 影片 | 停用自動播放 | 滑動態時影片不會自動播放，點一下才開始播放 |
-| | 預設播放速度 | 1x／1.25x／1.5x／2x |
-| 首頁動態 | 保留動態位置 | 從背景回到 Threads 時，首頁不重新整理、不跳回最上方；保留時間可選 10 分鐘／30 分鐘／不限時間 |
-| | 停用下拉重新整理 | 在首頁最上方往下拉不會重新整理 |
-| | 點首頁標籤：不捲回頂端 | 滑到首頁下方時點首頁標籤，停在原本的位置 |
-| | 點首頁標籤：不重新整理 | 已在首頁最上方時點首頁標籤，不會載入新串文 |
-| 隱藏項目 | 隱藏追蹤對象建議 | 不再自動跳出「追蹤對象建議」視窗 |
-| | 隱藏 Instagram 按鈕 | 隱藏個人檔案上方的 Instagram 按鈕 |
-| | 隱藏動態裡的推薦帳號 | 隱藏動態裡的推薦帳號卡片，以及個人檔案頁和追蹤某人後出現的「為你推薦」 |
-| 連結 | 偵測剪貼簿連結 | 回到 Threads 或切換帳號時，偵測剪貼簿裡的 Threads 連結並開啟該串文 |
+| | 阻擋分析回傳 | 不回傳瀏覽、停留時間與點擊等使用紀錄，推薦內容可能較不精準（預設關閉） |
+| | 移除網址追蹤碼 | 複製、分享或開啟連結時，自動移除 `xmt`、`igshid`、`utm_*` 等追蹤參數，並解開 `l.threads.com` 跳轉 |
+| 媒體下載 | 下載按鈕 | 串文右上角 ↓：點選下載全部圖片與影片，長按選擇只下載圖片或影片 |
+| | 下載原始尺寸圖片 | 從網頁版取得最高解析度；WebP 會轉成 JPEG 存入照片 |
+| | 下載原始尺寸大頭貼 | 在個人檔案長按大頭貼，或全螢幕檢視後點選右下角 ↓ 儲存 |
+| 播放器 | 停用自動播放 | 瀏覽動態時，影片不會自動播放，點選後才會開始播放 |
+| | 預設播放速度 | 1x／1.25x／1.5x／2x，長按 2 倍速放開後也會回到此速度 |
+| 首頁動態 | 保留動態位置 | 從背景返回時，首頁不重新整理、不跳回頂端，也不切換分頁；保留時間可選 10 分鐘／30 分鐘／不限時間 |
+| | 停用下拉重新整理 | 在首頁頂端下拉時，不會重新整理也不會回彈 |
+| | 點首頁標籤時：不捲回頂端 | 點選首頁標籤時維持目前位置，不跳回頂端 |
+| | 點首頁標籤時：不重新整理 | 位於首頁頂端時點選首頁標籤，不會重新整理或載入新串文 |
+| 隱藏項目：推薦內容 | 推薦帳號 | 隱藏動態與個人檔案頁面的「為你推薦」 |
+| | 追蹤建議 | 隱藏搜尋頁面的「追蹤建議」 |
+| | 追蹤對象建議 | 避免自動跳出「追蹤對象建議」 |
+| | 貼文興趣詢問 | 不再詢問你對貼文有沒有興趣 |
+| 隱藏項目：介面按鈕 | 搜尋按鈕 | 隱藏個人檔案頁面的搜尋按鈕（預設關閉） |
+| | Instagram 按鈕 | 隱藏個人檔案頁面的 Instagram 按鈕（預設關閉） |
+| 連結 | 偵測剪貼簿連結 | 回到 Threads 或切換帳號時，偵測剪貼簿裡的 Threads 連結並開啟 |
 | | 偵測到連結時 | 「詢問」顯示提示（可選上方／中間／下方）；「自動開啟」直接跳轉 |
-| | 使用外部瀏覽器開啟連結 | 串文和個人簡介裡的連結改用 Safari（或你的預設瀏覽器）開啟，不用 App 內建瀏覽器。Threads 的連結仍在 App 裡開啟 |
-| 介面與互動 | 主題配色 | 插件的主題色：珊瑚／海洋／薄荷／薰衣草／櫻花／琥珀 |
-| | 按讚確認 | 按愛心前先確認，避免誤按 |
+| | 使用外部瀏覽器開啟連結 | 串文與個人簡介中的連結改以 Safari 或預設瀏覽器開啟，Threads 連結仍在 App 內開啟 |
+| 私訊 | 不顯示看過 | 查看訊息時不會通知對方；要讓特定聊天室正常顯示「看過」，點選聊天室右上角的眼睛圖示（預設關閉） |
+| | 回覆後顯示看過 | 開啟：回覆訊息後，對方畫面才會顯示「看過」；關閉：即使回覆，對方畫面也不會顯示「看過」 |
+| | 重設聊天室 | 將透過眼睛圖示設為顯示「看過」的聊天室，全部恢復為不顯示 |
+| | 不顯示輸入中 | 輸入訊息時，對方不會看到輸入提示「…」（預設關閉） |
+| | 防止訊息收回 | 對方收回訊息時，訊息會保留在聊天室並標示「已收回」（預設關閉） |
+| 介面與互動 | 按讚確認 | 點愛心時會先顯示確認提示，收回時不會詢問 |
 | | 串文時間格式 | 相對時間／日期時間／含秒 |
-| | 固定底部標籤列 | 滑動時底部功能標籤列不會自動隱藏 |
-| | 複製個人檔案資訊 | 在個人檔案長按姓名、用戶名稱、個人簡介或大頭貼，可複製姓名、用戶名稱或個人簡介 |
-| | 長按首頁標籤開啟設定 | 長按底部的首頁標籤時，改為開啟 ThreadsPulse 設定（預設關閉） |
-| 備份 | 匯出／匯入設定 | JSON 檔 |
-| 進階 | 除錯提示 | 功能有在運作時顯示 `[TP]` 提示，Threads 更新後可判斷哪一項失效 |
-| | 側載相容修正 | 重新簽名後保持登入，並讓 App 群組資料正常讀寫；用原本簽名（越獄）時自動停用 |
+| | 固定底部標籤列 | 滑動時底部標籤列不會自動隱藏 |
+| | 複製個人檔案資訊 | 在個人檔案長按姓名、用戶名稱、個人簡介或大頭貼，即可複製相關資訊 |
+| | 長按首頁標籤開啟設定 | 長按底部的首頁標籤時，改為開啟 ThreadsPulse 設定（預設開啟） |
+| 備份 | 匯出／匯入設定 | 將設定匯出成 JSON 檔，重新安裝或換手機後再匯入 |
+| 進階 | 除錯提示 | 功能異常時開啟，畫面會顯示各功能的運作狀態，方便回報問題 |
+| | 分析回傳紀錄 | 顯示 Threads 收集的使用紀錄與內容：事件排行與每種事件最新一筆的內容，可複製；紀錄不會離開你的手機 |
+| | 歡迎畫面 | 再看一次打開插件設定的方法 |
+| | 側載相容修正 | 重新簽名後維持登入與 App 群組資料，僅對重新簽名的 App 生效 |
 
-**設定入口**：Threads「設定」頁右上角「〰 Pulse」，任何畫面三指長按 1 秒，或（開啟「長按首頁標籤開啟設定」後）長按首頁標籤。
+**主題色**：在設定主頁最上方的插件資訊卡裡，點色點即可切換（珊瑚／海洋／薄荷／薰衣草／櫻花／琥珀），只改變插件按鈕與設定頁的顏色。
+
+**設定入口**：Threads「設定」頁右上角「〰 Pulse」、長按底部的首頁標籤，或在任何畫面三指長按 1 秒。第一次開啟 Threads 時會顯示歡迎畫面說明這些方法。
 
 ---
 
@@ -112,8 +123,8 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.20.2
 推送 `v` 開頭的標籤會自動建立 Release 並附上這四個檔案（不含 Threads 本體）：
 
 ```bash
-git tag v1.20.2
-git push origin v1.20.2
+git tag v1.27.0
+git push origin v1.27.0
 ```
 
 ### 本機編譯
@@ -164,8 +175,9 @@ ThreadsPulse/
 ├── TPURLCleaner.h/.m               移除網址追蹤碼
 ├── TPDownloader.h/.m               網址選擇、下載、WebP→JPEG、診斷報告
 ├── TPHUD.h/.m                      進度視窗、toast、提示橫幅
-├── TPUI.h/.m                       圓形毛玻璃按鈕、長按選單、觸覺回饋
+├── TPUI.h/.m                       圓形毛玻璃按鈕、長按選單、觸覺回饋、主題色
 ├── TPSettingsViewController.h/.m   設定頁（資料模型在 TP_MODEL_BEGIN～TP_MODEL_END 之間）
+├── TPWelcomeViewController.h/.m    第一次開啟時的全螢幕歡迎畫面
 ├── TPLocalization.h/.m             TPL() 多語系
 ├── TPSideloadFix.h/.m              側載相容修正（鑰匙圈、App 群組）
 ├── TPVersion.h                     版本號（只在這裡改）
@@ -203,10 +215,18 @@ ThreadsPulse/
 - **固定底部標籤列**：不讓 `BCNLucentTabBarCoordinator` 收到 `scrollViewDidScroll:`／`scrollViewDidEndScrolling:`，並把 iOS 26 的 `tabBarMinimizeBehavior` 設為 never。
 - **側載相容修正**：載入時存一筆測試資料到鑰匙圈，讀回系統實際指派的存取群組；Team ID 不是 Meta 的（`MH9GU9K5PX`）才啟用。改寫 App 本身各映像檔（主程式與 `Frameworks/`）符號指標表裡的 `SecItemAdd`／`CopyMatching`／`Update`／`Delete`，把 Threads 指定的群組換成實際可用的群組；`containerURLForSecurityApplicationGroupIdentifier:` 回傳 nil 時改用 `Library/ThreadsPulseAppGroups/<群組>`。Threads 沒有用 iCloud，所以不處理 CloudKit。
 - **複製個人檔案資訊**：可複製姓名（`fullNameLabel`）、用戶名稱（`usernameLabel`，不含 `@`）或個人簡介。在 `BCNProfileHeaderView` 的大頭貼、`fullNameLabel`、`usernameLabel`、`IGProfileBioView` 加上長按手勢；個人簡介全文取自 `_fullCollapsibleBioString`（收合時）或 `_stringForView`。功能關閉時手勢不會啟動，Threads 原本的長按照常運作。
-- **隱藏 Instagram 按鈕**：在 `BCNProfileViewController` 的 `viewDidLayoutSubviews` 隱藏 `$__lazy_storage_$_appSwitcherButton`（切換到 Instagram 的按鈕），連同只包著它的外層容器一起隱藏。在 stack view 裡會自動靠攏；不在的話，把同一排的其他按鈕用 transform 移過去補位。
+- **隱藏搜尋／Instagram 按鈕**：在 `BCNProfileViewController` 的 `viewDidLayoutSubviews` 隱藏 `$__lazy_storage_$_searchButton`、`$__lazy_storage_$_appSwitcherButton`，連同只包著它們的外層容器一起隱藏。在 stack view 裡會自動靠攏；不在的話，把同一排的其他按鈕用 transform 移過去補位（兩個都隱藏時取較大的位移，不會重複相加）。
+- **推薦帳號／追蹤建議**：`BCNAYMFSectionController`（「為你推薦」區塊）依 `placement` 判斷位置：0 首頁動態、3 個人檔案由「推薦帳號」控制，2 搜尋頁由「追蹤建議」控制。
+- **貼文興趣詢問**：`BCNFeedItemSeeMoreSeeLessCell` 高度回傳 0 並隱藏，批次詢問的 section controller 項目數回傳 0。
 - **使用外部瀏覽器開啟連結**：攔截 `BCNLinkHandlerImpl` 的兩個 `handleLinkWithURL:` 方法（ObjC 協定，呼叫走 ObjC 派送）。先解開 `l.threads.com` 跳轉包裝；`threads.net`／`threads.com` 和非網頁連結維持原本行為，其他一律用 `-[UIApplication openURL:]` 開啟（開啟「移除網址追蹤碼」時會一併清掉追蹤參數）。
+- **三指長按**：手勢辨識器同時辨識、開始時暫時停用同一批觸控上的其他手勢，避免放開手指後又觸發原本按到的按鈕。
 - **長按首頁標籤開啟設定**：攔截 `-[BCNLucentTabBarCoordinator handleTabBarLongPress:]`。長按一開始落在第一個（首頁）標籤按鈕上時，開啟 ThreadsPulse 設定並吃掉這次手勢的後續；長按其他標籤（例如個人檔案標籤切換帳號）照常運作。
+- **不顯示看過**：呼叫 `+[BCNSlideMDCoreMarkThreadReadMutationBuilder builderWithOfflineThreadingId:threadFbid:timestampMs:]` 時，把時間換成這個聊天室已經讓對方知道的位置（沒有就是 0），伺服器上的已讀位置不會往前移，也不會往回退；你自己這邊照常當作已經看過。聊天室右上角的眼睛圖示可以讓個別聊天室照常送出。
+- **回覆後顯示看過**：Threads 建立要送出的訊息（`BCNSlideOutgoingMessagePayload`）或對訊息的動作（`BCNSlideOutgoingMessageUpdatePayload`）時，用記下的參數重新建立已讀請求，透過 Threads 自己送已讀的 GraphQL 服務送出。訊息會在 `-[MDCoreSendService sendMutationWithAppDataModel:…]` 暫停，等伺服器收下「看過」才放行（最多 0.8 秒），讓對方先看到「看過」再收到回覆。
+- **不顯示輸入中**：`+[BCNTypingIndicatorPublishEventMutationBuilder builderWithActivityStatus:threadId:]` 的狀態一律改成 0（停止輸入），聊天室編號不變，不影響即時收訊息。
+- **防止訊息收回**：對方收回訊息時，由 Swift 的 `BCNSlideDeleteMessageHandler` 處理，它透過 `MDCoreDeltaApplyingBridge`（建立時帶著處理器的型別名稱）修改本機資料庫。開關開啟時，把這個處理器從 `mutationCommandsForDeltaWithRequestedState:…` 回傳的刪除指令拿掉，訊息就會留在你的手機上，並立即在訊息下方標示「已收回」（之後關閉開關，標示也會保留）。已經被刪掉的訊息，或聊天室從伺服器整個重新載入後消失的，無法救回。
 - **阻擋分析回傳**：使用紀錄在收集階段就丟掉（`-[FBAnalyticsCoreLogger _captureAnalyticsEvent:]`、`_captureAnalyticsEventForBatchUpload:`，`_shouldStreamEvent:` 回傳 NO）；之前已存著的紀錄上傳時，改用 Meta 自己的 `FBAnalyticsNoOpNetworkConfigurator` 取代 `IGAnalyticsNetworkConfigurator`，不會發出網路要求。登入、發文、載入動態等正常 API 不經過這裡。
+- **分析回傳紀錄**：在 `_captureAnalyticsEvent:` 記下 `FBAnalyticsEvent` 的 `eventName` 次數，以及每種事件最新一筆的事件物件；打開紀錄時才讀取 `eventPayload`。只存在記憶體，關閉 App 就清空。
 - **停用自動播放**：動態裡的影片滑進畫面時（`-[IGFNFVideoPlayer playWithReason:callsiteContext:]`，原因代碼 1），照常讓 Threads 走完播放流程，介面（包括聲音圖示）才會正常出現，但把底層的 `FNFPlayer` 按住：第一次 `play` 以音量 0 試播，讓 Threads 走到「開始播放」並顯示聲音圖示，接著在第一格暫停（`videoPlayerDidInitialPlay:`）；之後的 `play` / `playWithContext:` 一律忽略。點一下影片（手指幾乎沒移動，所以滑動不算）才放開並讓 `FNFPlayer` 開始播放。其他原因（例如全螢幕）和不在動態裡的影片照常播放。開始播放後同一個播放器不再按住，直到它被停止。單支影片下載改成先從附近的資料物件找網址，沒播放過的影片也能下載。
 - **隱藏追蹤對象建議**：`BCNUserRecommendationsViewController` 以彈出方式出現時攔截 `presentViewController:`；推入的頁面不受影響。
 
