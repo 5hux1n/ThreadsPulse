@@ -249,19 +249,21 @@ static void TPLayoutToasts(UIWindow *win, BOOL animated) {
         pill.alpha = 0;
         pill.transform = CGAffineTransformMakeTranslation(0, 14);
 
-        // 多行的提示停久一點，讓人看得完
-        NSTimeInterval stay = 2.0 + MAX(0, (NSInteger)[text componentsSeparatedByString:@"\n"].count - 1) * 1.5;
+        // 多行的提示停久一點，讓人看得完；除錯提示（[TP] 開頭）停 4 秒方便截圖
+        NSTimeInterval stay = ([text hasPrefix:@"[TP]"] ? 4.0 : 2.0)
+                            + MAX(0, (NSInteger)[text componentsSeparatedByString:@"\n"].count - 1) * 1.5;
         [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0.5 options:0
-                         animations:^{ pill.alpha = 1; pill.transform = CGAffineTransformIdentity; } completion:^(BOOL f) {
-            [UIView animateWithDuration:0.3 delay:stay options:0 animations:^{ pill.alpha = 0; }
-                             completion:^(BOOL f2) {
+                         animations:^{ pill.alpha = 1; pill.transform = CGAffineTransformIdentity; } completion:nil];
+        // 用計時器決定何時消失：鍵盤切換之類的畫面更新會中斷動畫，用動畫的延遲會讓提示一閃就不見
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((0.3 + stay) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [UIView animateWithDuration:0.3 animations:^{ pill.alpha = 0; } completion:^(BOOL f2) {
                 [pill removeFromSuperview];
                 if ([sTPToasts containsObject:pill]) {
                     [sTPToasts removeObject:pill];
                     if (pill.window || win) TPLayoutToasts(win, YES);
                 }
             }];
-        }];
+        });
     });
 }
 #pragma mark - Banner
