@@ -1,3 +1,15 @@
+// Sideload Compatibility Fix.
+//
+// Threads is signed by Meta (team MH9GU9K5PX) with keychain groups MH9GU9K5PX.platformFamily /
+// .shared and app groups such as group.com.facebook.family. After re-signing those groups no
+// longer match: keychain calls fail with errSecMissingEntitlement, so the login can't be stored,
+// and app group containers come back nil.
+//
+// SecItem* calls in the app's own images are rebound to wrappers that swap the requested access
+// group for the one the system actually assigned. App group containers and group
+// NSUserDefaults suites are redirected into Library/ThreadsPulseAppGroups/<group>.
+// Nothing is changed when the app still carries Meta's signature.
+
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 #import <objc/runtime.h>
@@ -45,18 +57,18 @@ NSString *TPSideloadFixStats(void) {
 static NSString *TPResolveAccessGroup(void);
 static BOOL gTPNativeSignature;
 
+// com.apple.* groups are left alone. If the usable group can't be resolved yet, the foreign
+// group is removed so the item lands in the default group instead of failing.
 static CFDictionaryRef TPFixQuery(CFDictionaryRef query, CFMutableDictionaryRef *owned) {
     *owned = NULL;
     if (!query) return query;
     CFTypeRef group = CFDictionaryGetValue(query, kSecAttrAccessGroup);
     if (!group || CFGetTypeID(group) != CFStringGetTypeID()) return query;
-
     if (CFStringHasPrefix(group, CFSTR("com.apple."))) return query;
     NSString *ours = TPResolveAccessGroup();
     if (!ours && gTPNativeSignature) return query;
     if (ours && CFEqual(group, (__bridge CFStringRef)ours)) return query;
     CFMutableDictionaryRef copy = CFDictionaryCreateMutableCopy(kCFAllocatorDefault, 0, query);
-
     if (ours) CFDictionarySetValue(copy, kSecAttrAccessGroup, (__bridge CFStringRef)ours);
     else CFDictionaryRemoveValue(copy, kSecAttrAccessGroup);
     *owned = copy;
@@ -96,6 +108,9 @@ static OSStatus tp_SecItemDelete(CFDictionaryRef query) {
     return s;
 }
 
+// The usable group is read back from a probe item. The probe is AfterFirstUnlock: with the
+// default accessibility it can't be read while the device is locked, e.g. when the app is
+// woken in the background, and the whole launch would run without a group.
 static NSString *TPDetectAccessGroup(void) {
     NSDictionary *common = @{ (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
                               (__bridge id)kSecAttrAccount: @"ThreadsPulse.accessGroupProbe.afu",
@@ -117,6 +132,7 @@ static NSString *TPDetectAccessGroup(void) {
     return [group isKindOfClass:[NSString class]] ? group : nil;
 }
 
+// Cached only on success, so a failed attempt (device locked) is retried on the next call.
 static NSString *TPResolveAccessGroup(void) {
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     if (gTPAccessGroup || gTPNativeSignature) return gTPAccessGroup;
@@ -140,6 +156,8 @@ typedef struct { const char *name; void *replacement; } TPRebinding;
 static TPRebinding gTPRebindings[4];
 static char *gTPAppPath;
 
+// Symbol pointers in __DATA_CONST / __AUTH_CONST are read-only and are made writable only for
+// the duration of the write.
 static void TPRebindSection(const struct section_64 *sect, intptr_t slide, BOOL readOnly,
                             const struct nlist_64 *symtab, const char *strtab, const uint32_t *indirect) {
     uint32_t *indices = (uint32_t *)indirect + sect->reserved1;
@@ -219,6 +237,10 @@ static NSURL *tp_containerURL(id self, SEL _cmd, NSString *group) {
     return [NSURL fileURLWithPath:path isDirectory:YES];
 }
 
+// Group NSUserDefaults suites can't be written without the entitlement, so they read back
+// empty after a relaunch. Multi-account state stored there then no longer matches the keychain,
+// which is the likely cause of multi-account users being logged out at launch. The private
+// _initWithSuiteName:container: initializer is redirected to the same replacement folder.
 static IMP orig_initSuite;
 
 static id tp_initSuite(id self, SEL _cmd, NSString *suite, NSURL *container) {
@@ -227,7 +249,6 @@ static id tp_initSuite(id self, SEL _cmd, NSString *suite, NSURL *container) {
         NSURL *real = ((NSURL *(*)(id, SEL, NSString *))orig_containerURL)(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), suite);
         if (!real) {
             container = tp_containerURL(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), suite);
-
             NSString *prefs = [container.path stringByAppendingPathComponent:@"Library/Preferences"];
             if (![fm createDirectoryAtPath:prefs withIntermediateDirectories:YES attributes:nil error:nil]) container = nil;
         }
