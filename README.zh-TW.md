@@ -99,9 +99,9 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 
 | 錯誤訊息 | 原因 |
 |---|---|
-| 下載的檔案不是 IPA | 網址開啟的是網頁，不是直接下載 |
-| 這個 IPA 尚未解密 | 用的是 App Store 加密版本，請換成已解密的 IPA |
-| 執行檔的 header 空間不足 | 極少見；請回報 Threads 版本 |
+| The downloaded file is not an IPA | 網址開啟的是網頁，不是直接下載 |
+| This IPA is not decrypted | 用的是 App Store 加密版本，請換成已解密的 IPA |
+| Not enough header space in the executable | 極少見；請回報 Threads 版本 |
 
 > 請不要把產出的 IPA 上傳到公開的 Release 或任何公開位置。
 
