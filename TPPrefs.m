@@ -48,7 +48,6 @@ static NSArray<NSString *> *TPBoolKeys(void) {
 static NSArray<NSString *> *TPIntKeys(void) {
     return @[TPKeyPlaySpeed, TPKeyExactTime, TPKeyClipboardMode, TPKeyBannerPosition, TPKeyKeepFeedLimit, TPKeyTheme];
 }
-/// 各整數設定的合法範圍上限（含），匯入時用來擋掉不合理的值
 static NSInteger TPIntMax(NSString *key) {
     if ([key isEqualToString:TPKeyPlaySpeed])   return 3;
     if ([key isEqualToString:TPKeyExactTime])   return 2;
@@ -87,8 +86,6 @@ static NSInteger TPIntMax(NSString *key) {
     for (NSString *k in TPBoolKeys()) [[self defaults] removeObjectForKey:k];
     for (NSString *k in TPIntKeys())  [[self defaults] removeObjectForKey:k];
 }
-
-#pragma mark - 備份
 
 + (NSData *)exportJSONData {
     NSMutableDictionary *settings = [NSMutableDictionary dictionary];
