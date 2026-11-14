@@ -15,6 +15,7 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
 
 + (void)present { [self presentMarkingShown:NO attempt:0]; }
 
+// Shown once. Retries a few times if another view controller is being presented at launch.
 + (void)presentIfNeeded {
     if ([TPPrefs boolForKey:kTPWelcomeShownKey]) return;
     static BOOL scheduled;
@@ -302,6 +303,8 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     return wrap;
 }
 
+// preferredMaxLayoutWidth is updated on every layout pass so multi-line text wraps correctly on
+// every screen width instead of being truncated.
 - (void)wrap:(UILabel *)label {
     label.numberOfLines = 0;
     label.lineBreakMode = NSLineBreakByWordWrapping;
