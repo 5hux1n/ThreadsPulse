@@ -1,12 +1,3 @@
-// ThreadsPulse — Threads (com.burbn.barcelona) 增強插件
-//
-// 所有類別與方法名稱皆取自 Threads 主程式的 class-dump 標頭。
-// Threads 更新後若方法改名，對應 hook 會「靜默失效」（不會崩潰），
-// 請在設定選單開啟「除錯提示」確認哪一項還有作用。
-//
-// 重要：Threads 的許多類別是 Swift 類別，標頭只有名字沒有定義，
-// 所以對 `self` 呼叫方法時一律先轉型成 (id) 或 (UIView *)。
-
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <malloc/malloc.h>
@@ -23,26 +14,21 @@
 
 @interface NSObject (TPDecl)
 - (void)tp_threeFingerLongPress:(id)gesture;
-// Threads 內部類別沒有可用的標頭，先宣告會用到的方法，讓編譯器認得
 - (void)setPlaybackSpeed:(float)speed;
 - (BOOL)isPlaying;
-- (void)play;          // FNFPlayer
+- (void)play;
 - (void)pause;
-- (void)setVolume:(float)volume rampTime:(float)time;   // FNFPlayer
-- (id)videoPlayer;     // Swift 外層 IGVideoPlayer → 內層 IGFNFVideoPlayer
-// IGPhoto：依寬度取得對應尺寸的圖片網址（回傳 IGImageURL）
+- (void)setVolume:(float)volume rampTime:(float)time;
+- (id)videoPlayer;
 - (id)imageURLForWidth:(double)width;
 @end
 
-static NSURL *TPBestImageURLFromPhoto(id photo);   // 定義在後面：從 IGPhoto 的版本清單挑最大張
-static NSMutableString *gTPSizeLog;                 // 除錯：每張照片有哪些尺寸、挑了哪個
+static NSURL *TPBestImageURLFromPhoto(id photo);
+static NSMutableString *gTPSizeLog;
 static NSInteger gTPSizeIndex;
 
-static NSInteger gTPOwnPasteboardChange = -1;     // Threads 自己複製時的剪貼簿版本（不提示）
+static NSInteger gTPOwnPasteboardChange = -1;
 
-#pragma mark - 共用小工具
-
-/// 不節流的除錯提示（診斷一連串步驟時用，避免被 2 秒節流吃掉）
 static void TPDebugNow(NSString *msg) {
     if (![TPPrefs boolForKey:TPKeyDebugToast]) return;
     dispatch_async(dispatch_get_main_queue(), ^{ [TPHUD toast:[@"[TP] " stringByAppendingString:msg]]; });
@@ -52,12 +38,11 @@ static void TPDebug(NSString *msg) {
     if (![TPPrefs boolForKey:TPKeyDebugToast]) return;
     static CFAbsoluteTime last = 0;
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-    if (now - last < 2.0) return;           // 節流，避免洗版
+    if (now - last < 2.0) return;
     last = now;
     [TPHUD toast:[@"[TP] " stringByAppendingString:msg]];
 }
 
-/// 往下找第一個屬於 cls 的 view（包含 root 自己），最多找 maxDepth 層
 static UIView *TPFindView(UIView *root, Class cls, int maxDepth) {
     if (!root || !cls || maxDepth < 0) return nil;
     if ([root isKindOfClass:cls]) return root;
@@ -77,10 +62,6 @@ static NSArray *TPCleanItems(NSArray *items) {
     }
     return out;
 }
-
-
-#pragma mark - 1) 去廣告
-// 分三層攔截：要求廣告 → 收到廣告 → 插入廣告。任一層生效就看不到廣告。
 
 %group Ads
 
@@ -119,9 +100,7 @@ static NSArray *TPCleanItems(NSArray *items) {
 }
 %end
 
-%end // group Ads
-
-#pragma mark - 2) 移除網址追蹤碼
+%end
 
 %group Tracking
 
@@ -170,7 +149,7 @@ static NSArray *TPCleanItems(NSArray *items) {
 }
 %end
 
-%end // group Tracking
+%end
 
 static Class TPFeedMediaCellClass(void) {
     static Class c;
@@ -186,7 +165,6 @@ static Class TPVideoViewClass(void) {
     return c;
 }
 
-/// 動態串文裡的媒體由「串文層級的批次按鈕」負責，單支影片／單張圖片上不再重複放按鈕
 static BOOL TPInsideFeedMediaCell(UIView *v) {
     Class c = TPFeedMediaCellClass();
     if (!c) return NO;
@@ -194,23 +172,19 @@ static BOOL TPInsideFeedMediaCell(UIView *v) {
     return NO;
 }
 
-#pragma mark - 3) 影片下載按鈕
-
 static const void *kTPButtonKey = &kTPButtonKey;
 static const void *kTPPlayerKey = &kTPPlayerKey;
 
 static const void *kTPPlayerViewKey = &kTPPlayerViewKey;
 
-/// 弱參照容器：讓播放器記得自己的畫面，又不會互相保留造成記憶體洩漏
 @interface TPWeakBox : NSObject
 @property (nonatomic, weak) id object;
 @end
 @implementation TPWeakBox
 @end
 
-static void TPPauseIfHeld(id player);   // 停用自動播放：定義在後面
+static void TPPauseIfHeld(id player);
 
-/// 影片畫面拿到的是 Swift 外層播放器；真正負責播放的是它裡面的 IGFNFVideoPlayer
 static id TPInnerPlayer(id player) {
     if (![player respondsToSelector:@selector(videoPlayer)]) return player;
     id inner = [player videoPlayer];
@@ -241,7 +215,6 @@ static void TPEnsureVideoButton(UIView *host) {
             UIView *v = weakHost;
             if (!v) return;
             id player = objc_getAssociatedObject(v, kTPPlayerKey);
-            // 先從影片附近的資料物件找網址（影片沒播放過也找得到），找不到才問播放器
             NSURL *url = [TPDownloader bestVideoURLNearView:v];
             if (!url) url = [TPDownloader bestURLFromVideoView:v player:player];
             if (!url) {
@@ -264,9 +237,6 @@ static void TPEnsureVideoButton(UIView *host) {
 
 %group Download
 
-// IGVideoView 是 Swift 類別：Threads 內部直接呼叫它的方法不會經過 ObjC，
-// 所以改掛 UIKit 一定會用 ObjC 呼叫的 didMoveToWindow / layoutSubviews，
-// 並從播放器的 ObjC 回呼記下播放器物件（影片網址等按下按鈕時才去取）。
 %hook _TtC11IGVideoView11IGVideoView
 
 - (void)videoPlayerDidPrepare:(id)player { %orig; TPRememberPlayer(self, player); }
@@ -288,14 +258,11 @@ static void TPEnsureVideoButton(UIView *host) {
 
 %end
 
-%end // group Download
-
-#pragma mark - 4) 圖片／影片：串文一鍵批次下載
+%end
 
 static const void *kTPImgBtnKey   = &kTPImgBtnKey;
 static const void *kTPBatchBtnKey = &kTPBatchBtnKey;
 
-/// 在 root 底下收集已載入圖片的 UIImageView（IGImageView 是它的子類別）
 static void TPCollectImageViews(UIView *v, NSMutableArray<UIImageView *> *out, int depth) {
     if (v.hidden || v.alpha < 0.01 || depth > 30) return;
     if ([v isKindOfClass:[UIImageView class]]) {
@@ -317,7 +284,6 @@ static UIImageView *TPLargestImageView(UIView *host) {
     return best;
 }
 
-/// 從 IGImageView 取出目前顯示的圖片網址：imageSpecifier → _remoteImage_imageURL → url
 static NSURL *TPURLForImageView(UIImageView *iv) {
     id spec = [TPDownloader safeValue:iv key:@"imageSpecifier"];
     if (!spec) return nil;
@@ -327,13 +293,10 @@ static NSURL *TPURLForImageView(UIImageView *iv) {
     return [u isKindOfClass:[NSURL class]] ? u : nil;
 }
 
-/// 用檔名（不含副檔名與縮放參數）當作去重 key：同一張圖的不同尺寸、輪播重複的項目都會被合併
 static NSString *TPDedupeKey(NSURL *u) {
     return [[u.path lastPathComponent] stringByDeletingPathExtension];
 }
 
-/// 從 IGMedia / IGBaseMedia（cell 的 mediaFragment 就是它）取出影片網址。
-/// 這條路不需要影片播放過：IGMedia.video → IGVideo.videoVersions 已經帶有完整網址。
 static NSURL *TPVideoURLFromMedia(id media) {
     if (!media) return nil;
     for (NSString *key in @[@"video", @"computedVideo"]) {
@@ -344,8 +307,6 @@ static NSURL *TPVideoURLFromMedia(id media) {
     return [TPDownloader bestURLFromObject:media];
 }
 
-/// 從 IGMedia / IGBaseMedia 取出圖片網址：media.photo → imageURLForWidth:(原圖寬度) → IGImageURL.url
-/// 這條路不需要圖片已經顯示在畫面上，批次下載時捲過去還沒載入的圖片也拿得到。
 static NSURL *TPImageURLFromMedia(id media) {
     if (!media) return nil;
     for (NSString *key in @[@"photo", @"computedPhoto"]) {
@@ -354,11 +315,11 @@ static NSURL *TPImageURLFromMedia(id media) {
         if (best) return best;
         if (!photo || ![photo respondsToSelector:@selector(imageURLForWidth:)]) continue;
 
-        double w = 4096;                                       // 預設要一張夠大的
+        double w = 4096;
         id sizeVal = [TPDownloader safeValue:photo key:@"size"];
         if ([sizeVal isKindOfClass:[NSValue class]]) {
             CGSize sz = [(NSValue *)sizeVal CGSizeValue];
-            if (sz.width > 0) w = sz.width;                    // 原圖寬度 → 最大尺寸
+            if (sz.width > 0) w = sz.width;
         }
         id imgURL = nil;
         @try { imgURL = [photo imageURLForWidth:w]; } @catch (__unused id e) {}
@@ -368,13 +329,9 @@ static NSURL *TPImageURLFromMedia(id media) {
     return nil;
 }
 
-/// 解析串文媒體區裡的「單一項目」(圖片 cell 或影片 cell)。回傳 nil 表示這不是媒體項目。
-/// 影片取不到網址時回傳 @{@"video":@YES, @"failed":@YES}。
 static NSDictionary *TPItemForMediaCell(UIView *cell) {
-    id fragment = [TPDownloader ivarValue:cell name:@"mediaFragment"];   // 項目自己的媒體資料（IGMedia）
+    id fragment = [TPDownloader ivarValue:cell name:@"mediaFragment"];
 
-    // 判斷是不是影片：看 cell 類別，或裡面有沒有 IGVideoView
-    // （影片還沒開始準備時，IGVideoView 可能尚未建立，不能只靠它判斷，否則會誤抓縮圖）
     static Class videoCellClass;
     static dispatch_once_t once;
     dispatch_once(&once, ^{ videoCellClass = NSClassFromString(@"_TtC16BCNFeedMediaCell21BCNFeedMediaVideoCell"); });
@@ -383,12 +340,12 @@ static NSDictionary *TPItemForMediaCell(UIView *cell) {
 
     if (isVideo) {
         NSURL *url = nil;
-        if (vv) {                                                      // 1) 已播放過：直接從播放器取
+        if (vv) {
             id player = objc_getAssociatedObject(vv, kTPPlayerKey);
             url = [TPDownloader bestURLFromVideoView:vv player:player];
         }
-        if (!url) url = TPVideoURLFromMedia(fragment);                 // 2) 沒播放過：從媒體資料取
-        if (!url && fragment) url = [TPDownloader bestVideoURLHarvestedFromObject:fragment];   // 3) 最後手段：搜尋物件圖
+        if (!url) url = TPVideoURLFromMedia(fragment);
+        if (!url && fragment) url = [TPDownloader bestVideoURLHarvestedFromObject:fragment];
         if (!url) {
             TPDebug([NSString stringWithFormat:@"video fragment: %@", fragment ? NSStringFromClass([fragment class]) : @"nil"]);
             return @{ @"video": @YES, @"failed": @YES };
@@ -397,9 +354,9 @@ static NSDictionary *TPItemForMediaCell(UIView *cell) {
     }
 
     UIImageView *iv = TPLargestImageView(cell);
-    NSURL *url = TPImageURLFromMedia(fragment);                        // 1) 資料模型（最完整，不用等載入）
-    if (!url && iv) url = TPURLForImageView(iv);                       // 2) 畫面上已載入的圖片
-    if (!url && fragment) url = [TPDownloader bestImageURLHarvestedFromObject:fragment];   // 3) 最後手段
+    NSURL *url = TPImageURLFromMedia(fragment);
+    if (!url && iv) url = TPURLForImageView(iv);
+    if (!url && fragment) url = [TPDownloader bestImageURLHarvestedFromObject:fragment];
     if (!url && !iv.image) {
         TPDebug([NSString stringWithFormat:@"photo fragment: %@", fragment ? NSStringFromClass([fragment class]) : @"nil"]);
         return nil;
@@ -408,13 +365,11 @@ static NSDictionary *TPItemForMediaCell(UIView *cell) {
     NSMutableDictionary *d = [NSMutableDictionary dictionary];
     d[@"video"] = @NO;
     d[@"urls"] = url ? @[url] : @[];
-    if (iv.image) d[@"image"] = iv.image;            // 網址全失敗時，退而存畫面上已載入的那張
+    if (iv.image) d[@"image"] = iv.image;
     d[@"key"] = url ? TPDedupeKey(url) : [NSString stringWithFormat:@"img%p", iv.image];
     return d;
 }
 
-
-/// 單一媒體（IGMedia）→ 下載項目。影片取不到網址時回傳 failed。
 static NSDictionary *TPItemForMedia(id media) {
     if (!media) return nil;
     id video = [TPDownloader safeValue:media key:@"video"];
@@ -431,9 +386,8 @@ static NSDictionary *TPItemForMedia(id media) {
     return @{ @"video": @NO, @"urls": (u ? @[u] : @[]), @"key": TPDedupeKey(u) };
 }
 
-static NSString *gTPLastMediaDiag;     // 最近一次取不到網址的診斷資訊（除錯提示開啟時會顯示）
+static NSString *gTPLastMediaDiag;
 
-/// 收集 root 底下所有輪播項目 cell（帶有 mediaFragment 實例變數的 view）
 static void TPCollectMediaItemCells(UIView *v, NSMutableArray<UIView *> *out, int depth) {
     if (!v || depth > 12) return;
     if ([TPDownloader ivarValue:v name:@"mediaFragment"]) { [out addObject:v]; return; }
@@ -446,7 +400,6 @@ static NSString *TPDescribeCount(id obj) {
     return NSStringFromClass([obj class]);
 }
 
-/// 一個取不到網址的項目 → 診斷文字
 static NSString *TPDiagForMedia(id media, NSInteger index) {
     id video = [TPDownloader safeValue:media key:@"video"] ?: [TPDownloader safeValue:media key:@"computedVideo"];
     NSData *dash = [TPDownloader safeValue:video key:@"dashManifestData"];
@@ -460,8 +413,6 @@ static NSString *TPDiagForMedia(id media, NSInteger index) {
     return r;
 }
 
-/// 直接從串文的資料模型取出「所有」媒體：parentMediaFragment.carouselMedia（完整的輪播清單）。
-/// 不需要捲動，也不受輪播 cell 重複使用的影響。資料模型取不到網址的影片，再改用畫面上該項目的播放器。
 static NSArray<NSDictionary *> *TPCollectPostMediaFromModel(UIView *cellRoot) {
     NSMutableArray<UIView *> *itemCells = [NSMutableArray array];
     TPCollectMediaItemCells(cellRoot, itemCells, 0);
@@ -474,7 +425,7 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromModel(UIView *cellRoot) {
 
     NSArray *children = [TPDownloader safeValue:parent key:@"carouselMedia"];
     if (![children isKindOfClass:[NSArray class]] || !children.count) children = [TPDownloader safeValue:frag key:@"carouselMedia"];
-    if (![children isKindOfClass:[NSArray class]] || !children.count) children = frag ? @[frag] : @[];   // 單一媒體串文
+    if (![children isKindOfClass:[NSArray class]] || !children.count) children = frag ? @[frag] : @[];
 
     NSMutableArray<NSDictionary *> *items = [NSMutableArray array];
     NSMutableSet<NSString *> *seen = [NSMutableSet set];
@@ -483,7 +434,6 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromModel(UIView *cellRoot) {
     for (id child in children) {
         NSDictionary *d = TPItemForMedia(child);
 
-        // 資料模型拿不到 → 找畫面上「同一個項目」的 cell，改從它的播放器拿
         if ([d[@"failed"] boolValue]) {
             for (UIView *c in itemCells) {
                 if ([TPDownloader ivarValue:c name:@"mediaFragment"] != child) continue;
@@ -508,9 +458,6 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromModel(UIView *cellRoot) {
     return items;
 }
 
-#pragma mark   └ 從輪播 cell 的 items（BCNFeedMediaViewModel）直接讀出每一項的 IGPhoto / IGVideo
-
-/// IGPhoto／IGVideo 以及它們所有子類別的 class 指標集合，用來「安全地」辨識從記憶體讀到的指標
 static NSSet<NSValue *> *TPClassFamily(NSString *baseName) {
     Class base = NSClassFromString(baseName);
     if (!base) return [NSSet set];
@@ -537,18 +484,15 @@ static NSSet<NSValue *> *TPVideoClasses(void) {
     return s;
 }
 
-/// 把 Swift enum 記憶體裡的一個 word 當成物件指標，但「只有」確認它真的是 allowed 裡的類別才回傳。
-/// 步驟：去掉 Swift 可能藏在高位的標記 → 確認是 heap 配置（讀取不會閃退）→ 確認 class 在白名單內。
 static id TPObjectFromWord(uintptr_t w, NSSet<NSValue *> *allowed) {
     uintptr_t p = w & 0x0000000FFFFFFFF8ULL;
     if (p < 0x100000000ULL) return nil;
     if (!malloc_zone_from_ptr((const void *)p)) return nil;
-    uintptr_t isa = *(const uintptr_t *)p & 0x0000000FFFFFFFF8ULL;   // arm64 的 isa 遮罩：直接讀位元，不對未確認的指標做任何物件操作
+    uintptr_t isa = *(const uintptr_t *)p & 0x0000000FFFFFFFF8ULL;
     if (![allowed containsObject:[NSValue valueWithPointer:(const void *)isa]]) return nil;
     return (__bridge id)(void *)p;
 }
 
-/// 取得物件某個實例變數的原始記憶體位址（給 Swift 的 enum / Int 這類非物件欄位用）
 static uint8_t *TPIvarAddress(id obj, const char *name) {
     if (!obj) return NULL;
     for (Class c = object_getClass(obj); c; c = class_getSuperclass(c)) {
@@ -562,8 +506,6 @@ static double TPNumber(id v) {
     return [v respondsToSelector:@selector(doubleValue)] ? [v doubleValue] : 0;
 }
 
-/// 從 IGPhoto 內部的完整版本清單（_originalImageVersions／_processedImageVersions）挑「面積最大」的網址。
-/// 清單裡每一項是 IGImageURL，本身就有 width／height 屬性。
 static NSURL *TPBestImageURLFromPhoto(id photo) {
     if (!photo) return nil;
     NSURL *best = nil;
@@ -577,7 +519,7 @@ static NSURL *TPBestImageURLFromPhoto(id photo) {
             if (![u isKindOfClass:[NSURL class]]) continue;
             double w = TPNumber([TPDownloader safeValue:v key:@"width"]);
             double h = TPNumber([TPDownloader safeValue:v key:@"height"]);
-            if (w <= 0 || h <= 0) {                                    // 備援：IGImageURLInfo
+            if (w <= 0 || h <= 0) {
                 id info = [TPDownloader safeValue:v key:@"imageURLInfo"];
                 w = TPNumber([TPDownloader safeValue:info key:@"width"]);
                 h = TPNumber([TPDownloader safeValue:info key:@"height"]);
@@ -621,12 +563,11 @@ static NSString *TPDiagForVideo(id video, NSInteger index) {
             [dash isKindOfClass:[NSData class]] ? [NSString stringWithFormat:@"%lu bytes", (unsigned long)dash.length] : @"nil"];
 }
 
-/// 輪播 cell 本身的 items 陣列（Threads 用它來顯示輪播，數量一定完整）
 static NSArray<NSDictionary *> *TPCollectPostMediaFromViewModels(UIView *cellRoot) {
-    id vms = [TPDownloader ivarValue:cellRoot name:@"items"];      // Swift [BCNFeedMediaViewModel]（可當 NSArray 用）
+    id vms = [TPDownloader ivarValue:cellRoot name:@"items"];
     if (![vms isKindOfClass:[NSArray class]] || ![(NSArray *)vms count]) return nil;
 
-    NSMutableArray<UIView *> *itemCells = [NSMutableArray array];   // 畫面上的輪播 cell，給影片備援用
+    NSMutableArray<UIView *> *itemCells = [NSMutableArray array];
     TPCollectMediaItemCells(cellRoot, itemCells, 0);
 
     NSMutableArray<NSDictionary *> *items = [NSMutableArray array];
@@ -648,9 +589,8 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromViewModels(UIView *cellRoo
         if (video) {
             NSURL *u = [TPDownloader bestURLFromObject:video] ?: [TPDownloader bestVideoURLHarvestedFromObject:video];
             if (!u) {
-                // 資料裡沒有直連網址 → 找畫面上同一個位置的 cell，改從它的播放器拿
                 for (UIView *c in itemCells) {
-                    uint8_t *mi = TPIvarAddress(c, "mediaIndex");             // Swift Int?：8 bytes 數值 + 1 byte 是否為 nil
+                    uint8_t *mi = TPIvarAddress(c, "mediaIndex");
                     if (!mi || mi[8] != 0 || *(NSInteger *)mi != idx) continue;
                     NSDictionary *fromCell = TPItemForMediaCell(c);
                     if (fromCell && ![fromCell[@"failed"] boolValue]) d = fromCell;
@@ -670,7 +610,7 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromViewModels(UIView *cellRoo
         if (key) { if ([seen containsObject:key]) continue; [seen addObject:key]; }
         [items addObject:d];
     }
-    if (!recognized) return nil;                                    // 一項都認不出來 → 交給其他方法
+    if (!recognized) return nil;
 
     gTPLastMediaDiag = diag.length
         ? [NSString stringWithFormat:@"ThreadsPulse %@ [items]\nitems: %lu\n\n%@", TP_VERSION, (unsigned long)[(NSArray *)vms count], diag]
@@ -679,15 +619,11 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromViewModels(UIView *cellRoo
     return items;
 }
 
-/// 先用輪播 cell 的 items（完整、快）；拿不到才改用串文資料模型
 static NSArray<NSDictionary *> *TPCollectPostMedia(UIView *cellRoot) {
     NSArray *items = TPCollectPostMediaFromViewModels(cellRoot);
     return items.count ? items : TPCollectPostMediaFromModel(cellRoot);
 }
 
-#pragma mark   └ 原始尺寸：從 threads.com 網頁版取得 Meta 保存的最大張
-
-/// 媒體 pk（數字）→ 串文代碼（Instagram／Threads 的 base64 字母表）
 static NSString *TPShortcodeFromPK(NSString *pk) {
     pk = [[pk componentsSeparatedByString:@"_"] firstObject];
     unsigned long long n = strtoull(pk.UTF8String, NULL, 10);
@@ -705,7 +641,6 @@ static NSString *TPCodeFromMedia(id media) {
     return nil;
 }
 
-/// 盡力找出這則串文的代碼：媒體資料的 code → 輪播父項目 → 父項目 pk 換算 → 同一則串文的按讚列 → 單一媒體的 mediaID 換算
 static NSString *TPPostCodeForCell(UIView *cellRoot) {
     NSMutableArray<UIView *> *itemCells = [NSMutableArray array];
     TPCollectMediaItemCells(cellRoot, itemCells, 0);
@@ -716,10 +651,9 @@ static NSString *TPPostCodeForCell(UIView *cellRoot) {
         if (code) return code;
         id parentId = [TPDownloader safeValue:frag key:@"carouselParentId"];
         if ([parentId isKindOfClass:[NSString class]] && [parentId length]) return TPShortcodeFromPK(parentId);
-        if (!parent) { code = TPCodeFromMedia(frag); if (code) return code; }   // 單一媒體：frag 就是串文本身
+        if (!parent) { code = TPCodeFromMedia(frag); if (code) return code; }
     }
 
-    // 同一則串文的其他 cell（例如按讚列）帶有串文資料
     UICollectionView *feed = nil;
     for (UIView *v = cellRoot.superview; v; v = v.superview) if ([v isKindOfClass:[UICollectionView class]]) { feed = (UICollectionView *)v; break; }
     if (feed && [cellRoot isKindOfClass:[UICollectionViewCell class]]) {
@@ -734,7 +668,6 @@ static NSString *TPPostCodeForCell(UIView *cellRoot) {
         }
     }
 
-    // 只有一個媒體時，它的 mediaID 就是串文 ID
     id vms = [TPDownloader ivarValue:cellRoot name:@"items"];
     if ([vms isKindOfClass:[NSArray class]] && [(NSArray *)vms count] == 1) {
         uint8_t *kind = TPIvarAddress([(NSArray *)vms firstObject], "kind");
@@ -748,8 +681,6 @@ static NSString *TPPostCodeForCell(UIView *cellRoot) {
     return nil;
 }
 
-/// 解析網頁：找出所有 {"url":"https://…","width":N,"height":N} 候選，依檔名取面積最大的那個
-/// 把網頁裡可能被跳脫一或多層的 JSON 還原：\\\" → "、\/ → /、\u0026 → &
 static NSString *TPUnescapeJSONText(NSString *s) {
     for (int i = 0; i < 3; i++) {
         NSString *before = s;
@@ -762,7 +693,6 @@ static NSString *TPUnescapeJSONText(NSString *s) {
     return [s stringByReplacingOccurrencesOfString:@"&amp;" withString:@"&"];
 }
 
-/// 網頁內容摘要（除錯用）：關鍵字出現次數＋第一個圖片網址附近的片段
 static NSString *TPHTMLSummary(NSString *html) {
     NSMutableString *r = [NSMutableString string];
     for (NSString *k in @[@"image_versions2", @"candidates", @"cdninstagram", @"fbcdn", @"og:image", @"\"width\"", @"login"]) {
@@ -806,14 +736,13 @@ static NSDictionary<NSString *, NSURL *> *TPOriginalsFromHTML(NSString *rawHTML,
         NSURL *url = [NSURL URLWithString:raw];
         if (!url) continue;
         NSString *path = url.path.lowercaseString;
-        if ([path hasSuffix:@".mp4"]) continue;                                            // 影片不算
-        if ([path containsString:@"-19/"] != avatars) continue;                              // 「-19/」是大頭貼的路徑特徵
+        if ([path hasSuffix:@".mp4"]) continue;
+        if ([path containsString:@"-19/"] != avatars) continue;
         double a = [[obj substringWithRange:[w rangeAtIndex:1]] doubleValue] * [[obj substringWithRange:[h rangeAtIndex:1]] doubleValue];
         count++;
         NSString *key = TPDedupeKey(url);
         if (a > [area[key] doubleValue]) { area[key] = @(a); best[key] = url; }
     }
-    // og:image 預覽圖（有些網頁只有這個）
     static NSRegularExpression *ogRe, *ogW, *ogH;
     static dispatch_once_t once2;
     dispatch_once(&once2, ^{
@@ -837,7 +766,6 @@ static NSDictionary<NSString *, NSURL *> *TPOriginalsFromHTML(NSString *rawHTML,
     return best;
 }
 
-/// 把 items 裡的圖片網址換成網頁版的最大張（原本的網址留作備援），完成後呼叫 done
 static BOOL TPItemsHaveImage(NSArray<NSDictionary *> *items) {
     for (NSDictionary *d in items) if (![d[@"video"] boolValue]) return YES;
     return NO;
@@ -858,7 +786,6 @@ static void TPUpgradeToOriginals(NSString *code, NSArray<NSDictionary *> *items,
     TPUpgradeFromPage(page, NO, [@"code " stringByAppendingString:code], TPL(@"Getting original photos…"), items, done);
 }
 
-/// 讀 page 網頁，依檔名把 items 裡的圖片換成網頁版的最大張（原本的網址留作備援）
 static void TPUpgradeFromPage(NSURL *page, BOOL avatars, NSString *label, NSString *hudTitle,
                               NSArray<NSDictionary *> *items, void (^done)(NSArray<NSDictionary *> *)) {
     __block BOOL finished = NO;
@@ -883,7 +810,6 @@ static void TPUpgradeFromPage(NSURL *page, BOOL avatars, NSString *label, NSStri
     NSURLSession *session = [NSURLSession sessionWithConfiguration:NSURLSessionConfiguration.ephemeralSessionConfiguration];
     NSMutableString *log = [NSMutableString string];
 
-    // attempt 會在完成時自己設成 nil，避免區塊互相持有造成記憶體不釋放
     __block void (^attempt)(NSUInteger) = nil;
     attempt = ^(NSUInteger idx) {
         NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:page cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:12];
@@ -902,7 +828,7 @@ static void TPUpgradeFromPage(NSURL *page, BOOL avatars, NSString *label, NSStri
                  err ? [@" · " stringByAppendingString:err.localizedDescription] : @""];
             if (html && !cands) [log appendFormat:@"  %@\n", TPHTMLSummary(html)];
 
-            if (!originals.count && idx + 1 < agents.count) {        // 這個身分沒拿到 → 換下一個
+            if (!originals.count && idx + 1 < agents.count) {
                 attempt(idx + 1);
                 return;
             }
@@ -914,7 +840,7 @@ static void TPUpgradeFromPage(NSURL *page, BOOL avatars, NSString *label, NSStri
                 if ([d[@"video"] boolValue]) { [out addObject:d]; continue; }
                 images++;
                 NSURL *orig = d[@"key"] ? originals[d[@"key"]] : nil;
-                if (!orig && !avatars && originals.count == 1 && items.count == 1) orig = originals.allValues.firstObject;   // 單張：og:image 檔名可能不同
+                if (!orig && !avatars && originals.count == 1 && items.count == 1) orig = originals.allValues.firstObject;
                 NSArray *urls = d[@"urls"];
                 if (orig && ![urls containsObject:orig]) {
                     NSMutableDictionary *nd = [d mutableCopy];
@@ -934,7 +860,6 @@ static void TPUpgradeFromPage(NSURL *page, BOOL avatars, NSString *label, NSStri
     attempt(0);
 }
 
-/// filter：0 = 全部，1 = 只要圖片，2 = 只要影片
 static void TPBatchDownload(UIView *cell, NSInteger filter) {
     BOOL debug = [TPPrefs boolForKey:TPKeyDebugToast];
     gTPSizeLog = debug ? [NSMutableString string] : nil;
@@ -952,7 +877,7 @@ static void TPBatchDownload(UIView *cell, NSInteger filter) {
         [items addObject:d];
     }
     if (skipped && gTPLastMediaDiag && [TPPrefs boolForKey:TPKeyDebugToast]) {
-        [TPDownloader showReport:gTPLastMediaDiag];            // 除錯用：列出哪些項目、為什麼取不到網址
+        [TPDownloader showReport:gTPLastMediaDiag];
         if (!items.count) return;
     }
     if (!items.count) {
@@ -984,8 +909,8 @@ static void TPEnsureBatchButton(UIView *cell) {
         TPMenuItem *vids = [TPMenuItem itemWithTitle:TPL(@"Download Videos Only") symbol:@"video"
                                               handler:^{ if (wc) TPBatchDownload(wc, 2); }];
         b = [TPUI circleButtonWithSymbol:@"arrow.down.to.line" diameter:d onTap:^{
-            if (wc) TPBatchDownload(wc, 0);                 // 點一下：整則串文全部下載
-        } menuItems:@[all, imgs, vids]];                  // 長按：只下載圖片／只下載影片
+            if (wc) TPBatchDownload(wc, 0);
+        } menuItems:@[all, imgs, vids]];
         [cell addSubview:b];
         objc_setAssociatedObject(cell, kTPBatchBtnKey, b, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         TPDebug(TPL(@"Download button added"));
@@ -1000,16 +925,12 @@ static void TPEnsureBatchButton(UIView *cell) {
     if (cell.subviews.lastObject != b) [cell bringSubviewToFront:b];
 }
 
-// ---- 全螢幕檢視（燈箱）：單張圖片按鈕。點一下＝這張；長按＝這張／已載入的全部 ----
-
-/// IGMedia 及其子類別（給 Swift enum 記憶體掃描用）
 static NSSet<NSValue *> *TPMediaClasses(void) {
     static NSSet *s; static dispatch_once_t once;
     dispatch_once(&once, ^{ s = TPClassFamily(@"IGMedia"); });
     return s;
 }
 
-/// 全螢幕圖片：從 cell 的 postItem、或全螢幕畫面存的整則串文，找出串文代碼
 static NSString *TPPostCodeForLightbox(UIView *cell) {
     id item = [TPDownloader ivarValue:cell name:@"postItem"];
     if (item) {
@@ -1024,7 +945,6 @@ static NSString *TPPostCodeForLightbox(UIView *cell) {
         if (!parent) { code = TPCodeFromMedia(item); if (code) return code; }
     }
 
-    // 全螢幕畫面 BCNLightboxViewController.content.body（Swift enum，.post 的第一個值是整則串文的 IGMedia）
     static Class lbClass;
     static dispatch_once_t once;
     dispatch_once(&once, ^{ lbClass = NSClassFromString(@"_TtC11BCNLightbox25BCNLightboxViewController"); });
@@ -1073,7 +993,6 @@ static void TPDownloadLightboxImages(UIView *host, BOOL all) {
         if (iv) [ivs addObject:iv];
     }
 
-    // 只下載這張時，用 cell 的 postItem.photo 挑 App 裡最大的版本
     NSURL *bestOfItem = nil;
     if (!all) bestOfItem = TPBestImageURLFromPhoto([TPDownloader safeValue:[TPDownloader ivarValue:host name:@"postItem"] key:@"photo"]);
 
@@ -1123,26 +1042,22 @@ static void TPEnsureLightboxButton(UIView *host) {
     }
     b.hidden = NO;
     CGRect r = CGRectIntersection([host convertRect:iv.bounds fromView:iv], host.bounds);
-    b.frame = CGRectMake(CGRectGetMaxX(r) - d - 10, CGRectGetMaxY(r) - d - 10, d, d);   // 圖片右下角，避開上方控制列
+    b.frame = CGRectMake(CGRectGetMaxX(r) - d - 10, CGRectGetMaxY(r) - d - 10, d, d);
     if (host.subviews.lastObject != b) [host bringSubviewToFront:b];
 }
 
 %group Images
 
-// 動態串文：整則串文一顆批次按鈕
 %hook _TtC16BCNFeedMediaCell16BCNFeedMediaCell
 - (void)layoutSubviews { %orig; TPEnsureBatchButton((UIView *)self); }
 - (void)didMoveToWindow { %orig; TPEnsureBatchButton((UIView *)self); }
 %end
 
-// 全螢幕檢視
 %hook _TtC11BCNLightbox20BCNLightboxPhotoCell
 - (void)layoutSubviews { %orig; TPEnsureLightboxButton((UIView *)self); }
 %end
 
-%end // group Images
-
-#pragma mark - 5) 影片預設倍速
+%end
 
 static float TPSpeedForIndex(NSInteger i) {
     static const float table[] = {1.0f, 1.25f, 1.5f, 2.0f};
@@ -1151,23 +1066,17 @@ static float TPSpeedForIndex(NSInteger i) {
 
 static const void *kTPPlayerInitKey = &kTPPlayerInitKey;
 
-#pragma mark   └ 停用自動播放
-
-// 做法：動態裡的影片滑進畫面時，讓 Threads 照常開始播放（聲音圖示等介面才會出現），
-// 但底層 FNFPlayer 先以音量 0 試播到第一格就停住，之後的播放要求一律忽略；點一下影片才放開。
-// 開始播放後同一個播放器不再按住，直到它被停止（滑走、cell 重用）。不在動態裡的影片（例如全螢幕）照常播放。
 static const void *kTPUserStartedKey = &kTPUserStartedKey;
 static const void *kTPTouchStartKey  = &kTPTouchStartKey;
-static const void *kTPHeldKey = &kTPHeldKey;   // 自動播放被「按住」：Threads 照常開始播放（喇叭圖示等介面才會出現），但底層播放器不准動
+static const void *kTPHeldKey = &kTPHeldKey;
 static CFAbsoluteTime gTPLastTapAt = 0;
 
-/// IGFNFVideoPlayer 裡真正出聲出畫面的 FNFPlayer
 static id TPFNFPlayer(id inner) {
     Ivar iv = class_getInstanceVariable(object_getClass(inner), "_player");
     return iv ? object_getIvar(inner, iv) : nil;
 }
 
-static const void *kTPPrimedKey = &kTPPrimedKey;   // 被按住的底層播放器已經「靜音試播」過一次（讓 Threads 顯示聲音圖示）
+static const void *kTPPrimedKey = &kTPPrimedKey;
 
 static void TPSetHeld(id inner, BOOL held) {
     id v = held ? @YES : nil;
@@ -1175,13 +1084,12 @@ static void TPSetHeld(id inner, BOOL held) {
     id fnf = TPFNFPlayer(inner);
     if (!fnf) return;
     objc_setAssociatedObject(fnf, kTPHeldKey, v, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (!held && objc_getAssociatedObject(fnf, kTPPrimedKey)) {   // 放開：音量恢復
+    if (!held && objc_getAssociatedObject(fnf, kTPPrimedKey)) {
         objc_setAssociatedObject(fnf, kTPPrimedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         if ([fnf respondsToSelector:@selector(setVolume:rampTime:)]) [fnf setVolume:1.0f rampTime:0];
     }
 }
 
-/// 試播的第一格出來了（Threads 這時會顯示聲音圖示）→ 立刻停住
 static void TPPauseIfHeld(id player) {
     id inner = TPInnerPlayer(player);
     if (!inner || !objc_getAssociatedObject(inner, kTPHeldKey)) return;
@@ -1189,15 +1097,12 @@ static void TPPauseIfHeld(id player) {
     if ([fnf respondsToSelector:@selector(pause)]) [fnf pause];
 }
 
-/// NO = 這次是動態裡的自動播放，要按住
 static BOOL TPPlayerMayPlay(id player, long long reason) {
     if (![TPPrefs boolForKey:TPKeyNoAutoplay]) return YES;
     if (objc_getAssociatedObject(player, kTPUserStartedKey)) return YES;
     UIView *view = ((TPWeakBox *)objc_getAssociatedObject(player, kTPPlayerViewKey)).object;
     BOOL tapped = CFAbsoluteTimeGetCurrent() - gTPLastTapAt < 1.5;
-    // 還不知道播放器在哪個畫面（剛滑進來時常常還沒對應上）也當作動態裡的影片
     BOOL inFeed = !view || TPInsideFeedMediaCell(view);
-    // 只擋「滑進畫面自動播放」(reason 1) 而且在動態裡的影片；其他原因（點擊、全螢幕等）一律放行
     if (reason != 1 || tapped || !inFeed) {
         objc_setAssociatedObject(player, kTPUserStartedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         if (reason != 1) TPDebug([NSString stringWithFormat:@"%@ (%lld)", TPL(@"Playback allowed"), reason]);
@@ -1207,26 +1112,24 @@ static BOOL TPPlayerMayPlay(id player, long long reason) {
     return NO;
 }
 
-/// 點了某支被按住的影片：放開底層播放器，影片從第一格開始播
 static void TPPlayVideoAtTouch(UITouch *t) {
     UIView *hit = t.view;
     Class vcls = TPVideoViewClass();
     if (!hit || !vcls) return;
     UIView *video = nil;
     for (UIView *v = hit; v; v = v.superview) if ([v isKindOfClass:vcls]) { video = v; break; }
-    if (!video) {                                              // 點到影片上的覆蓋層（例如喇叭圖示）：找同一個 cell 裡的影片
+    if (!video) {
         UIView *cell = hit;
         Class cellCls = TPFeedMediaCellClass();
         while (cell && !(cellCls && [cell isKindOfClass:cellCls])) cell = cell.superview;
         if (cell) video = TPFindView(cell, vcls, 30);
     }
-    if (!video) return;                                        // 沒點到影片：不是我們的事
+    if (!video) return;
     id player = TPInnerPlayer(objc_getAssociatedObject(video, kTPPlayerKey));
     if (!player) { TPDebug(TPL(@"Tap: no video player found")); return; }
     objc_setAssociatedObject(player, kTPUserStartedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (!objc_getAssociatedObject(player, kTPHeldKey)) return;   // 沒被按住（已經在播）：交給 Threads 自己處理
+    if (!objc_getAssociatedObject(player, kTPHeldKey)) return;
     TPSetHeld(player, NO);
-    // 等 Threads 先處理完這次點擊（例如切換聲音、開啟全螢幕），再放開
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         id fnf = TPFNFPlayer(player);
         if (![fnf respondsToSelector:@selector(play)]) { TPDebug(TPL(@"Tap: no video player found")); return; }
@@ -1239,17 +1142,13 @@ static void TPPlayVideoAtTouch(UITouch *t) {
     });
 }
 
-
 %group VideoSettings
 
-// IGFNFVideoPlayer 是 ObjC 類別，Threads 的 Swift 包裝層對它的呼叫會走 ObjC 派送
 %hook IGFNFVideoPlayer
 
 - (void)playWithReason:(long long)reason callsiteContext:(id)context {
     BOOL may = TPPlayerMayPlay(self, reason);
-    // 自動播放不直接擋掉：讓 Threads 照常走完播放流程（介面、喇叭圖示都正常），只按住底層播放器
     if ([TPPrefs boolForKey:TPKeyNoAutoplay]) TPSetHeld(self, !may);
-    // 每個播放器第一次播放時，套用預設倍速
     if (!objc_getAssociatedObject(self, kTPPlayerInitKey)) {
         objc_setAssociatedObject(self, kTPPlayerInitKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         float sp = TPSpeedForIndex([TPPrefs integerForKey:TPKeyPlaySpeed]);
@@ -1258,14 +1157,12 @@ static void TPPlayVideoAtTouch(UITouch *t) {
     %orig;
 }
 
-// 播放器被停止（滑走、cell 重用）：下次又要你點一下才播放
 - (void)stopWithReason:(long long)reason callsiteContext:(id)context {
     objc_setAssociatedObject(self, kTPUserStartedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (objc_getAssociatedObject(self, kTPHeldKey)) TPSetHeld(self, NO);
     %orig;
 }
 
-// Threads 長按 2 倍速、放開時會設回 1.0 → 改成設回「你選的預設倍速」
 - (void)setPlaybackSpeed:(float)speed {
     float def = TPSpeedForIndex([TPPrefs integerForKey:TPKeyPlaySpeed]);
     if (def != 1.0f && speed == 1.0f) speed = def;
@@ -1274,7 +1171,6 @@ static void TPPlayVideoAtTouch(UITouch *t) {
 
 %end
 
-// 第一次：靜音試播，讓 Threads 跑到「開始播放」顯示聲音圖示，接著在第一格停住；之後的播放一律忽略
 static BOOL TPFNFShouldSkipPlay(id fnf) {
     if (!objc_getAssociatedObject(fnf, kTPHeldKey)) return NO;
     if (objc_getAssociatedObject(fnf, kTPPrimedKey)) return YES;
@@ -1294,7 +1190,6 @@ static BOOL TPFNFShouldSkipPlay(id fnf) {
 }
 %end
 
-// 記錄「點擊」：手指放開時移動很少、時間很短才算點擊（滑動不算），只在停用自動播放時才計算
 %hook UIWindow
 - (void)sendEvent:(UIEvent *)event {
     if (event.type == UIEventTypeTouches && [TPPrefs boolForKey:TPKeyNoAutoplay]) {
@@ -1320,9 +1215,7 @@ static BOOL TPFNFShouldSkipPlay(id fnf) {
 }
 %end
 
-%end // group VideoSettings
-
-#pragma mark - 6) 顯示精確時間
+%end
 
 static NSString *TPExactString(NSDate *date) {
     NSInteger mode = [TPPrefs integerForKey:TPKeyExactTime];
@@ -1342,7 +1235,6 @@ static NSString *TPExactString(NSDate *date) {
 
 %group Time
 
-// Threads 用 NSDate 的 RelativeDate 分類產生「3 小時前」；全部換成絕對時間
 %hook NSDate
 - (id)formattedDateRelativeToNow {
     NSString *e = TPExactString((NSDate *)self);
@@ -1406,9 +1298,7 @@ static NSString *TPExactString(NSDate *date) {
 }
 %end
 
-%end // group Time
-
-#pragma mark - 7) 防誤觸：按讚前確認
+%end
 
 static void TPConfirm(NSString *title, NSString *actionTitle, void (^go)(void)) {
     UIAlertController *a = [UIAlertController alertControllerWithTitle:title message:nil
@@ -1423,9 +1313,6 @@ static void TPConfirm(NSString *title, NSString *actionTitle, void (^go)(void)) 
 
 %group Interactions
 
-// Threads 的按讚列是 Swift 的 BCNUFIButton；點擊結束時以 target-action 呼叫這個 ObjC 方法，所以攔得到。
-// type 是 BCNUFIButtonType：comment=0、repost=1、like=2 …（無附帶值的 enum，存成 1 byte）
-// toggledState 為 YES 代表已按讚
 %hook _TtC6BCNUFI12BCNUFIButton
 - (void)didEndTappingButtonOnPurpose:(id)sender {
     if (![TPPrefs boolForKey:TPKeyConfirmLike]) { %orig; return; }
@@ -1433,15 +1320,13 @@ static void TPConfirm(NSString *title, NSString *actionTitle, void (^go)(void)) 
     uint8_t *toggled = TPIvarAddress(self, "toggledState");
     BOOL isLike = type && *type == 2;
     BOOL alreadyLiked = toggled && *toggled != 0;
-    if (!isLike || alreadyLiked) { %orig; return; }          // 不是愛心，或是收回讚 → 照常
+    if (!isLike || alreadyLiked) { %orig; return; }
     TPDebug(TPL(@"Like confirmation shown"));
     TPConfirm(TPL(@"Like this post?"), TPL(@"Like"), ^{ %orig; });
 }
 %end
 
-%end // group Interactions
-
-#pragma mark - 8) 下載大頭貼原圖（全螢幕大頭貼頁面）
+%end
 
 static const void *kTPAvatarBtnKey = &kTPAvatarBtnKey;
 
@@ -1459,28 +1344,23 @@ static NSURL *TPURLFromString(id s) {
     return nil;
 }
 
-/// 大頭貼：只用「這個帳號自己」的網址，不再搜尋整份資料（會混到共同追蹤者等其他人的頭像）
 static void TPDownloadAvatarFromPictureView(UIView *pic);
 
 static void TPDownloadAvatar(UIViewController *vc) {
     TPDownloadAvatarFromPictureView([TPDownloader ivarValue:vc name:@"profilePictureView"]);
 }
 
-/// pic：IGProfilePictureImageView（全螢幕大頭貼頁與個人檔案頁都是這個元件）
 static void TPDownloadAvatarFromPictureView(UIView *pic) {
-    id profileImage = [TPDownloader safeValue:pic key:@"image"];                    // IGProfileImage
+    id profileImage = [TPDownloader safeValue:pic key:@"image"];
     id user = [TPDownloader ivarValue:profileImage name:@"_profileImageModel_user"];
 
-    // 1) 高解析度大頭貼：user.asIGUserHDProfilePicURLFragment.hdProfilePicUrlInfo.urlString
     NSURL *hd = nil;
     for (NSString *frag in @[@"asIGUserHDProfilePicURLFragment", @"asIGUserHDProfilePicImageURLFragment"]) {
         id info = [TPDownloader safeValue:[TPDownloader safeValue:user key:frag] key:@"hdProfilePicUrlInfo"];
         hd = TPURLFromString([TPDownloader safeValue:info key:@"urlString"]);
         if (hd) break;
     }
-    // 2) 畫面上正在顯示的那張
     NSURL *shown = TPURLFromImageSpecifier([TPDownloader ivarValue:profileImage name:@"_imageSpecifier"]);
-    // 3) 一般大頭貼網址
     id derived = [TPDownloader safeValue:user key:@"asIGUserDerivedProfilePicURLFragment"];
     NSURL *normal = TPURLFromString([TPDownloader safeValue:derived key:@"computedProfilePicURLString"])
                  ?: TPURLFromString([TPDownloader safeValue:derived key:@"profilePicURLString"]);
@@ -1534,18 +1414,13 @@ static void TPEnsureAvatarButton(UIViewController *vc) {
     if (host.subviews.lastObject != b) [host bringSubviewToFront:b];
 }
 
-#pragma mark - 9) 個人檔案頁：長按大頭貼、名稱、用戶名稱、個人簡介
-
-// 長按後跳出選單：儲存大頭貼（下載按鈕開啟時）、複製姓名、複製用戶名稱、複製個人簡介（複製個人檔案資訊開啟時）
 static const void *kTPProfilePressKey = &kTPProfilePressKey;
 static Class gTPProfileHeaderClass;
 
-/// 往上找到個人檔案頁頂部（BCNProfileHeaderView）
 static UIView *TPProfileHeaderFor(UIView *v) {
     for (; v; v = v.superview) if (gTPProfileHeaderClass && [v isKindOfClass:gTPProfileHeaderClass]) return v;
     return nil;
 }
-
 
 static NSString *TPStyledText(id styled) {
     id attr = [TPDownloader safeValue:styled key:@"attributedString"];
@@ -1568,7 +1443,6 @@ static NSString *TPProfileUsername(UIView *header) {
     return [u hasPrefix:@"@"] ? [u substringFromIndex:1] : u;
 }
 
-/// 個人簡介全文：收合時用完整版本，否則用目前顯示的文字
 static NSString *TPProfileBio(UIView *header) {
     UIView *bio = TPFindView(header, objc_getClass("IGProfileBioView"), 8);
     if (!bio) return nil;
@@ -1607,7 +1481,6 @@ static void TPAddSheetAction(UIAlertController *sheet, NSString *title, NSString
     [sheet addAction:a];
 }
 
-/// 功能關閉時讓手勢直接失敗，Threads 原本的長按（例如個人簡介）就能照常運作
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)g {
     UIView *header = TPProfileHeaderFor(g.view);
     BOOL isPicture = [g.view isEqual:[TPDownloader ivarValue:header name:@"profilePictureView"]];
@@ -1648,7 +1521,6 @@ static void TPAddProfilePress(UIView *v, BOOL takeOverExisting) {
     g.minimumPressDuration = 0.45;
     g.delegate = [TPProfilePressHandler shared];
     if (takeOverExisting) {
-        // 個人簡介本身有 Threads 的長按：讓我們的選單優先
         for (UIGestureRecognizer *other in v.gestureRecognizers)
             if ([other isKindOfClass:[UILongPressGestureRecognizer class]]) [other requireGestureRecognizerToFail:g];
     }
@@ -1674,7 +1546,6 @@ static void TPEnsureProfilePress(UIView *header) {
 }
 %end
 
-// 個人檔案頁頂部
 %hook _TtC10BCNProfile20BCNProfileHeaderView
 - (void)layoutSubviews {
     %orig;
@@ -1682,14 +1553,10 @@ static void TPEnsureProfilePress(UIView *header) {
 }
 %end
 
-%end // group Avatar
-
-#pragma mark - 10) App 內設定選單入口與手勢
+%end
 
 static const void *kTPGestureKey3 = &kTPGestureKey3;
 
-/// 三指長按的幫手：記下這次按下去的手指，手勢成立時把這些手指碰到的其他東西全部取消。
-///   不這樣做的話，三根手指裡先碰到按鈕或貼文的那一根，放開時還是會觸發它（打開插件後又跳出剛剛按到的東西）
 @interface TPThreeFingerHelper : NSObject <UIGestureRecognizerDelegate>
 @end
 
@@ -1707,12 +1574,11 @@ static const void *kTPGestureKey3 = &kTPGestureKey3;
     return self;
 }
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)g shouldReceiveTouch:(UITouch *)touch {
-    for (UITouch *t in _touches.allObjects)                    // 清掉已經放開的手指
+    for (UITouch *t in _touches.allObjects)
         if (t.phase == UITouchPhaseEnded || t.phase == UITouchPhaseCancelled) [_touches removeObject:t];
     [_touches addObject:touch];
     return YES;
 }
-/// 不擋 Threads 自己的手勢同時辨識（捲動、點按照常），只在三指長按成立時才取消它們
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)g shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other {
     return YES;
 }
@@ -1720,7 +1586,7 @@ static const void *kTPGestureKey3 = &kTPGestureKey3;
     for (UITouch *t in _touches.allObjects) {
         for (UIGestureRecognizer *g in t.gestureRecognizers) {
             if (g == mine || !g.enabled) continue;
-            g.enabled = NO;                                    // 關掉再打開：正在進行的辨識會被取消，之後照常運作
+            g.enabled = NO;
             g.enabled = YES;
         }
     }
@@ -1730,7 +1596,6 @@ static const void *kTPGestureKey3 = &kTPGestureKey3;
 
 %group Menu
 
-// 入口 A：Threads「設定」頁右上角加上「〰 Pulse」按鈕（主題色，與插件設定頁一致）
 static NSString *const kTPEntryID = @"ThreadsPulseEntry";
 
 static void TPTintEntryButton(UIButton *b) {
@@ -1746,11 +1611,11 @@ static void TPTintEntryButton(UIButton *b) {
     UIViewController *vc = (UIViewController *)self;
     NSMutableArray *items = [vc.navigationItem.rightBarButtonItems mutableCopy] ?: [NSMutableArray array];
     for (UIBarButtonItem *i in items) if ([i.customView.accessibilityIdentifier isEqualToString:kTPEntryID]) {
-        TPTintEntryButton((UIButton *)i.customView);          // 已經有了：換成目前的主題色
+        TPTintEntryButton((UIButton *)i.customView);
         return;
     }
 
-    UIColor *tint = [TPUI accentIcon];   // 主題色（與設定頁圖示同色）
+    UIColor *tint = [TPUI accentIcon];
     UIButtonConfiguration *cfg = [UIButtonConfiguration plainButtonConfiguration];
     cfg.title = @"Pulse";
     cfg.image = [UIImage systemImageNamed:@"waveform.path.ecg"
@@ -1770,7 +1635,6 @@ static void TPTintEntryButton(UIButton *b) {
     b.accessibilityIdentifier = kTPEntryID;
     b.accessibilityLabel = @"ThreadsPulse";
     [b sizeToFit];
-    // 在插件設定頁換主題時，入口按鈕馬上跟著變色
     __weak UIButton *wb = b;
     [[NSNotificationCenter defaultCenter] addObserverForName:TPThemeDidChangeNotification object:nil
                                                        queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
@@ -1785,12 +1649,11 @@ static void TPTintEntryButton(UIButton *b) {
 
 - (void)becomeKeyWindow {
     %orig;
-    // 入口 B（保底）：三指長按 1 秒 → 插件選單
     if (!objc_getAssociatedObject(self, kTPGestureKey3)) {
         UILongPressGestureRecognizer *g = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(tp_threeFingerLongPress:)];
         g.numberOfTouchesRequired = 3;
         g.minimumPressDuration = 1.0;
-        g.cancelsTouchesInView = YES;                          // 手勢成立時，取消已經送給按鈕等元件的觸控
+        g.cancelsTouchesInView = YES;
         g.delegate = [TPThreeFingerHelper shared];
         [(UIWindow *)self addGestureRecognizer:g];
         objc_setAssociatedObject(self, kTPGestureKey3, g, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -1807,9 +1670,7 @@ static void TPTintEntryButton(UIButton *b) {
 
 %end
 
-%end // group Menu
-
-#pragma mark - 11) 剪貼簿連結偵測
+%end
 
 static BOOL TPIsThreadsURL(NSURL *u) {
     NSString *host = u.host.lowercaseString;
@@ -1819,7 +1680,6 @@ static BOOL TPIsThreadsURL(NSURL *u) {
     return threads && u.path.length > 1;
 }
 
-/// 像從外面點進 Universal Link 一樣交給 Threads，由它自己打開對應的串文、留言或個人檔案
 static void TPOpenInThreads(NSURL *url) {
     NSUserActivity *act = [[NSUserActivity alloc] initWithActivityType:NSUserActivityTypeBrowsingWeb];
     act.webpageURL = url;
@@ -1840,11 +1700,9 @@ static void TPOpenInThreads(NSURL *url) {
     [UIApplication.sharedApplication openURL:url options:@{ UIApplicationOpenURLOptionUniversalLinksOnly: @YES } completionHandler:nil];
 }
 
-/// 使用者按了「開啟」才真正讀剪貼簿（iOS 可能會詢問是否允許貼上）
 static void TPOpenClipboardLinkSilently(BOOL silent);
 static void TPOpenClipboardLink(void) { TPOpenClipboardLinkSilently(NO); }
 
-/// silent：自動開啟模式下，不是 Threads 連結就安靜略過
 static void TPOpenClipboardLinkSilently(BOOL silent) {
     UIPasteboard *pb = UIPasteboard.generalPasteboard;
     NSURL *url = pb.hasURLs ? pb.URL : nil;
@@ -1862,15 +1720,13 @@ static void TPOpenClipboardLinkSilently(BOOL silent) {
     TPOpenInThreads([TPURLCleaner cleanURL:url]);
 }
 
-/// 回到 Threads 時檢查：只判斷「有沒有網址」，不讀內容，所以不會跳出貼上詢問
-/// force：切換帳號後使用，略過「同一份剪貼簿只提示一次」與「Threads 自己複製的不提示」
 static void TPCheckClipboardForced(BOOL force) {
     if (![TPPrefs boolForKey:TPKeyClipboardLinks]) return;
     UIPasteboard *pb = UIPasteboard.generalPasteboard;
     NSInteger cc = pb.changeCount;
     if (!force) {
-        if (cc == gTPOwnPasteboardChange) return;                                // Threads 自己複製的
-        if (cc == [TPPrefs integerForKey:@"tp_clip_last_change"]) return;      // 這份剪貼簿已經提示過
+        if (cc == gTPOwnPasteboardChange) return;
+        if (cc == [TPPrefs integerForKey:@"tp_clip_last_change"]) return;
     }
     [TPPrefs setInteger:cc forKey:@"tp_clip_last_change"];
 
@@ -1878,7 +1734,7 @@ static void TPCheckClipboardForced(BOOL force) {
     [pb detectPatternsForPatterns:patterns completionHandler:^(NSSet *found, NSError *err) {
         if (![found containsObject:UIPasteboardDetectionPatternProbableWebURL]) return;
         dispatch_async(dispatch_get_main_queue(), ^{
-            if ([TPPrefs integerForKey:TPKeyClipboardMode] == 1) {      // 自動開啟
+            if ([TPPrefs integerForKey:TPKeyClipboardMode] == 1) {
                 TPOpenClipboardLinkSilently(YES);
                 return;
             }
@@ -1891,12 +1747,11 @@ static void TPCheckClipboardForced(BOOL force) {
 
 static void TPCheckClipboard(void) { TPCheckClipboardForced(NO); }
 
-/// 切換帳號後：等新帳號的畫面重建完成再檢查（多個事件只算一次）
 static void TPScheduleClipboardCheckAfterSwitch(void) {
     static NSUInteger generation = 0;
     NSUInteger mine = ++generation;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (mine != generation) return;                // 期間又有新的切換事件，以最後一次為準
+        if (mine != generation) return;
         TPDebug(TPL(@"Account switched"));
         TPCheckClipboardForced(YES);
     });
@@ -1921,19 +1776,10 @@ static void TPScheduleClipboardCheckAfterSwitch(void) {
 }
 %end
 
-%end // group AccountSwitch
+%end
 
-#pragma mark - 12) 保留首頁動態位置（回到 Threads 不重新整理）
+static CFAbsoluteTime gTPBackgroundedAt = 0;
 
-// Threads 從背景回來時，會依「離開了多久」決定要不要重新整理首頁、跳回頂端、甚至切回首頁分頁：
-//   ① IGWarmStartListener：applicationWillWarmStartWithTimeIntervalSinceBackgrounded:（首頁、App 主畫面都有實作）
-//   ② 首頁自己記錄的 lastBgTime（willEnterForeground 時拿來算離開多久）
-//   ③ 伺服器下發的門檻 IGFeedRefreshInstructionsStore（warmStartRefreshInterval 等）
-// 做法：在「保留時間」內，讓 Threads 以為只離開了一下子。下拉重新整理、冷啟動都不受影響。
-
-static CFAbsoluteTime gTPBackgroundedAt = 0;   // 進入背景的時間（0 = 這次啟動還沒進過背景）
-
-/// 「保留時間」上限（秒）；不限時間回傳 0
 static double TPKeepFeedLimitSeconds(void) {
     switch ([TPPrefs integerForKey:TPKeyKeepFeedLimit]) {
         case 0:  return 10 * 60;
@@ -1942,7 +1788,6 @@ static double TPKeepFeedLimitSeconds(void) {
     }
 }
 
-/// 這次回到前景要不要保留動態。第一次判斷後 10 秒內的檢查都用同一個答案，避免各處結果不一致
 static BOOL TPShouldKeepFeed(void) {
     static CFAbsoluteTime decidedAt = 0;
     static BOOL decided = NO;
@@ -1960,13 +1805,11 @@ static BOOL TPShouldKeepFeed(void) {
     return keep;
 }
 
-/// 把 Swift 的 `Date?` ivar 設為現在（Date 是 8 bytes 的 Double，後面 1 byte 是否為 nil：0 = 有值）
 static void TPSetOptionalDateNow(id obj, const char *name) {
     Class cls = object_getClass(obj);
     Ivar iv = class_getInstanceVariable(cls, name);
     if (!iv) return;
     ptrdiff_t off = ivar_getOffset(iv);
-    // 確認後面還有至少 9 bytes 空間（下一個 ivar 或物件結尾），避免版本變動時寫壞記憶體
     ptrdiff_t next = (ptrdiff_t)class_getInstanceSize(cls);
     unsigned int n = 0;
     Ivar *list = class_copyIvarList(cls, &n);
@@ -1977,16 +1820,15 @@ static void TPSetOptionalDateNow(id obj, const char *name) {
     free(list);
     if (next - off < 9) return;
     uint8_t *p = (uint8_t *)(__bridge void *)obj + off;
-    double t = CFAbsoluteTimeGetCurrent();      // Foundation.Date 以 2001-01-01 為基準，與 CFAbsoluteTime 相同
+    double t = CFAbsoluteTimeGetCurrent();
     memcpy(p, &t, sizeof(double));
     p[8] = 0;
 }
 
-/// 伺服器下發的「離開多久才重新整理」門檻：保留期間改成至少等於保留時間
 static NSNumber *TPKeepFeedThreshold(NSNumber *orig) {
     if (![TPPrefs boolForKey:TPKeyKeepFeed]) return orig;
     double limit = TPKeepFeedLimitSeconds();
-    if (limit == 0) return @(1.0e9);                             // 不限時間：約 31 年
+    if (limit == 0) return @(1.0e9);
     return (orig && orig.doubleValue >= limit) ? orig : @(limit);
 }
 
@@ -2002,7 +1844,6 @@ static NSNumber *TPKeepFeedThreshold(NSNumber *orig) {
 }
 %end
 
-// App 主畫面：離開太久會切回首頁分頁
 %hook BCNAppViewController
 - (void)applicationWillWarmStartWithTimeIntervalSinceBackgrounded:(double)backgrounded {
     %orig(TPShouldKeepFeed() ? 0.0 : backgrounded);
@@ -2016,20 +1857,13 @@ static NSNumber *TPKeepFeedThreshold(NSNumber *orig) {
 - (NSNumber *)minimumWarmStartBackgroundedIntervalOnPeak { return TPKeepFeedThreshold(%orig); }
 %end
 
-%end // group KeepFeed
+%end
 
-#pragma mark - 13) 停用下拉重新整理、點首頁標籤的捲回頂端／重新整理
-
-// 點首頁標籤時，Threads 的判斷是：不在頂端 → 捲回頂端；已在頂端 → 重新整理。
-//   新版分頁列（BCNLucentTabBarCoordinator）：重複點同一個分頁時，直接決定要不要讓 Threads 處理這次點擊。
-//   舊版分頁列（BCNLegacyTabBarController）：判斷寫在 Swift 裡攔不到，改成記下點擊時間，
-//     1 秒內在首頁那一側攔截往上捲動／重新整理。這組 hook 只在第一次點舊版分頁列時才啟用。
 static Class gTPMainFeedClass;
-static __weak UIViewController *gTPMainFeedVC;     // 最後顯示的首頁（為你推薦／追蹤中各一個）
+static __weak UIViewController *gTPMainFeedVC;
 
 static CGFloat TPTopOffset(UIScrollView *sv) { return -sv.adjustedContentInset.top; }
 
-/// 這個捲動視圖是不是首頁動態的（往上找第一個 view controller）
 static BOOL TPIsMainFeedScrollView(UIScrollView *sv) {
     if (!gTPMainFeedClass) return NO;
     for (UIResponder *r = sv.nextResponder; r; r = r.nextResponder) {
@@ -2038,7 +1872,6 @@ static BOOL TPIsMainFeedScrollView(UIScrollView *sv) {
     return NO;
 }
 
-/// 目前畫面上的首頁捲動視圖（首頁不在畫面上時回傳 nil）
 static UIScrollView *TPVisibleMainFeedScrollView(void) {
     UIViewController *vc = gTPMainFeedVC;
     if (!vc || !vc.isViewLoaded || !vc.view.window) return nil;
@@ -2053,12 +1886,11 @@ static UIScrollView *TPVisibleMainFeedScrollView(void) {
     return best;
 }
 
-/// 新版分頁列：在首頁時又點了首頁標籤，依開關決定要不要讓 Threads 處理這次點擊
 static BOOL TPShouldBlockHomeReselect(void) {
     BOOL noTop = [TPPrefs boolForKey:TPKeyTabNoScrollTop], noRefresh = [TPPrefs boolForKey:TPKeyTabNoRefresh];
     if (!noTop && !noRefresh) return NO;
     UIScrollView *sv = TPVisibleMainFeedScrollView();
-    if (!sv) return NO;                                       // 不在首頁：照常
+    if (!sv) return NO;
     BOOL atTop = sv.contentOffset.y <= TPTopOffset(sv) + 1.0;
     if (!atTop && noTop)    { TPDebug(TPL(@"Scroll to top blocked"));    return YES; }
     if (atTop && noRefresh) { TPDebug(TPL(@"Home tab refresh blocked")); return YES; }
@@ -2070,23 +1902,20 @@ static id TPSelectedTab(id controller) {
     return [controller respondsToSelector:sel] ? ((id (*)(id, SEL))objc_msgSend)(controller, sel) : nil;
 }
 
-// ---- 舊版分頁列的備援：點擊後 1 秒內攔截首頁的往上捲動／重新整理 ----
 static CFAbsoluteTime gTPTabTapAt = 0;
 
 static BOOL TPInTabTapWindow(void) {
     return gTPTabTapAt > 0 && CFAbsoluteTimeGetCurrent() - gTPTabTapAt < 1.0;
 }
 
-///   不在頂端、往上捲 → 「捲回頂端」
-///   已在頂端、再往上捲（露出重新整理圖示）→ 「重新整理」
 static BOOL TPShouldBlockFeedScroll(UIScrollView *sv, CGFloat targetY) {
     if (!TPInTabTapWindow() || sv.isTracking) return NO;
-    if (targetY >= sv.contentOffset.y - 0.5) return NO;          // 不是往上
+    if (targetY >= sv.contentOffset.y - 0.5) return NO;
     if (!TPIsMainFeedScrollView(sv)) return NO;
     BOOL atTop = sv.contentOffset.y <= TPTopOffset(sv) + 1.0;
     if ((!atTop && [TPPrefs boolForKey:TPKeyTabNoScrollTop]) || (atTop && [TPPrefs boolForKey:TPKeyTabNoRefresh])) {
         TPDebug(TPL(atTop ? @"Home tab refresh blocked" : @"Scroll to top blocked"));
-        gTPTabTapAt = CFAbsoluteTimeGetCurrent();             // 動畫還在跑：延長攔截時間
+        gTPTabTapAt = CFAbsoluteTimeGetCurrent();
         return YES;
     }
     return NO;
@@ -2114,7 +1943,6 @@ static BOOL TPShouldBlockTabRefresh(void) {
 }
 %end
 
-// Threads 可能用其中任一種方式捲動
 %hook UIScrollView
 - (void)setContentOffset:(CGPoint)offset animated:(BOOL)animated {
     if (TPInTabTapWindow() && TPShouldBlockFeedScroll((UIScrollView *)self, offset.y)) return;
@@ -2143,9 +1971,8 @@ static BOOL TPShouldBlockTabRefresh(void) {
 }
 %end
 
-%end // group LegacyTabFallback
+%end
 
-/// 舊版分頁列被點擊：記下時間；第一次時才啟用上面的備援 hook（新版分頁列的使用者完全不會經過它們）
 static void TPMarkLegacyTabTap(void) {
     if (![TPPrefs boolForKey:TPKeyTabNoScrollTop] && ![TPPrefs boolForKey:TPKeyTabNoRefresh]) return;
     static dispatch_once_t once;
@@ -2153,7 +1980,6 @@ static void TPMarkLegacyTabTap(void) {
     gTPTabTapAt = CFAbsoluteTimeGetCurrent();
 }
 
-/// 長按首頁標籤開啟設定後，手指放開時不要再當成點了首頁（避免捲回頂端／重新整理）
 static CFAbsoluteTime gTPSuppressTabSelectUntil = 0;
 static BOOL TPTabSelectSuppressed(void) { return CFAbsoluteTimeGetCurrent() < gTPSuppressTabSelectUntil; }
 
@@ -2181,7 +2007,6 @@ static BOOL TPTabSelectSuppressed(void) { return CFAbsoluteTimeGetCurrent() < gT
 %end
 
 %hook _TtC11BCNMainFeed25BCNMainFeedViewController
-// 停用下拉重新整理：使用者拖動時，不讓首頁超過頂端，下拉元件就不會被觸發
 - (void)scrollViewDidScroll:(UIScrollView *)sv {
     if ([TPPrefs boolForKey:TPKeyNoPullRefresh] && [sv isKindOfClass:[UIScrollView class]]
         && (sv.isTracking || sv.isDragging || sv.isDecelerating)) {
@@ -2199,12 +2024,8 @@ static BOOL TPTabSelectSuppressed(void) { return CFAbsoluteTimeGetCurrent() < gT
 }
 %end
 
-%end // group HomeFeedControls
+%end
 
-#pragma mark - 14) 隱藏「追蹤對象建議」視窗
-
-// 這個視窗是 BCNUserRecommendationsViewController，以底部彈出視窗（sheet）的方式出現。
-// 只擋「彈出」的情況；從個人檔案等地方推入（push）的頁面不受影響。
 static Class gTPUserRecsClass;
 
 static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
@@ -2228,7 +2049,6 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 }
 %end
 
-// 保險：沒在彈出時攔到（例如包在其他容器裡才加入），出現時若是彈出視窗就直接關掉
 %hook _TtC22BCNUserRecommendations36BCNUserRecommendationsViewController
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
@@ -2236,19 +2056,14 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
     UIViewController *me = (UIViewController *)self;
     UIViewController *top = me;
     while (top.parentViewController) top = top.parentViewController;
-    if (!top.presentingViewController) return;                // 不是彈出視窗（是推入的頁面）：照常顯示
+    if (!top.presentingViewController) return;
     TPDebug(TPL(@"Follow suggestions hidden"));
     dispatch_async(dispatch_get_main_queue(), ^{ [top dismissViewControllerAnimated:NO completion:nil]; });
 }
 %end
 
-%end // group HideFollowSuggest
+%end
 
-#pragma mark - 15) 固定底部標籤列
-
-// 新版分頁列（BCNLucentTabBarCoordinator）靠 scrollViewDidScroll:／scrollViewDidEndScrolling: 累計捲動距離，
-// 決定要不要把標籤列滑出畫面。開啟時不讓它收到捲動事件，標籤列就不會隱藏。
-// 另外 iOS 26 原生分頁列的「捲動時縮小」也一併關掉。
 %group PinTabBar
 
 %hook _TtC26BCNLucentTabBarCoordinator26BCNLucentTabBarCoordinator
@@ -2267,35 +2082,25 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
     %orig;
     SEL sel = sel_registerName("setTabBarMinimizeBehavior:");
     if ([TPPrefs boolForKey:TPKeyPinTabBar] && [(id)self respondsToSelector:sel])
-        ((void (*)(id, SEL, NSInteger))objc_msgSend)((id)self, sel, 1);   // UITabBarMinimizeBehaviorNever
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)((id)self, sel, 1);
 }
 %end
 
-%end // group PinTabBar
+%end
 
-#pragma mark - 16) 隱藏動態裡的推薦帳號卡片
-
-// 動態裡的推薦都是 IGListKit 的區塊，讓區塊的項目數變成 0 就不會顯示
-//   BCNVerticalsSuggestionUnit   ：動態中的「推薦追蹤」橫向卡片
-//   BCNAYMFUnit                  ：動態中的「為你推薦」帳號卡片（見下方）
-//   BCNInterestFeedSuggestedUnit ：推薦的主題動態／帳號組合
-//   BCNSuggestedUser             ：追蹤某人後跳出的推薦（只擋這個情境，surface = followChaining）
-//   BCNProfileChainingView       ：個人檔案頁的「為你推薦」（見下方）
 %group HideFeedSuggestions
 
 %hook _TtC26BCNVerticalsSuggestionUnit43BCNVerticalsSuggestionUnitSectionController
 - (long long)numberOfItems { return [TPPrefs boolForKey:TPKeyHideFeedSuggest] ? 0 : %orig; }
 %end
 
-// 「為你推薦」「追蹤建議」帳號卡片（AYMF＝Accounts You May Follow）：首頁動態和追蹤後的推薦歸「推薦帳號」，搜尋頁歸「追蹤建議」，
-//   通知、社群頁的同類區塊照常顯示（placement：0 首頁、1 通知、2 搜尋、3 追蹤後推薦、4／5 社群）
 %hook _TtC11BCNAYMFUnit24BCNAYMFSectionController
 - (long long)numberOfItems {
     if ([TPPrefs boolForKey:TPKeyHideFeedSuggest]) {
         uint8_t *placement = TPIvarAddress(self, "placement");
         if (placement && (*placement == 0 || *placement == 3)) return 0;
     }
-    if ([TPPrefs boolForKey:TPKeyHideSearchSuggest]) {               // 搜尋頁的「追蹤建議」另外一個開關
+    if ([TPPrefs boolForKey:TPKeyHideSearchSuggest]) {
         uint8_t *placement = TPIvarAddress(self, "placement");
         if (placement && *placement == 2) return 0;
     }
@@ -2310,20 +2115,18 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 %hook _TtC16BCNSuggestedUser33BCNSuggestedUserSectionController
 - (long long)numberOfItems {
     if ([TPPrefs boolForKey:TPKeyHideFeedSuggest]) {
-        uint8_t *surface = TPIvarAddress(self, "surface");     // 0 提及的使用者、1 追蹤後的推薦、2 社群推薦
+        uint8_t *surface = TPIvarAddress(self, "surface");
         if (surface && *surface == 1) return 0;
     }
     return %orig;
 }
 %end
 
-// 個人檔案頁的「為你推薦」：自己的個人檔案（新帳號常見），以及在別人個人檔案按追蹤後出現的推薦
-// 由 BCNProfileHeaderView 的 showProfileChain 決定要不要顯示 BCNProfileChainingView
 %hook _TtC10BCNProfile20BCNProfileHeaderView
 - (CGSize)sizeThatFits:(CGSize)fits {
     if ([TPPrefs boolForKey:TPKeyHideFeedSuggest]) {
         uint8_t *show = TPIvarAddress(self, "showProfileChain");
-        if (show) *show = 0;                                   // 計算高度時不保留推薦區的空間
+        if (show) *show = 0;
     }
     return %orig;
 }
@@ -2347,8 +2150,6 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 }
 %end
 
-// 「打造動態消息：你對這則貼文有興趣嗎？」：貼文下方的詢問列（BCNFeedItemSeeMoreSeeLessCell），
-//   以及一次問好幾則的詢問區塊（BCNFeedBatchedSeeMoreSeeLessSessionUnit）。詢問列高度變 0 並隱藏
 %hook _TtC29BCNFeedItemSeeMoreSeeLessCell29BCNFeedItemSeeMoreSeeLessCell
 - (CGSize)sizeThatFits:(CGSize)fits {
     if ([TPPrefs boolForKey:TPKeyHidePostFeedback]) return CGSizeMake(fits.width, 0);
@@ -2364,11 +2165,8 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 - (long long)numberOfItems { return [TPPrefs boolForKey:TPKeyHidePostFeedback] ? 0 : %orig; }
 %end
 
-%end // group HideFeedSuggestions
+%end
 
-#pragma mark - 17) 停用截圖偵測
-
-// Threads 透過 IGScreenshotObserver 得知使用者截圖或錄影（會記錄、跳出分享提示等）
 %group BlockScreenshotDetection
 
 %hook IGScreenshotObserver
@@ -2382,23 +2180,14 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 }
 %end
 
-%end // group BlockScreenshotDetection
+%end
 
-#pragma mark - 18) 阻擋分析回傳
-
-// Threads 的使用紀錄（看了什麼、停留多久、點了什麼、效能數據）都經過 FBAnalyticsCoreLogger 收集，
-// 再由 IGAnalyticsNetworkConfigurator 打包上傳。開關打開時：
-//   1. 新的紀錄在收集階段就丟掉（不存檔、不即時串流）
-//   2. 之前存著還沒傳的紀錄，上傳時改用 Meta 自己的 FBAnalyticsNoOpNetworkConfigurator（不發出網路要求）
-// 登入、發文、載入動態等正常的 API 不經過這裡，不受影響。
 static int gTPAnalyticsDropped;
 
-// 分析回傳紀錄（設定 › 進階）：只存在記憶體，本次啟動有效，不寫檔、不送出。
-// 每筆只記名稱計數；最近 10 筆保留事件物件本身，打開紀錄時才去讀內容，平常幾乎沒有額外負擔。
 static NSMutableDictionary<NSString *, NSNumber *> *gTPAnaCounts;
-static NSMutableDictionary<NSString *, NSDictionary *> *gTPAnaLast;   // 每種事件只留最新一筆
+static NSMutableDictionary<NSString *, NSDictionary *> *gTPAnaLast;
 static NSUInteger gTPAnaTotal;
-static const NSUInteger kTPAnaRecentMax = 10;   // 報告列出幾種
+static const NSUInteger kTPAnaRecentMax = 10;
 
 static void TPRecordAnalytics(id event, BOOL blocked) {
     if (!event) return;
@@ -2428,9 +2217,6 @@ static NSString *TPAnaPayloadString(id event) {
     return s;
 }
 
-// 事件名稱的白話說明。Meta 的事件名稱是英文底線命名（例如 feed_item_impression），
-// 先查整個名稱（常見事件），查不到就拆成單字逐一翻譯，拼成「動態・項目・曝光」這樣的說明。
-// 拆字翻譯是推測，實際意思以內容欄位為準。
 static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaKnownEvents(void) {
     static NSDictionary *d; static dispatch_once_t once;
     dispatch_once(&once, ^{ d = @{
@@ -2460,7 +2246,6 @@ static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaKnownEvents(void) {
         @"like":                             @[@"按讚", @"Like"],
         @"unlike":                           @[@"收回讚", @"Unlike"],
         @"follow_button_tapped":             @[@"點了追蹤按鈕", @"Follow button tapped"],
-        // 以下是實際從 Threads 抓到的事件
         @"mobile_config_exposure_log":       @[@"伺服器設定值讀取紀錄（記錄 App 套用了哪些遠端設定）", @"Remote config exposure (which server settings the app used)"],
         @"mobile_config_param_access_without_exposure": @[@"伺服器設定值讀取（未分組）", @"Remote config read (no exposure)"],
         @"privacy_flow_trigger_event":       @[@"隱私相關流程觸發紀錄", @"Privacy flow triggered"],
@@ -2526,7 +2311,6 @@ static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaKnownEvents(void) {
 static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaWords(void) {
     static NSDictionary *d; static dispatch_once_t once;
     dispatch_once(&once, ^{ d = @{
-        // 內容與位置
         @"feed": @[@"動態", @"feed"], @"timeline": @[@"動態", @"feed"], @"home": @[@"首頁", @"home"],
         @"item": @[@"項目", @"item"], @"post": @[@"串文", @"post"], @"posts": @[@"串文", @"posts"],
         @"thread": @[@"串文", @"thread"], @"text": @[@"文字", @"text"], @"reply": @[@"回覆", @"reply"],
@@ -2548,7 +2332,6 @@ static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaWords(void) {
         @"sponsored": @[@"贊助內容", @"sponsored"], @"story": @[@"限時動態", @"story"], @"reel": @[@"短片", @"reel"],
         @"session": @[@"使用期間", @"session"], @"app": @[@"App", @"app"], @"page": @[@"頁面", @"page"],
         @"screen": @[@"畫面", @"screen"], @"view": @[@"畫面", @"view"], @"settings": @[@"設定", @"settings"],
-        // 動作
         @"impression": @[@"曝光（出現在畫面上）", @"impression"], @"impressions": @[@"曝光", @"impressions"],
         @"vpv": @[@"停留時間", @"view time"], @"viewport": @[@"可見範圍", @"viewport"], @"visible": @[@"可見", @"visible"],
         @"tap": @[@"點擊", @"tap"], @"tapped": @[@"點擊", @"tapped"], @"click": @[@"點擊", @"click"], @"clicked": @[@"點擊", @"clicked"],
@@ -2570,7 +2353,6 @@ static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaWords(void) {
         @"failed": @[@"失敗", @"failed"], @"failure": @[@"失敗", @"failure"], @"error": @[@"錯誤", @"error"], @"cancel": @[@"取消", @"cancel"],
         @"login": @[@"登入", @"login"], @"logout": @[@"登出", @"logout"], @"switch": @[@"切換", @"switch"], @"edit": @[@"編輯", @"edit"],
         @"delete": @[@"刪除", @"delete"], @"report": @[@"檢舉", @"report"], @"translate": @[@"翻譯", @"translate"],
-        // 系統與效能
         @"time": @[@"時間", @"time"], @"spent": @[@"花費", @"spent"], @"duration": @[@"時長", @"duration"], @"perf": @[@"效能", @"performance"],
         @"performance": @[@"效能", @"performance"], @"latency": @[@"延遲", @"latency"], @"frame": @[@"畫面格", @"frame"],
         @"frames": @[@"畫面格", @"frames"], @"drop": @[@"掉格", @"drop"], @"dropped": @[@"掉格", @"dropped"], @"memory": @[@"記憶體", @"memory"],
@@ -2596,7 +2378,6 @@ static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaWords(void) {
     return d;
 }
 
-/// 回傳事件的白話說明；認不出任何字就回 nil
 static NSString *TPAnaDescribe(NSString *name, BOOL zh) {
     NSUInteger li = zh ? 0 : 1;
     NSString *low = name.lowercaseString;
@@ -2607,17 +2388,15 @@ static NSString *TPAnaDescribe(NSString *name, BOOL zh) {
     NSUInteger hit = 0, total = 0;
     for (NSString *w in parts) {
         if (!w.length) continue;
-        // 常見前綴（ig、barcelona、bcn、text_app、fb）只是 Meta 內部代號，不翻
         if ([@[@"ig", @"instagram", @"barcelona", @"bcn", @"xth", @"fb", @"meta", @"textapp", @"ios", @"threads"] containsObject:w]) continue;
         total++;
         NSArray *t = TPAnaWords()[w];
         if (t) { hit++; if (![out.lastObject isEqualToString:t[li]]) [out addObject:t[li]]; }
     }
-    if (!hit || hit * 2 < total) return nil;   // 一半以上看不懂就不硬翻，避免誤導
+    if (!hit || hit * 2 < total) return nil;
     return [out componentsJoinedByString:zh ? @"・" : @" · "];
 }
 
-/// 給設定頁「分析回傳紀錄」用
 NSString *TPAnalyticsLogReport(void) {
     NSDictionary *counts; NSArray *recent; NSUInteger total;
     @synchronized ([TPPrefs class]) { counts = [gTPAnaCounts copy]; recent = [gTPAnaLast.allValues sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) { return [b[@"t"] compare:a[@"t"]]; }]; total = gTPAnaTotal; }
@@ -2656,8 +2435,8 @@ NSString *TPAnalyticsLogReport(void) {
     if (block) { __sync_fetch_and_add(&gTPAnalyticsDropped, 1); return; }
     %orig;
 }
-- (BOOL)_captureAnalyticsEventForBatchUpload:(id)event {   // 備援：萬一有路徑直接進批次上傳
-    if ([TPPrefs boolForKey:TPKeyBlockAnalytics]) return YES;  // 當作已處理，不存進待上傳的檔案
+- (BOOL)_captureAnalyticsEventForBatchUpload:(id)event {
+    if ([TPPrefs boolForKey:TPKeyBlockAnalytics]) return YES;
     return %orig;
 }
 - (BOOL)_shouldStreamEvent:(id)event {
@@ -2666,9 +2445,8 @@ NSString *TPAnalyticsLogReport(void) {
 }
 %end
 
-%end // group BlockAnalytics
+%end
 
-// 上傳：參數是大型結構（arm64 以指標傳遞），所以用 (id, SEL, id, void *) 原封不動轉交
 typedef BOOL (*TPPerformIMP)(id, SEL, id, void *);
 static TPPerformIMP orig_TPAnalyticsPerform, noop_TPAnalyticsPerform;
 static BOOL tp_AnalyticsPerform(id self, SEL _cmd, id context, void *requestContext) {
@@ -2684,20 +2462,16 @@ static void TPInstallAnalyticsUploadBlock(void) {
     Method nm = noop ? class_getInstanceMethod(noop, sel) : NULL;
     Method rm = real ? class_getInstanceMethod(real, sel) : NULL;
     if (!nm || !rm || method_getImplementation(nm) == method_getImplementation(rm)) return;
-    // 兩邊型別簽章一致才換，避免 Threads 改版後參數不同
     if (strcmp(method_getTypeEncoding(nm), method_getTypeEncoding(rm)) != 0) return;
     noop_TPAnalyticsPerform = (TPPerformIMP)method_getImplementation(nm);
     orig_TPAnalyticsPerform = (TPPerformIMP)method_setImplementation(rm, (IMP)tp_AnalyticsPerform);
 }
 
-#pragma mark - 19) 使用外部瀏覽器開啟連結
-
-/// 要交給外部瀏覽器的網址；Threads 自己的連結或非網頁連結回傳 nil（照原本在 App 裡開）
 static NSURL *TPExternalBrowserURL(id url) {
     if (![TPPrefs boolForKey:TPKeyExternalBrowser] || ![url isKindOfClass:[NSURL class]]) return nil;
     NSURL *target = url;
     NSURLComponents *c = [NSURLComponents componentsWithURL:target resolvingAgainstBaseURL:NO];
-    if (c && [TPURLCleaner isRedirectHost:c.host]) {             // 先解開 l.threads.com 跳轉包裝，才看得出真正目的地
+    if (c && [TPURLCleaner isRedirectHost:c.host]) {
         for (NSURLQueryItem *q in c.queryItems)
             if ([q.name isEqualToString:@"u"] && q.value.length) { NSURL *inner = [NSURL URLWithString:q.value]; if (inner) target = inner; break; }
     }
@@ -2718,7 +2492,6 @@ static BOOL TPOpenExternally(id url) {
 
 %group ExternalBrowser
 
-// 串文、個人簡介等處點連結都會經過 BCNLinkHandler（ObjC 協定，所以呼叫走 ObjC 派送）
 %hook _TtC20BCNLinkHandlerPlugin18BCNLinkHandlerImpl
 - (void)handleLinkWithURL:(id)url containerModule:(id)module presenter:(id)presenter {
     if (TPOpenExternally(url)) return;
@@ -2730,16 +2503,10 @@ static BOOL TPOpenExternally(id url) {
 }
 %end
 
-%end // group ExternalBrowser
+%end
 
-#pragma mark - 20) 隱藏個人檔案的 Instagram 按鈕、搜尋按鈕
-
-// 個人檔案上方的按鈕都是 BCNProfileViewController 的 lazy 屬性：
-//   appSwitcherButton：Instagram 按鈕（點了切換到 Instagram）
-//   searchButton     ：搜尋按鈕
 static const void *kTPHiddenProfileViewsKey = &kTPHiddenProfileViewsKey;
 
-/// 按鈕外面常包著一層只放它的容器（例如毛玻璃圓底），要把整個容器藏起來，旁邊的按鈕才會靠攏
 static UIView *TPIGButtonSlot(UIView *button) {
     UIView *v = button;
     while (v.superview && ![v.superview isKindOfClass:[UIStackView class]] && v.superview.subviews.count == 1) v = v.superview;
@@ -2763,7 +2530,6 @@ static UIView *TPProfileButton(UIViewController *vc, const char *ivar) {
 }
 
 static void TPApplyHideIGButton(UIViewController *vc) {
-    // 先還原上次藏起來、移過的
     for (TPWeakBox *box in (NSArray *)objc_getAssociatedObject(vc, kTPHiddenProfileViewsKey)) ((UIView *)box.object).hidden = NO;
     objc_setAssociatedObject(vc, kTPHiddenProfileViewsKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     TPResetShifted(vc);
@@ -2780,7 +2546,6 @@ static void TPApplyHideIGButton(UIViewController *vc) {
     }
     objc_setAssociatedObject(vc, kTPHiddenProfileViewsKey, hiddenBoxes, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-    // 不在 stack view 裡（Threads 自己算座標）：把同一排的其他按鈕往空位移過去；在 stack view 裡會自動靠攏
     NSMapTable<UIView *, NSNumber *> *shift = [NSMapTable weakToStrongObjectsMapTable];
     for (UIView *slot in slots) {
         if (!slot.superview || [slot.superview isKindOfClass:[UIStackView class]]) continue;
@@ -2790,17 +2555,16 @@ static void TPApplyHideIGButton(UIViewController *vc) {
         for (UIView *v in slot.superview.subviews) {
             if ([slots containsObject:v] || v.hidden || v.alpha < 0.01) continue;
             CGRect g = v.frame;
-            if (g.size.width > 100 || g.size.height > 100) continue;             // 只動按鈕大小的東西，標題等不碰
-            if (CGRectGetMaxY(g) <= CGRectGetMinY(f) || CGRectGetMinY(g) >= CGRectGetMaxY(f)) continue;   // 不同一排
+            if (g.size.width > 100 || g.size.height > 100) continue;
+            if (CGRectGetMaxY(g) <= CGRectGetMinY(f) || CGRectGetMinY(g) >= CGRectGetMaxY(f)) continue;
             if (CGRectGetMaxX(g) <= CGRectGetMinX(f) + 1) { [left addObject:v]; leftEdge = MAX(leftEdge, CGRectGetMaxX(g)); }
             else if (CGRectGetMinX(g) >= CGRectGetMaxX(f) - 1) { [right addObject:v]; rightEdge = MIN(rightEdge, CGRectGetMinX(g)); }
         }
         NSArray *movers; CGFloat dx;
-        if (left.count) { movers = left; dx = CGRectGetMaxX(f) - leftEdge; }        // 靠右的一排：左邊的往右補
-        else if (right.count) { movers = right; dx = CGRectGetMinX(f) - rightEdge; } // 靠左的一排：右邊的往左補
+        if (left.count) { movers = left; dx = CGRectGetMaxX(f) - leftEdge; }
+        else if (right.count) { movers = right; dx = CGRectGetMinX(f) - rightEdge; }
         else continue;
         for (UIView *v in movers) {
-            // 藏起來的按鈕相鄰時，每顆算出的距離都已經包含另一顆的空位（計算時兩顆都跳過），取較大的就好，不能相加
             double prev = [[shift objectForKey:v] doubleValue];
             if (fabs(dx) > fabs(prev)) [shift setObject:@(dx) forKey:v];
         }
@@ -2822,11 +2586,8 @@ static void TPApplyHideIGButton(UIViewController *vc) {
 }
 %end
 
-%end // group HideIGButton
+%end
 
-#pragma mark - 21) 長按首頁標籤開啟設定
-
-/// 底部標籤列上的各個標籤按鈕（依 x 座標排好）
 static void TPCollectTabButtons(UIView *v, NSMutableArray<UIView *> *out, int depth) {
     if (depth > 8) return;
     for (UIView *s in v.subviews) {
@@ -2836,7 +2597,6 @@ static void TPCollectTabButtons(UIView *v, NSMutableArray<UIView *> *out, int de
     }
 }
 
-/// 這次長按是不是按在「首頁」標籤（最左邊那個；從右到左的語系是最右邊）上
 static BOOL TPIsHomeTabPress(UIGestureRecognizer *g) {
     UIView *bar = g.view;
     if (!bar) return NO;
@@ -2853,7 +2613,6 @@ static BOOL TPIsHomeTabPress(UIGestureRecognizer *g) {
         CGRect f = [home convertRect:home.bounds toView:bar];
         return p.x >= CGRectGetMinX(f) && p.x <= CGRectGetMaxX(f);
     }
-    // 找不到標籤按鈕：把標籤列平均分成幾格估算
     NSUInteger n = [bar isKindOfClass:[UITabBar class]] && ((UITabBar *)bar).items.count ? ((UITabBar *)bar).items.count : 5;
     CGFloat cell = bar.bounds.size.width / n;
     return rtl ? p.x >= bar.bounds.size.width - cell : p.x <= cell;
@@ -2863,7 +2622,6 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
 
 %group HomeLongPress
 
-// Threads 長按標籤列的處理（例如長按個人檔案切換帳號）都經過這裡；只攔首頁標籤，其他標籤照常
 %hook _TtC26BCNLucentTabBarCoordinator26BCNLucentTabBarCoordinator
 - (void)handleTabBarLongPress:(UIGestureRecognizer *)press {
     BOOL began = [press isKindOfClass:[UIGestureRecognizer class]] && press.state == UIGestureRecognizerStateBegan;
@@ -2880,7 +2638,7 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
                  (unsigned long)buttons.count, [press locationInView:press.view].x, press.view.bounds.size.width]);
         objc_setAssociatedObject(press, kTPHomePressKey, home ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         if (!home) { %orig; return; }
-        gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + 10;   // 手指還按著：之後的「點選」都不算（最多 10 秒，避免卡住）
+        gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + 10;
         [TPUI hapticLight];
         [TPSettingsViewController present];
         return;
@@ -2889,20 +2647,14 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
     if (press.state == UIGestureRecognizerStateEnded || press.state == UIGestureRecognizerStateCancelled
         || press.state == UIGestureRecognizerStateFailed) {
         objc_setAssociatedObject(press, kTPHomePressKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        if (mine) gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + 0.6;   // 放開後再擋一下下
+        if (mine) gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + 0.6;
     }
     if (!mine) %orig;
 }
 %end
 
-%end // group HomeLongPress
+%end
 
-#pragma mark - 22) 私訊：不顯示看過、不顯示輸入中、防止訊息收回
-
-// 不顯示看過：Threads 標記聊天室已讀時，會用 BCNSlideMDCoreMarkThreadReadMutationBuilder 建立「已讀到某個時間」的請求。
-//   把時間改成 0（或已經讓對方看過的位置），伺服器上的已讀位置就不會往前移，對方看不到「看過」；你自己這邊照常當作已經看過。
-//   個別聊天室：按右上角的眼睛可以設定這個聊天室照常顯示「看過」，設定會一直保留。
-//   回覆訊息時：按下送出就補送一次已讀，訊息等「看過」送到才送出，對方會先看到「看過」再看到你的回覆
 static NSString *TPThreadKey(id fbid) {
     if (!fbid) return nil;
     if ([fbid isKindOfClass:[NSString class]]) return fbid;
@@ -2910,14 +2662,12 @@ static NSString *TPThreadKey(id fbid) {
     id raw = [TPDownloader safeValue:fbid key:@"rawValue"];
     if ([raw isKindOfClass:[NSString class]]) return raw;
     if ([raw isKindOfClass:[NSNumber class]]) return [raw stringValue];
-    // 拿不到原始值時，從描述裡取出最長的一串數字（不能用整段描述，裡面有記憶體位址，每個物件都不一樣）
     NSString *best = nil;
     for (NSString *part in [[fbid description] componentsSeparatedByCharactersInSet:[[NSCharacterSet decimalDigitCharacterSet] invertedSet]])
         if (part.length > best.length) best = part;
     return best.length >= 6 ? best : [fbid description];
 }
 
-// 目前開著的聊天室（標題列在畫面上），以及它是否設定為顯示「看過」
 static NSString *gTPOpenChatKey;
 static BOOL gTPOpenChatShowsSeen;
 
@@ -2927,9 +2677,8 @@ static BOOL TPChatShowsSeen(NSString *key);
 static void TPAllowSeenAfterReply(id fbid) {
     NSString *k = TPThreadKey(fbid);
     if (!k.length) return;
-    if (TPChatShowsSeen(k)) return;   // 這個聊天室本來就會顯示「看過」
-    if (![TPPrefs boolForKey:TPKeySeenOnReply]) return;   // 「回覆後顯示看過」關閉：回覆也不送
-    // 1.5 秒內同一個聊天室只算一次
+    if (TPChatShowsSeen(k)) return;
+    if (![TPPrefs boolForKey:TPKeySeenOnReply]) return;
     static NSMutableDictionary<NSString *, NSNumber *> *lastReply;
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
     @synchronized ([TPPrefs class]) {
@@ -2937,12 +2686,10 @@ static void TPAllowSeenAfterReply(id fbid) {
         if (now - [lastReply[k] doubleValue] < 1.5) return;
         lastReply[k] = @(now);
     }
-    // 按下送出時就補送已讀（在主執行緒就直接送，要比 MDCoreSendService 排訊息早，那邊才知道要先暫停訊息）
     if ([NSThread isMainThread]) TPSendSeenNow(k);
     else dispatch_async(dispatch_get_main_queue(), ^{ TPSendSeenNow(k); });
 }
 
-// 個別聊天室設定：這些聊天室照常送出「看過」（其他聊天室依總開關隱藏）。存在手機裡，重開聊天室或 App 都不會變
 static NSString *const kTPSeenChatsKey = @"tp_seen_allowed_chats";
 
 static BOOL TPChatShowsSeen(NSString *key) {
@@ -2959,26 +2706,20 @@ static void TPSetChatShowsSeen(NSString *key, BOOL show) {
     [[NSUserDefaults standardUserDefaults] setObject:list forKey:kTPSeenChatsKey];
 }
 
-// 補送已讀（回覆時、打開眼睛時）：照著 Threads 平常送已讀的方式送一次。
-//   - 記下每個聊天室上次被擋下的已讀參數（聊天室編號、時間格式）
-//   - 記下 Threads 用哪個 GraphQL 服務、哪個方法送出已讀
 static const void *kTPMarkReadTag = &kTPMarkReadTag;
 static NSMutableDictionary<NSString *, NSDictionary *> *gTPLastReadArgs;
 static __weak id gTPGQLService;
-static int gTPMarkReadVia;                 // 1 handleWithService、2 handleFiniteWithService、3 initiateRequest、4 initiateFiniteRequest
-static BOOL gTPForceSeen;                  // 插件自己補送時，不要被攔下來
+static int gTPMarkReadVia;
+static BOOL gTPForceSeen;
 
 static id TPTagMarkRead(id b) {
     if (b) objc_setAssociatedObject(b, kTPMarkReadTag, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return b;
 }
 
-static NSMutableDictionary<NSString *, NSNumber *> *gTPSeenSentAt;   // 補送成功的時間，送出訊息時判斷要不要先暫停
-// 每個聊天室已經讓對方知道讀到哪個時間（補送或照常送出的）。之後要擋的已讀改送這個時間而不是 0：
-//   送 0 會讓伺服器把已讀位置往回退，對方剛看到的「看過」又消失
+static NSMutableDictionary<NSString *, NSNumber *> *gTPSeenSentAt;
 static NSMutableDictionary<NSString *, NSNumber *> *gTPSeenWatermark;
 
-// 等「看過」送到伺服器才送出的訊息：伺服器一回應就放行，最多等 0.8 秒
 static NSMutableDictionary<NSString *, NSMutableArray *> *gTPHeldMessages;
 
 static void TPReleaseHeldMessages(NSString *k) {
@@ -3006,7 +2747,6 @@ static void TPSendSeenNow(NSString *k) {
     long long otidVal = (nowMs << 22) | arc4random_uniform(1 << 22);
     BOOL otidStr = [args[@"otidStr"] boolValue], msStr = [args[@"msStr"] boolValue];
     id otid = otidStr ? [NSString stringWithFormat:@"%lld", otidVal] : @(otidVal);
-    // 用 Threads 原本要送的時間（最新一則訊息）；沒有才用現在。用現在的時間伺服器可能不接受
     id ms = args[@"ms"] ?: (msStr ? [NSString stringWithFormat:@"%lld", nowMs] : @(nowMs));
     Class cls = objc_getClass("BCNSlideMDCoreMarkThreadReadMutationBuilder");
     gTPForceSeen = YES;
@@ -3018,13 +2758,12 @@ static void TPSendSeenNow(NSString *k) {
         if (!gTPSeenSentAt) gTPSeenSentAt = [NSMutableDictionary dictionary];
         gTPSeenSentAt[k] = @(CFAbsoluteTimeGetCurrent());
     }
-    // 伺服器收下「看過」後，稍等 0.15 秒讓它傳到對方，再放行剛才暫停的訊息
     void (^update)(id) = ^(id x) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ TPReleaseHeldMessages(k); });
     };
     void (^failure)(id) = ^(id e) {
         TPDebugNow([NSString stringWithFormat:@"Seen: send failed %@", e]);
-        TPReleaseHeldMessages(k);                          // 送不出去也不要卡住訊息
+        TPReleaseHeldMessages(k);
     };
     dispatch_queue_t q = dispatch_get_main_queue();
     @try {
@@ -3046,17 +2785,15 @@ static void TPSendSeenNow(NSString *k) {
 + (id)builderWithOfflineThreadingId:(id)otid threadFbid:(id)fbid timestampMs:(id)ms {
     if (gTPForceSeen) return TPTagMarkRead(%orig);
     if (![TPPrefs boolForKey:TPKeyNoSeen]) return TPTagMarkRead(%orig);
-    // 記下這個聊天室的已讀參數，回覆時補送用
     NSString *argKey = TPThreadKey(fbid);
     if (argKey.length && fbid) @synchronized ([TPPrefs class]) {
         if (!gTPLastReadArgs) gTPLastReadArgs = [NSMutableDictionary dictionary];
         NSMutableDictionary *d = [@{ @"fbid": fbid, @"otidStr": @([otid isKindOfClass:[NSString class]]),
                                      @"msStr": @([ms isKindOfClass:[NSString class]]) } mutableCopy];
-        if (ms && [ms longLongValue] > 0) d[@"ms"] = ms;   // Threads 原本要標記的已讀時間（最新一則訊息的時間）
+        if (ms && [ms longLongValue] > 0) d[@"ms"] = ms;
         gTPLastReadArgs[argKey] = d;
     }
-    if (TPChatShowsSeen(TPThreadKey(fbid))) { TPRecordWatermark(argKey, ms); return TPTagMarkRead(%orig); }   // 這個聊天室設定為照常顯示「看過」
-    // 保險：開著的聊天室設定為顯示「看過」時也照常送出（萬一兩邊拿到的聊天室編號格式不同）
+    if (TPChatShowsSeen(TPThreadKey(fbid))) { TPRecordWatermark(argKey, ms); return TPTagMarkRead(%orig); }
     if (gTPOpenChatShowsSeen && gTPOpenChatKey.length) {
         NSString *k = TPThreadKey(fbid), *otidKey = TPThreadKey(otid);
         if (!k.length || [k isEqualToString:gTPOpenChatKey] || [gTPOpenChatKey containsString:k] || [k containsString:gTPOpenChatKey]
@@ -3065,8 +2802,7 @@ static void TPSendSeenNow(NSString *k) {
     }
     long long wm;
     @synchronized ([TPPrefs class]) { wm = [gTPSeenWatermark[argKey] longLongValue]; }
-    id zero = [ms isKindOfClass:[NSString class]] ? [NSString stringWithFormat:@"%lld", wm] : @(wm);   // 沒送過就是 0
-    // Threads 會反覆送出已讀（例如新訊息進來、捲動時），提示同一個聊天室 1 分鐘只顯示一次
+    id zero = [ms isKindOfClass:[NSString class]] ? [NSString stringWithFormat:@"%lld", wm] : @(wm);
     static NSMutableDictionary<NSString *, NSNumber *> *lastToast;
     static dispatch_once_t once;
     dispatch_once(&once, ^{ lastToast = [NSMutableDictionary dictionary]; });
@@ -3079,7 +2815,6 @@ static void TPSendSeenNow(NSString *k) {
 }
 %end
 
-// 記下 Threads 送出已讀用的服務和方法（補送時照做）
 %hook PNGraphQLQueryBuilder
 - (id)handleWithService:(id)service updateCallback:(id)u failureCallback:(id)f callbackQueue:(id)q {
     if (objc_getAssociatedObject(self, kTPMarkReadTag)) { gTPGQLService = service; gTPMarkReadVia = 1; }
@@ -3107,11 +2842,6 @@ static void TPSendSeenNow(NSString *k) {
 }
 %end
 
-// 送出訊息時：Threads 建立「要送出的訊息」（BCNSlideOutgoingMessagePayload）或「對訊息的動作」（回應等，
-//   BCNSlideOutgoingMessageUpdatePayload）時就算回覆。不從 MDCoreSendService 判斷：那裡大多是聊天室更新（例如已讀），
-//   一進聊天室就會排好幾筆，會被誤當成回覆
-// 送出訊息時：如果剛補送「看過」，訊息等伺服器收下「看過」才送（最多 0.8 秒），讓對方先看到「看過」再看到你的回覆
-//   （「看過」跟訊息同時到的話，對方畫面上最後一則變成你的訊息，「看過」就沒地方顯示）
 %hook MDCoreSendService
 - (void)sendMutationWithAppDataModel:(id)model offlineThreadingId:(id)otid optimisticImages:(id)images syncGroupId:(int)group {
     Ivar iv = model && [TPPrefs boolForKey:TPKeyNoSeen] ? class_getInstanceVariable(object_getClass(model), "_outgoingMessagePayload") : NULL;
@@ -3121,7 +2851,6 @@ static void TPSendSeenNow(NSString *k) {
     if (k.length) @synchronized ([TPPrefs class]) { hold = CFAbsoluteTimeGetCurrent() - [gTPSeenSentAt[k] doubleValue] < 2; }
     if (!hold) { %orig; return; }
     TPDebug(TPL(@"Seen sent first, message follows"));
-    // 訊息先暫停，等伺服器收下「看過」再送（直接呼叫原本的方法，不會再進到這裡）
     dispatch_block_t send = ^{ %orig(model, otid, images, group); };
     __block BOOL done = NO;
     dispatch_block_t once = ^{ if (done) return; done = YES; send(); };
@@ -3130,7 +2859,7 @@ static void TPSendSeenNow(NSString *k) {
         if (!gTPHeldMessages[k]) gTPHeldMessages[k] = [NSMutableArray array];
         [gTPHeldMessages[k] addObject:[once copy]];
     }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), once);   // 保險：最多等 0.8 秒
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), once);
 }
 %end
 
@@ -3153,11 +2882,8 @@ static void TPSendSeenNow(NSString *k) {
 }
 %end
 
-// 聊天室右上角「…」左邊加一顆眼睛按鈕，個別設定這個聊天室要不要顯示「看過」（設定會保留）：
-//   眼睛加斜線（灰）＝不顯示（跟總開關）；眼睛（主題色）＝這個聊天室照常顯示
 static const void *kTPSeenButtonKey = &kTPSeenButtonKey;
 
-/// 眼睛按鈕的狀態：顯示「看過」＝眼睛（主題色）；隱藏＝眼睛加斜線（灰）
 static void TPSetSeenButtonState(UIButton *b, BOOL showsSeen) {
     [b setImage:[UIImage systemImageNamed:showsSeen ? @"eye" : @"eye.slash"
                          withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium]]
@@ -3166,7 +2892,6 @@ static void TPSetSeenButtonState(UIButton *b, BOOL showsSeen) {
     b.accessibilityValue = TPL(showsSeen ? @"This chat shows Seen" : @"This chat hides Seen");
 }
 
-/// 聊天室的 BCNSlideMessageListViewController（從按鈕往上找）
 static UIViewController *TPChatViewControllerOf(UIView *v) {
     Class chat = objc_getClass("_TtC21BCNSlideMessageListUI33BCNSlideMessageListViewController");
     for (UIResponder *r = v; r; r = r.nextResponder) if (chat && [r isKindOfClass:chat]) return (UIViewController *)r;
@@ -3196,15 +2921,11 @@ static UIButton *TPMakeSeenButton(void) {
         [TPUI hapticLight];
         TPSetSeenButtonState(wb, show);
         [TPHUD toast:TPL(show ? @"This chat shows Seen" : @"This chat hides Seen")];
-        // 改成顯示：馬上補送一次已讀，對方立刻看到「看過」
-        //   （不假裝離開又回到聊天室：那樣會讓聊天室停止即時接收新訊息）
         if (show) TPSendSeenNow(key);
     }] forControlEvents:UIControlEventTouchUpInside];
     return btn;
 }
 
-// 聊天室標題列（BCNSlideMessageListNavBarTitleView）本身就有「…」（moreButton）：
-//   在它排版時把眼睛放在「…」左邊，跟著標題列一起出現、一起轉場，不會延遲也不會跑到別的畫面
 %hook _TtC21BCNSlideMessageListUI34BCNSlideMessageListNavBarTitleView
 - (void)layoutSubviews {
     %orig;
@@ -3221,7 +2942,7 @@ static UIButton *TPMakeSeenButton(void) {
     }
     if (btn.superview != more.superview) [more.superview addSubview:btn];
     CGRect m = more.frame;
-    btn.frame = CGRectMake(CGRectGetMinX(m) - 8 - 36, CGRectGetMidY(m) - 18, 36, 36);   // 「…」左邊，間距 8
+    btn.frame = CGRectMake(CGRectGetMinX(m) - 8 - 36, CGRectGetMidY(m) - 18, 36, 36);
     NSString *key = TPChatKeyOf(TPChatViewControllerOf(me));
     BOOL shows = TPChatShowsSeen(key);
     if (key.length && me.window) { gTPOpenChatKey = key; gTPOpenChatShowsSeen = shows; }
@@ -3230,14 +2951,11 @@ static UIButton *TPMakeSeenButton(void) {
 }
 - (void)didMoveToWindow {
     %orig;
-    if (!((UIView *)self).window) gTPOpenChatShowsSeen = NO;   // 離開聊天室
+    if (!((UIView *)self).window) gTPOpenChatShowsSeen = NO;
 }
 %end
-%end // group NoSeen
+%end
 
-// 不顯示輸入中：打字時 Threads 用 BCNTypingIndicatorPublishEventMutationBuilder 送出狀態給對方（1＝輸入中、0＝停止輸入）。
-//   開啟時一律改成送 0：請求照常送到正確的聊天室，伺服器只會收到「沒在輸入」，對方就看不到「輸入中…」，
-//   也不會因為請求失敗影響聊天室的即時連線（之前改聊天室編號的做法會讓新訊息要進出聊天室才出現）
 %group NoTyping
 %hook BCNTypingIndicatorPublishEventMutationBuilder
 + (id)builderWithActivityStatus:(id)status threadId:(id)tid {
@@ -3247,14 +2965,10 @@ static UIButton *TPMakeSeenButton(void) {
     return %orig(@0, tid);
 }
 %end
-%end // group NoTyping
+%end
 
-// 防止訊息收回：對方收回訊息時，伺服器送來「刪除訊息」的更新，交給 Swift 的 BCNSlideDeleteMessageHandler 處理。
-//   它透過 MDCoreDeltaApplyingBridge（ObjC 橋接，建立時帶著處理器的型別名稱）產生要套用到本機資料庫的指令；
-//   開關開啟時，把「刪除訊息」處理器產生的刪除指令拿掉，訊息就會留在本機。
 static const void *kTPApplierNameKey = &kTPApplierNameKey;
 
-/// MDCoreMutationCommand 是 enum 包裝，用 match 方法判斷是不是「刪除」指令；是的話回傳裡面的 MDCoreDeleteMutationCommand
 static id TPDeleteCommandPayload(id cmd) {
     SEL sel = NSSelectorFromString(@"matchUpsertCommand:deleteCommand:updateCommand:deleteAllCommand:deleteFolderCommand:");
     if (![cmd respondsToSelector:sel]) return nil;
@@ -3266,9 +2980,6 @@ static id TPDeleteCommandPayload(id cmd) {
     return del ? (payload ?: (id)kCFNull) : nil;
 }
 
-#pragma mark   └ 「已收回」標示
-
-// 被收回的訊息：記下刪除指令裡的訊息識別文字（格式不固定，所以存整段描述，比對時看是否包含訊息 ID）
 static NSString *const kTPUnsentKey = @"tp_unsent_messages";
 static NSMutableArray<NSString *> *gTPUnsent;
 
@@ -3281,7 +2992,6 @@ static NSMutableArray<NSString *> *TPUnsentList(void) {
     return gTPUnsent;
 }
 
-// 畫面上的訊息格子：記下來，對方收回訊息時馬上重新排版，「已收回」立刻出現，不用離開聊天室再回來
 static NSHashTable<UIView *> *gTPMessageCells;
 
 static void TPRefreshMessageCells(void) {
@@ -3313,12 +3023,11 @@ static BOOL TPIsUnsentMessageId(NSString *mid) {
     return NO;
 }
 
-/// 讀 Swift String（16 bytes）：只接受「短字串」「原生字串」「橋接的 NSString」，讀取前都先確認記憶體位址可用
 static NSString *TPReadSwiftString(const uint8_t *p) {
     if (!p) return nil;
     uint64_t w0, w1;
     memcpy(&w0, p, 8); memcpy(&w1, p + 8, 8);
-    if (w1 & (1ULL << 61)) {                                   // 短字串：內容就放在這 16 bytes 裡
+    if (w1 & (1ULL << 61)) {
         NSUInteger n = (w1 >> 56) & 0xF;
         if (n > 15) return nil;
         char buf[16]; memcpy(buf, p, 16);
@@ -3326,22 +3035,21 @@ static NSString *TPReadSwiftString(const uint8_t *p) {
     }
     uintptr_t addr = (uintptr_t)(w1 & 0x0FFFFFFFFFFFFFFFULL);
     if (!addr || !malloc_zone_from_ptr((const void *)addr)) return nil;
-    if ((w1 >> 60) == 0x4) {                                  // 橋接的 NSString
+    if ((w1 >> 60) == 0x4) {
         id obj = (__bridge id)(void *)addr;
         return [obj isKindOfClass:[NSString class]] ? obj : nil;
     }
-    if ((w1 >> 60) != 0) return nil;                          // 其他形式不處理
-    NSUInteger n = (NSUInteger)(w0 & 0x0000FFFFFFFFFFFFULL);   // 原生字串：字元從物件開頭往後 32 bytes
+    if ((w1 >> 60) != 0) return nil;
+    NSUInteger n = (NSUInteger)(w0 & 0x0000FFFFFFFFFFFFULL);
     if (n == 0 || n > 512 || malloc_size((const void *)addr) < 32 + n) return nil;
     return [[NSString alloc] initWithBytes:(const void *)(addr + 32) length:n encoding:NSUTF8StringEncoding];
 }
 
-/// 訊息格子的 model（BCNSlideMessageViewModel?）：開頭是 metadata { threadId（物件）, messageId（String）, … }
 static NSString *TPMessageIdOfCell(UIView *cell) {
     uint8_t *m = TPIvarAddress(cell, "model");
     if (!m) return nil;
     uintptr_t thread; memcpy(&thread, m, 8);
-    if (!thread) return nil;                                   // model 是 nil
+    if (!thread) return nil;
     return TPReadSwiftString(m + 8);
 }
 
@@ -3349,7 +3057,6 @@ static const void *kTPUnsentLabelKey = &kTPUnsentLabelKey;
 
 static void TPUpdateUnsentLabel(UIView *cell) {
     UILabel *label = objc_getAssociatedObject(cell, kTPUnsentLabelKey);
-    // 不看開關：之前保留下來的訊息，關掉「防止訊息收回」後還是留在聊天室裡，標示也要跟著留著
     NSString *mid = TPMessageIdOfCell(cell);
     BOOL show = mid && TPIsUnsentMessageId(mid);
     if (!show) { label.hidden = YES; return; }
@@ -3387,7 +3094,6 @@ static void TPUpdateUnsentLabel(UIView *cell) {
     if (![TPPrefs boolForKey:TPKeyKeepUnsent]) return r;
     NSString *name = objc_getAssociatedObject(self, kTPApplierNameKey);
     if (![name isKindOfClass:[NSString class]] || ![name containsString:@"DeleteMessage"]) return r;
-    // 回傳的是 MDCoreDeltaApplicationResult（enum 包裝）；只處理「一組要套用的指令」這一種
     Class resultCls = objc_getClass("MDCoreDeltaApplicationResult");
     Ivar iv = resultCls && [r isKindOfClass:resultCls] ? class_getInstanceVariable(resultCls, "_mutationCommands_commands") : NULL;
     NSArray *cmds = iv ? object_getIvar(r, iv) : nil;
@@ -3396,9 +3102,9 @@ static void TPUpdateUnsentLabel(UIView *cell) {
     for (id cmd in cmds) {
         id payload = TPDeleteCommandPayload(cmd);
         if (!payload) { [kept addObject:cmd]; continue; }
-        if (payload != (id)kCFNull) TPRememberUnsent(payload);   // 記下來，訊息旁邊才標得出「已收回」
+        if (payload != (id)kCFNull) TPRememberUnsent(payload);
     }
-    if (kept.count == cmds.count) return r;               // 沒有刪除指令
+    if (kept.count == cmds.count) return r;
     SEL make = NSSelectorFromString(@"mutationCommandsWithCommands:");
     if (![resultCls respondsToSelector:make]) return r;
     TPDebug(TPL(@"Unsent message kept"));
@@ -3414,14 +3120,12 @@ static void TPUpdateUnsentLabel(UIView *cell) {
     TPUpdateUnsentLabel((UIView *)self);
 }
 %end
-%end // group KeepUnsent
-
-#pragma mark - 初始化
+%end
 
 %ctor {
     @autoreleasepool {
-        TPSideloadFixInstall();       // 要在 Threads 開始使用鑰匙圈之前
-        for (NSString *old in @[@"tp_last_logout", @"tp_logout_history", @"tp_logout_keychain"])   // 舊版測試用的登出紀錄
+        TPSideloadFixInstall();
+        for (NSString *old in @[@"tp_last_logout", @"tp_logout_history", @"tp_logout_keychain"])
             [[TPPrefs defaults] removeObjectForKey:old];
         %init(Ads);
         %init(Tracking);
@@ -3451,7 +3155,6 @@ static void TPUpdateUnsentLabel(UIView *cell) {
         %init(NoTyping);
         %init(Menu);
 
-        // 進入背景時：記下時間（保留首頁動態位置用），並存下這次的鑰匙圈與分析回傳統計（下次開啟時的除錯提示用）
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidEnterBackgroundNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
@@ -3460,7 +3163,6 @@ static void TPUpdateUnsentLabel(UIView *cell) {
             [[TPPrefs defaults] setInteger:gTPAnalyticsDropped forKey:@"tp_analytics_last_dropped"];
         }];
 
-        // 回到 Threads 時檢查剪貼簿裡有沒有連結（稍等一下，讓畫面先就緒）
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
@@ -3469,12 +3171,10 @@ static void TPUpdateUnsentLabel(UIView *cell) {
             });
         }];
 
-        // 除錯提示：顯示側載相容修正的狀態，以及上次擋下的分析紀錄數
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                // 顯示這次的狀態，以及上次使用期間（進背景前）鑰匙圈的統計
                 NSString *last = [[TPPrefs defaults] stringForKey:@"tp_sf_last_stats"];
                 NSString *msg = [NSString stringWithFormat:@"%@: %@", TPL(@"Sideload Compatibility Fix"), TPSideloadFixStatus()];
                 if (last.length) msg = [msg stringByAppendingFormat:@"\n%@: %@", TPL(@"Last session"), last];
@@ -3485,7 +3185,6 @@ static void TPUpdateUnsentLabel(UIView *cell) {
             });
         }];
 
-        // 還沒看過歡迎畫面的人，回到 App 時顯示一次（介紹怎麼打開插件設定）
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
