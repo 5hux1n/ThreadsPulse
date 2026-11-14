@@ -22,8 +22,6 @@ UIViewController *TPTopViewController(void) {
     return vc;
 }
 
-#pragma mark - TPMenuItem
-
 @implementation TPMenuItem
 + (instancetype)itemWithTitle:(NSString *)title symbol:(NSString *)symbol handler:(void (^)(void))handler {
     TPMenuItem *i = [TPMenuItem new];
@@ -32,20 +30,16 @@ UIViewController *TPTopViewController(void) {
 }
 @end
 
-/// 長按手勢：把選單項目掛在手勢上，觸發時跳出底部選單
 @interface TPLongPressMenuGesture : UILongPressGestureRecognizer
 @property (nonatomic, copy) NSArray<TPMenuItem *> *items;
 @end
 @implementation TPLongPressMenuGesture
 @end
 
-#pragma mark - TPUI
-
 NSString *const TPThemeDidChangeNotification = @"TPThemeDidChangeNotification";
 
 @implementation TPUI
 
-// 主題：{主色, 圖示亮色（深色模式）, 圖示深色（淺色模式）, 名稱}
 typedef struct { uint32_t main, iconDark, iconLight; const char *name; } TPTheme;
 static const TPTheme kTPThemes[] = {
     { 0xD85A30, 0xF0997B, 0xC44F28, "Coral" },
@@ -110,7 +104,6 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
     b.layer.shadowRadius = 8;
     b.layer.shadowOffset = CGSizeMake(0, 2);
 
-    // 超薄霧面＋一層淡白，圖片亮或暗都看得清楚
     UIVisualEffectView *blur = [[UIVisualEffectView alloc]
         initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
     blur.frame = b.bounds;
@@ -123,8 +116,6 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
     [blur.contentView addSubview:frost];
     [b insertSubview:blur atIndex:0];
 
-    // 圖示用獨立的 UIImageView 疊在毛玻璃「上面」；不用 UIButton 內建的 imageView，
-    // 因為它可能被後加入的毛玻璃蓋住，結果只剩一個圓圈。
     UIImageSymbolConfiguration *cfg =
         [UIImageSymbolConfiguration configurationWithPointSize:d * 0.40 weight:UIImageSymbolWeightSemibold];
     UIImage *img = [UIImage systemImageNamed:symbol withConfiguration:cfg];
@@ -136,7 +127,7 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
         icon.image = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         icon.tintColor = UIColor.whiteColor;
     } else {
-        UILabel *l = [[UILabel alloc] initWithFrame:b.bounds];     // 最後防線：純文字箭頭
+        UILabel *l = [[UILabel alloc] initWithFrame:b.bounds];
         l.text = @"↓";
         l.textColor = UIColor.whiteColor;
         l.font = [UIFont systemFontOfSize:d * 0.5 weight:UIFontWeightBold];
@@ -159,8 +150,6 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
          forControlEvents:UIControlEventTouchUpInside];
     }
     if (menuItems.count) {
-        // 長按＝自己跳出底部選單（點一下仍是直接下載）。
-        // 不用 UIButton.menu：系統選單動畫會把按鈕內容藏起來，結束後常只剩外框。
         TPLongPressMenuGesture *g = [[TPLongPressMenuGesture alloc] initWithTarget:self action:@selector(tp_longPressed:)];
         g.minimumPressDuration = 0.45;
         g.items = menuItems;
@@ -172,7 +161,7 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
 + (void)tp_longPressed:(TPLongPressMenuGesture *)g {
     if (g.state != UIGestureRecognizerStateBegan) return;
     UIView *src = g.view;
-    src.transform = CGAffineTransformIdentity;          // 確保按鈕回到原狀
+    src.transform = CGAffineTransformIdentity;
     [TPUI hapticLight];
 
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:nil message:nil
