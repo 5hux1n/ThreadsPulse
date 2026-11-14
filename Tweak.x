@@ -19,6 +19,7 @@
 #import "TPHUD.h"
 #import "TPVersion.h"
 #import "TPSideloadFix.h"
+#import "TPWelcomeViewController.h"
 
 @interface NSObject (TPDecl)
 - (void)tp_threeFingerLongPress:(id)gesture;
@@ -40,6 +41,12 @@ static NSInteger gTPSizeIndex;
 static NSInteger gTPOwnPasteboardChange = -1;     // Threads 自己複製時的剪貼簿版本（不提示）
 
 #pragma mark - 共用小工具
+
+/// 不節流的除錯提示（診斷一連串步驟時用，避免被 2 秒節流吃掉）
+static void TPDebugNow(NSString *msg) {
+    if (![TPPrefs boolForKey:TPKeyDebugToast]) return;
+    dispatch_async(dispatch_get_main_queue(), ^{ [TPHUD toast:[@"[TP] " stringByAppendingString:msg]]; });
+}
 
 static void TPDebug(NSString *msg) {
     if (![TPPrefs boolForKey:TPKeyDebugToast]) return;
@@ -1681,6 +1688,46 @@ static void TPEnsureProfilePress(UIView *header) {
 
 static const void *kTPGestureKey3 = &kTPGestureKey3;
 
+/// 三指長按的幫手：記下這次按下去的手指，手勢成立時把這些手指碰到的其他東西全部取消。
+///   不這樣做的話，三根手指裡先碰到按鈕或貼文的那一根，放開時還是會觸發它（打開插件後又跳出剛剛按到的東西）
+@interface TPThreeFingerHelper : NSObject <UIGestureRecognizerDelegate>
+@end
+
+@implementation TPThreeFingerHelper {
+    NSHashTable<UITouch *> *_touches;
+}
++ (instancetype)shared {
+    static TPThreeFingerHelper *h;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ h = [self new]; });
+    return h;
+}
+- (instancetype)init {
+    if ((self = [super init])) _touches = [NSHashTable weakObjectsHashTable];
+    return self;
+}
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)g shouldReceiveTouch:(UITouch *)touch {
+    for (UITouch *t in _touches.allObjects)                    // 清掉已經放開的手指
+        if (t.phase == UITouchPhaseEnded || t.phase == UITouchPhaseCancelled) [_touches removeObject:t];
+    [_touches addObject:touch];
+    return YES;
+}
+/// 不擋 Threads 自己的手勢同時辨識（捲動、點按照常），只在三指長按成立時才取消它們
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)g shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other {
+    return YES;
+}
+- (void)cancelOtherGesturesExcept:(UIGestureRecognizer *)mine {
+    for (UITouch *t in _touches.allObjects) {
+        for (UIGestureRecognizer *g in t.gestureRecognizers) {
+            if (g == mine || !g.enabled) continue;
+            g.enabled = NO;                                    // 關掉再打開：正在進行的辨識會被取消，之後照常運作
+            g.enabled = YES;
+        }
+    }
+    [_touches removeAllObjects];
+}
+@end
+
 %group Menu
 
 // 入口 A：Threads「設定」頁右上角加上「〰 Pulse」按鈕（主題色，與插件設定頁一致）
@@ -1743,7 +1790,8 @@ static void TPTintEntryButton(UIButton *b) {
         UILongPressGestureRecognizer *g = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(tp_threeFingerLongPress:)];
         g.numberOfTouchesRequired = 3;
         g.minimumPressDuration = 1.0;
-        g.cancelsTouchesInView = NO;
+        g.cancelsTouchesInView = YES;                          // 手勢成立時，取消已經送給按鈕等元件的觸控
+        g.delegate = [TPThreeFingerHelper shared];
         [(UIWindow *)self addGestureRecognizer:g];
         objc_setAssociatedObject(self, kTPGestureKey3, g, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -1751,7 +1799,10 @@ static void TPTintEntryButton(UIButton *b) {
 
 %new
 - (void)tp_threeFingerLongPress:(UILongPressGestureRecognizer *)g {
-    if (g.state == UIGestureRecognizerStateBegan) [TPSettingsViewController present];
+    if (g.state != UIGestureRecognizerStateBegan) return;
+    [[TPThreeFingerHelper shared] cancelOtherGesturesExcept:g];
+    [TPUI hapticLight];
+    [TPSettingsViewController present];
 }
 
 %end
@@ -2226,6 +2277,7 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 
 // 動態裡的推薦都是 IGListKit 的區塊，讓區塊的項目數變成 0 就不會顯示
 //   BCNVerticalsSuggestionUnit   ：動態中的「推薦追蹤」橫向卡片
+//   BCNAYMFUnit                  ：動態中的「為你推薦」帳號卡片（見下方）
 //   BCNInterestFeedSuggestedUnit ：推薦的主題動態／帳號組合
 //   BCNSuggestedUser             ：追蹤某人後跳出的推薦（只擋這個情境，surface = followChaining）
 //   BCNProfileChainingView       ：個人檔案頁的「為你推薦」（見下方）
@@ -2233,6 +2285,22 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 
 %hook _TtC26BCNVerticalsSuggestionUnit43BCNVerticalsSuggestionUnitSectionController
 - (long long)numberOfItems { return [TPPrefs boolForKey:TPKeyHideFeedSuggest] ? 0 : %orig; }
+%end
+
+// 「為你推薦」「追蹤建議」帳號卡片（AYMF＝Accounts You May Follow）：首頁動態和追蹤後的推薦歸「推薦帳號」，搜尋頁歸「追蹤建議」，
+//   通知、社群頁的同類區塊照常顯示（placement：0 首頁、1 通知、2 搜尋、3 追蹤後推薦、4／5 社群）
+%hook _TtC11BCNAYMFUnit24BCNAYMFSectionController
+- (long long)numberOfItems {
+    if ([TPPrefs boolForKey:TPKeyHideFeedSuggest]) {
+        uint8_t *placement = TPIvarAddress(self, "placement");
+        if (placement && (*placement == 0 || *placement == 3)) return 0;
+    }
+    if ([TPPrefs boolForKey:TPKeyHideSearchSuggest]) {               // 搜尋頁的「追蹤建議」另外一個開關
+        uint8_t *placement = TPIvarAddress(self, "placement");
+        if (placement && *placement == 2) return 0;
+    }
+    return %orig;
+}
 %end
 
 %hook _TtC28BCNInterestFeedSuggestedUnit45BCNInterestFeedSuggestedUnitSectionController
@@ -2279,6 +2347,23 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 }
 %end
 
+// 「打造動態消息：你對這則貼文有興趣嗎？」：貼文下方的詢問列（BCNFeedItemSeeMoreSeeLessCell），
+//   以及一次問好幾則的詢問區塊（BCNFeedBatchedSeeMoreSeeLessSessionUnit）。詢問列高度變 0 並隱藏
+%hook _TtC29BCNFeedItemSeeMoreSeeLessCell29BCNFeedItemSeeMoreSeeLessCell
+- (CGSize)sizeThatFits:(CGSize)fits {
+    if ([TPPrefs boolForKey:TPKeyHidePostFeedback]) return CGSizeMake(fits.width, 0);
+    return %orig;
+}
+- (void)layoutSubviews {
+    %orig;
+    ((UIView *)self).hidden = [TPPrefs boolForKey:TPKeyHidePostFeedback];
+}
+%end
+
+%hook _TtC39BCNFeedBatchedSeeMoreSeeLessSessionUnit56BCNFeedBatchedSeeMoreSeeLessSessionUnitSectionController
+- (long long)numberOfItems { return [TPPrefs boolForKey:TPKeyHidePostFeedback] ? 0 : %orig; }
+%end
+
 %end // group HideFeedSuggestions
 
 #pragma mark - 17) 停用截圖偵測
@@ -2308,11 +2393,267 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
 // 登入、發文、載入動態等正常的 API 不經過這裡，不受影響。
 static int gTPAnalyticsDropped;
 
+// 分析回傳紀錄（設定 › 進階）：只存在記憶體，本次啟動有效，不寫檔、不送出。
+// 每筆只記名稱計數；最近 10 筆保留事件物件本身，打開紀錄時才去讀內容，平常幾乎沒有額外負擔。
+static NSMutableDictionary<NSString *, NSNumber *> *gTPAnaCounts;
+static NSMutableDictionary<NSString *, NSDictionary *> *gTPAnaLast;   // 每種事件只留最新一筆
+static NSUInteger gTPAnaTotal;
+static const NSUInteger kTPAnaRecentMax = 10;   // 報告列出幾種
+
+static void TPRecordAnalytics(id event, BOOL blocked) {
+    if (!event) return;
+    NSString *name = nil;
+    @try { if ([event respondsToSelector:@selector(eventName)]) name = [event performSelector:@selector(eventName)]; } @catch (__unused id e) {}
+    if (![name isKindOfClass:[NSString class]] || !name.length) name = @"(unnamed)";
+    @synchronized ([TPPrefs class]) {
+        if (!gTPAnaCounts) { gTPAnaCounts = [NSMutableDictionary new]; gTPAnaLast = [NSMutableDictionary new]; }
+        gTPAnaTotal++;
+        gTPAnaCounts[name] = @(gTPAnaCounts[name].unsignedIntegerValue + 1);
+        if (gTPAnaLast[name] || gTPAnaLast.count < 100)
+            gTPAnaLast[name] = @{ @"t": [NSDate date], @"n": name, @"e": event, @"b": @(blocked) };
+    }
+}
+
+static NSString *TPAnaPayloadString(id event) {
+    id payload = nil;
+    @try { if ([event respondsToSelector:@selector(eventPayload)]) payload = [event performSelector:@selector(eventPayload)]; } @catch (__unused id e) {}
+    if (!payload) return @"{}";
+    NSString *s = nil;
+    if ([NSJSONSerialization isValidJSONObject:payload]) {
+        NSData *d = [NSJSONSerialization dataWithJSONObject:payload options:NSJSONWritingSortedKeys error:nil];
+        if (d) s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
+    }
+    if (!s) s = [payload description];
+    if (s.length > 600) s = [[s substringToIndex:600] stringByAppendingString:@"…"];
+    return s;
+}
+
+// 事件名稱的白話說明。Meta 的事件名稱是英文底線命名（例如 feed_item_impression），
+// 先查整個名稱（常見事件），查不到就拆成單字逐一翻譯，拼成「動態・項目・曝光」這樣的說明。
+// 拆字翻譯是推測，實際意思以內容欄位為準。
+static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaKnownEvents(void) {
+    static NSDictionary *d; static dispatch_once_t once;
+    dispatch_once(&once, ^{ d = @{
+        @"navigation":                       @[@"切換頁面", @"Page navigation"],
+        @"time_spent_bit_array":             @[@"使用時長（逐秒記錄）", @"Time spent (per second)"],
+        @"time_spent":                       @[@"使用時長", @"Time spent"],
+        @"app_state":                        @[@"App 前景／背景切換", @"App foreground/background"],
+        @"perf":                             @[@"效能紀錄（圖片、影片、動態的載入速度與網路狀況）", @"Performance (load times of images, videos, feed, and network)"],
+        @"client_event":                     @[@"一般操作紀錄", @"General client event"],
+        @"impression":                       @[@"內容出現在畫面上", @"Content shown on screen"],
+        @"vpv":                              @[@"內容在畫面上停留的時間", @"How long content stayed on screen"],
+        @"video_should_start":               @[@"影片準備播放", @"Video about to play"],
+        @"video_started_playing":            @[@"影片開始播放", @"Video started"],
+        @"video_paused":                     @[@"影片暫停", @"Video paused"],
+        @"video_exited":                     @[@"離開影片", @"Left video"],
+        @"video_displayed":                  @[@"影片出現在畫面上", @"Video shown on screen"],
+        @"qe_exposure":                      @[@"實驗分組紀錄（你被分到哪個測試版本）", @"Experiment exposure (which test group you're in)"],
+        @"ig_qe_exposure":                   @[@"實驗分組紀錄（你被分到哪個測試版本）", @"Experiment exposure (which test group you're in)"],
+        @"gk_exposure":                      @[@"功能開關檢查紀錄", @"Feature gate check"],
+        @"mobile_network_stats":             @[@"網路連線品質", @"Network quality"],
+        @"cold_start":                       @[@"App 冷啟動速度", @"App cold start time"],
+        @"warm_start":                       @[@"App 熱啟動速度", @"App warm start time"],
+        @"memory_warning":                   @[@"記憶體不足警告", @"Low memory warning"],
+        @"push_notification_received":       @[@"收到推播通知", @"Push notification received"],
+        @"notification_open":                @[@"點開通知", @"Notification opened"],
+        @"search":                           @[@"搜尋", @"Search"],
+        @"like":                             @[@"按讚", @"Like"],
+        @"unlike":                           @[@"收回讚", @"Unlike"],
+        @"follow_button_tapped":             @[@"點了追蹤按鈕", @"Follow button tapped"],
+        // 以下是實際從 Threads 抓到的事件
+        @"mobile_config_exposure_log":       @[@"伺服器設定值讀取紀錄（記錄 App 套用了哪些遠端設定）", @"Remote config exposure (which server settings the app used)"],
+        @"mobile_config_param_access_without_exposure": @[@"伺服器設定值讀取（未分組）", @"Remote config read (no exposure)"],
+        @"privacy_flow_trigger_event":       @[@"隱私相關流程觸發紀錄", @"Privacy flow triggered"],
+        @"ig_time_spent_action":             @[@"使用時長（依操作記錄）", @"Time spent (by action)"],
+        @"ig_time_spent_screen_time":        @[@"使用時長（各畫面停留時間）", @"Time spent (per screen)"],
+        @"instagram_ad_delivery":            @[@"廣告投放紀錄", @"Ad delivery"],
+        @"enigma_ios_event":                 @[@"廣告成效追蹤", @"Ad performance tracking"],
+        @"odin_features":                    @[@"裝置與使用狀態數值（網路、啟動方式等，用於預測與推薦）", @"Device and usage signals (network, launch type, used for prediction)"],
+        @"app_installations":                @[@"已安裝的 Meta App（是否裝了 Instagram、Facebook 等）", @"Installed Meta apps (Instagram, Facebook, etc.)"],
+        @"badging_event":                    @[@"通知紅點／數字標記", @"Notification badge"],
+        @"push_notification_setting":        @[@"推播通知設定狀態", @"Push notification settings"],
+        @"instagram_organic_impression":    @[@"一般串文（非廣告）出現在畫面上", @"Regular (non-ad) post shown on screen"],
+        @"instagram_organic_vpvd_imp":      @[@"一般串文在畫面上停留的時間", @"How long a regular post stayed on screen"],
+        @"threads_media_header_context_impression": @[@"串文上方的話題標籤（例如相關熱門話題）出現在畫面上", @"Topic label above a post (e.g. related trend) shown"],
+        @"client_registration_initiated":   @[@"App 向伺服器登記裝置", @"App registering the device with the server"],
+        @"fx_upsells_product":              @[@"帳號管理中心的跨 App 推廣（例如連結 Instagram、Facebook）", @"Accounts Center cross-app promotion (e.g. linking Instagram, Facebook)"],
+        @"instagram_two_measurement_debugging_signal": @[@"串文曝光追蹤訊號（含追蹤碼與串文編號）", @"Post impression tracking signal (tracking token, post ID)"],
+        @"media_playback_compound":         @[@"影片播放過程紀錄（準備、開始、暫停、緩衝等）", @"Video playback log (prepare, start, pause, buffering)"],
+        @"media_playback_compound_fast":    @[@"影片播放過程紀錄（即時版）", @"Video playback log (real-time)"],
+        @"barcelona_permalink_action":      @[@"串文頁的操作（進入、離開、看到哪裡）", @"Post page actions (enter, exit, how far you read)"],
+        @"barcelona_media_viewer_entry":    @[@"進入全螢幕檢視圖片或影片", @"Opened full-screen media viewer"],
+        @"barcelona_media_viewer_exit":     @[@"離開全螢幕檢視圖片或影片", @"Closed full-screen media viewer"],
+        @"barcelona_post_tap":              @[@"點擊串文", @"Tapped a post"],
+        @"client_registration_request_sent": @[@"裝置登記：請求已送出", @"Device registration: request sent"],
+        @"client_registration_response_received": @[@"裝置登記：收到回應", @"Device registration: response received"],
+        @"client_registration_failure":     @[@"裝置登記失敗", @"Device registration failed"],
+        @"client_registration_token_obtained_from_provider": @[@"裝置登記：從系統取得推播權杖", @"Device registration: push token obtained"],
+        @"instagram_media_metrics":         @[@"圖片與影片的載入、顯示數據", @"Media load and display metrics"],
+        @"instagram_client_delivery_funnel_start": @[@"動態內容載入流程開始（這次送來哪些串文）", @"Feed delivery started (which posts were served)"],
+        @"instagram_client_delivery_funnel_end": @[@"動態內容載入流程結束", @"Feed delivery finished"],
+        @"bcn_press_location_event":        @[@"點擊位置紀錄（點了畫面哪裡）", @"Tap location (where on screen you tapped)"],
+        @"ads_tracking_status":             @[@"廣告追蹤授權狀態（iOS「允許 App 要求追蹤」）", @"Ad tracking permission (iOS App Tracking Transparency)"],
+        @"apple_ad_services_token":         @[@"Apple 廣告歸因權杖（是否透過廣告安裝 Threads）", @"Apple ad attribution token (whether you installed via an ad)"],
+        @"fx_access_library":               @[@"帳號管理中心存取紀錄", @"Accounts Center access"],
+        @"threads_recommended_entity_impression": @[@"推薦內容（例如相關標籤）出現在畫面上", @"Recommended item (e.g. related tags) shown"],
+        @"threads_badge_click":             @[@"點擊通知紅點", @"Tapped a notification badge"],
+        @"save_sso_nonce_key_chain_success": @[@"登入憑證已存入鑰匙圈", @"Login token saved to Keychain"],
+        @"cats_device_identifiers_reliability_ig": @[@"裝置識別碼一致性檢查", @"Device identifier consistency check"],
+        @"instagram_device_ids":            @[@"裝置識別碼回報", @"Device identifiers"],
+        @"appjobs_ios_job_finished":        @[@"背景工作完成", @"Background job finished"],
+        @"screen_time_service_init":        @[@"使用時長統計服務啟動", @"Screen time tracking started"],
+        @"device_permissions_external":     @[@"系統權限狀態（相機、相簿、定位等）", @"System permissions (camera, photos, location, etc.)"],
+        @"threads_author_badge_impression": @[@"作者旁的標章（例如認證徽章）出現在畫面上", @"Author badge (e.g. verified) shown"],
+        @"instagram_organic_carousel_vpvd_imp": @[@"多圖串文在畫面上停留的時間", @"How long a multi-photo post stayed on screen"],
+        @"instagram_organic_sub_impression": @[@"多圖串文裡的單張圖片出現在畫面上", @"Single photo in a multi-photo post shown"],
+        @"instagram_organic_like":          @[@"按讚（一般串文）", @"Liked a regular post"],
+        @"instagram_organic_unlike":        @[@"收回讚（一般串文）", @"Unliked a regular post"],
+        @"instagram_organic_brand_profile": @[@"瀏覽品牌或創作者帳號", @"Viewed a brand or creator account"],
+        @"ig_profile_action":               @[@"個人檔案頁的操作（進入、追蹤、點擊等）", @"Profile page actions (open, follow, taps)"],
+        @"threads_profile_tag_impression":  @[@"個人檔案上的標籤出現在畫面上", @"Profile tag shown"],
+        @"threads_profile_tag_unit_impression": @[@"個人檔案的標籤區塊出現在畫面上", @"Profile tag section shown"],
+        @"threads_monthly_views_impression": @[@"個人檔案的每月瀏覽次數出現在畫面上", @"Monthly views on a profile shown"],
+        @"threads_message_cta_impression":  @[@"「傳送訊息」按鈕出現在畫面上", @"Message button shown"],
+        @"threads_spoiler_reveal_tap":      @[@"點開被遮住的防雷內容", @"Revealed spoiler content"],
+        @"barcelona_growth_integration_impression": @[@"推廣區塊出現在畫面上（例如邀請好友、跨 App 推廣）", @"Growth promotion shown (e.g. invite friends, cross-app)"],
+        @"instagram_session_throughput":    @[@"本次使用期間的資料傳輸量", @"Data transferred this session"],
+        @"igfeeditemtracker_igusersession_leak_analysis_event_reported": @[@"記憶體洩漏檢測回報（開發除錯用）", @"Memory leak check (debugging)"],
+        @"threads_feed_menu_button_impression": @[@"動態串文的「⋯」選單按鈕出現在畫面上", @"Post \"…\" menu button shown in feed"],
+    }; });
+    return d;
+}
+
+static NSDictionary<NSString *, NSArray<NSString *> *> *TPAnaWords(void) {
+    static NSDictionary *d; static dispatch_once_t once;
+    dispatch_once(&once, ^{ d = @{
+        // 內容與位置
+        @"feed": @[@"動態", @"feed"], @"timeline": @[@"動態", @"feed"], @"home": @[@"首頁", @"home"],
+        @"item": @[@"項目", @"item"], @"post": @[@"串文", @"post"], @"posts": @[@"串文", @"posts"],
+        @"thread": @[@"串文", @"thread"], @"text": @[@"文字", @"text"], @"reply": @[@"回覆", @"reply"],
+        @"replies": @[@"回覆", @"replies"], @"comment": @[@"留言", @"comment"], @"repost": @[@"轉發", @"repost"],
+        @"quote": @[@"引用", @"quote"], @"profile": @[@"個人檔案", @"profile"], @"user": @[@"使用者", @"user"],
+        @"account": @[@"帳號", @"account"], @"search": @[@"搜尋", @"search"], @"activity": @[@"動態通知頁", @"activity"],
+        @"notification": @[@"通知", @"notification"], @"notifications": @[@"通知", @"notifications"],
+        @"push": @[@"推播", @"push"], @"inbox": @[@"收件匣", @"inbox"], @"direct": @[@"私訊", @"DM"],
+        @"dm": @[@"私訊", @"DM"], @"message": @[@"訊息", @"message"], @"messaging": @[@"訊息", @"messaging"],
+        @"slide": @[@"私訊", @"DM"], @"media": @[@"媒體", @"media"], @"image": @[@"圖片", @"image"],
+        @"photo": @[@"相片", @"photo"], @"video": @[@"影片", @"video"], @"carousel": @[@"多圖", @"carousel"],
+        @"link": @[@"連結", @"link"], @"url": @[@"網址", @"URL"], @"tab": @[@"分頁", @"tab"],
+        @"composer": @[@"發文畫面", @"composer"], @"compose": @[@"發文", @"compose"], @"camera": @[@"相機", @"camera"],
+        @"keyboard": @[@"鍵盤", @"keyboard"], @"sheet": @[@"選單", @"sheet"], @"menu": @[@"選單", @"menu"],
+        @"button": @[@"按鈕", @"button"], @"dialog": @[@"對話框", @"dialog"], @"nux": @[@"新手提示", @"onboarding tip"],
+        @"suggested": @[@"推薦", @"suggested"], @"recommendation": @[@"推薦", @"recommendation"], @"recs": @[@"推薦", @"recs"],
+        @"aymf": @[@"為你推薦", @"suggested for you"], @"community": @[@"社群", @"community"], @"topic": @[@"主題", @"topic"],
+        @"tag": @[@"標籤", @"tag"], @"hashtag": @[@"主題標籤", @"hashtag"], @"ad": @[@"廣告", @"ad"], @"ads": @[@"廣告", @"ads"],
+        @"sponsored": @[@"贊助內容", @"sponsored"], @"story": @[@"限時動態", @"story"], @"reel": @[@"短片", @"reel"],
+        @"session": @[@"使用期間", @"session"], @"app": @[@"App", @"app"], @"page": @[@"頁面", @"page"],
+        @"screen": @[@"畫面", @"screen"], @"view": @[@"畫面", @"view"], @"settings": @[@"設定", @"settings"],
+        // 動作
+        @"impression": @[@"曝光（出現在畫面上）", @"impression"], @"impressions": @[@"曝光", @"impressions"],
+        @"vpv": @[@"停留時間", @"view time"], @"viewport": @[@"可見範圍", @"viewport"], @"visible": @[@"可見", @"visible"],
+        @"tap": @[@"點擊", @"tap"], @"tapped": @[@"點擊", @"tapped"], @"click": @[@"點擊", @"click"], @"clicked": @[@"點擊", @"clicked"],
+        @"press": @[@"按下", @"press"], @"long": @[@"長", @"long"], @"swipe": @[@"滑動", @"swipe"], @"scroll": @[@"捲動", @"scroll"],
+        @"open": @[@"開啟", @"open"], @"opened": @[@"開啟", @"opened"], @"close": @[@"關閉", @"close"], @"closed": @[@"關閉", @"closed"],
+        @"dismiss": @[@"關閉", @"dismiss"], @"show": @[@"顯示", @"show"], @"shown": @[@"顯示", @"shown"], @"hide": @[@"隱藏", @"hide"],
+        @"display": @[@"顯示", @"display"], @"displayed": @[@"顯示", @"displayed"], @"render": @[@"繪製", @"render"],
+        @"like": @[@"按讚", @"like"], @"unlike": @[@"收回讚", @"unlike"], @"share": @[@"分享", @"share"], @"copy": @[@"複製", @"copy"],
+        @"follow": @[@"追蹤", @"follow"], @"unfollow": @[@"取消追蹤", @"unfollow"], @"mute": @[@"靜音", @"mute"], @"block": @[@"封鎖", @"block"],
+        @"save": @[@"儲存", @"save"], @"send": @[@"送出", @"send"], @"sent": @[@"已送出", @"sent"], @"receive": @[@"收到", @"receive"],
+        @"received": @[@"收到", @"received"], @"read": @[@"已讀", @"read"], @"seen": @[@"看過", @"seen"], @"typing": @[@"輸入中", @"typing"],
+        @"play": @[@"播放", @"play"], @"playing": @[@"播放", @"playing"], @"pause": @[@"暫停", @"pause"], @"paused": @[@"暫停", @"paused"],
+        @"start": @[@"開始", @"start"], @"started": @[@"開始", @"started"], @"end": @[@"結束", @"end"], @"ended": @[@"結束", @"ended"],
+        @"exit": @[@"離開", @"exit"], @"exited": @[@"離開", @"exited"], @"enter": @[@"進入", @"enter"], @"navigation": @[@"切換頁面", @"navigation"],
+        @"load": @[@"載入", @"load"], @"loaded": @[@"載入完成", @"loaded"], @"loading": @[@"載入中", @"loading"], @"fetch": @[@"讀取", @"fetch"],
+        @"refresh": @[@"重新整理", @"refresh"], @"prefetch": @[@"預先載入", @"prefetch"], @"download": @[@"下載", @"download"],
+        @"upload": @[@"上傳", @"upload"], @"request": @[@"請求", @"request"], @"response": @[@"回應", @"response"],
+        @"success": @[@"成功", @"success"], @"succeeded": @[@"成功", @"succeeded"], @"fail": @[@"失敗", @"fail"],
+        @"failed": @[@"失敗", @"failed"], @"failure": @[@"失敗", @"failure"], @"error": @[@"錯誤", @"error"], @"cancel": @[@"取消", @"cancel"],
+        @"login": @[@"登入", @"login"], @"logout": @[@"登出", @"logout"], @"switch": @[@"切換", @"switch"], @"edit": @[@"編輯", @"edit"],
+        @"delete": @[@"刪除", @"delete"], @"report": @[@"檢舉", @"report"], @"translate": @[@"翻譯", @"translate"],
+        // 系統與效能
+        @"time": @[@"時間", @"time"], @"spent": @[@"花費", @"spent"], @"duration": @[@"時長", @"duration"], @"perf": @[@"效能", @"performance"],
+        @"performance": @[@"效能", @"performance"], @"latency": @[@"延遲", @"latency"], @"frame": @[@"畫面格", @"frame"],
+        @"frames": @[@"畫面格", @"frames"], @"drop": @[@"掉格", @"drop"], @"dropped": @[@"掉格", @"dropped"], @"memory": @[@"記憶體", @"memory"],
+        @"network": @[@"網路", @"network"], @"cache": @[@"快取", @"cache"], @"cold": @[@"冷", @"cold"], @"warm": @[@"熱", @"warm"],
+        @"startup": @[@"啟動", @"startup"], @"launch": @[@"啟動", @"launch"], @"foreground": @[@"回到前景", @"foreground"],
+        @"background": @[@"進入背景", @"background"], @"state": @[@"狀態", @"state"], @"battery": @[@"電池", @"battery"],
+        @"device": @[@"裝置", @"device"], @"bandwidth": @[@"頻寬", @"bandwidth"], @"connection": @[@"連線", @"connection"],
+        @"qe": @[@"實驗", @"experiment"], @"exposure": @[@"分組紀錄", @"exposure"], @"experiment": @[@"實驗", @"experiment"],
+        @"gk": @[@"功能開關", @"feature gate"], @"config": @[@"設定值", @"config"], @"sync": @[@"同步", @"sync"],
+        @"count": @[@"次數", @"count"], @"stats": @[@"統計", @"stats"], @"event": @[@"事件", @"event"], @"events": @[@"事件", @"events"],
+        @"bit": @[@"逐秒", @"bit"], @"array": @[@"記錄", @"array"], @"client": @[@"用戶端", @"client"], @"server": @[@"伺服器", @"server"],
+        @"bloks": @[@"介面元件", @"UI component"], @"mobile": @[@"行動裝置", @"mobile"], @"log": @[@"紀錄", @"log"],
+        @"param": @[@"參數", @"parameter"], @"access": @[@"讀取", @"access"], @"without": @[@"未", @"without"],
+        @"trigger": @[@"觸發", @"trigger"], @"flow": @[@"流程", @"flow"], @"privacy": @[@"隱私", @"privacy"],
+        @"installations": @[@"安裝", @"installations"], @"install": @[@"安裝", @"install"], @"badging": @[@"紅點標記", @"badge"],
+        @"badge": @[@"紅點標記", @"badge"], @"setting": @[@"設定", @"setting"], @"delivery": @[@"投放", @"delivery"],
+        @"action": @[@"操作", @"action"],
+        @"organic": @[@"一般內容", @"organic"], @"vpvd": @[@"停留時間", @"view time"], @"imp": @[@"曝光", @"impression"],
+        @"registration": @[@"登記", @"registration"], @"initiated": @[@"開始", @"initiated"], @"upsells": @[@"推廣", @"promotion"],
+        @"upsell": @[@"推廣", @"promotion"], @"product": @[@"產品", @"product"], @"header": @[@"上方標籤", @"header"],
+        @"context": @[@"情境", @"context"], @"trend": @[@"熱門話題", @"trend"], @"trends": @[@"熱門話題", @"trends"], @"component": @[@"元件", @"component"], @"graphql": @[@"資料請求", @"data request"],
+    }; });
+    return d;
+}
+
+/// 回傳事件的白話說明；認不出任何字就回 nil
+static NSString *TPAnaDescribe(NSString *name, BOOL zh) {
+    NSUInteger li = zh ? 0 : 1;
+    NSString *low = name.lowercaseString;
+    NSArray *known = TPAnaKnownEvents()[low];
+    if (known) return known[li];
+    NSArray *parts = [low componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"_:.-/ "]];
+    NSMutableArray *out = [NSMutableArray new];
+    NSUInteger hit = 0, total = 0;
+    for (NSString *w in parts) {
+        if (!w.length) continue;
+        // 常見前綴（ig、barcelona、bcn、text_app、fb）只是 Meta 內部代號，不翻
+        if ([@[@"ig", @"instagram", @"barcelona", @"bcn", @"xth", @"fb", @"meta", @"textapp", @"ios", @"threads"] containsObject:w]) continue;
+        total++;
+        NSArray *t = TPAnaWords()[w];
+        if (t) { hit++; if (![out.lastObject isEqualToString:t[li]]) [out addObject:t[li]]; }
+    }
+    if (!hit || hit * 2 < total) return nil;   // 一半以上看不懂就不硬翻，避免誤導
+    return [out componentsJoinedByString:zh ? @"・" : @" · "];
+}
+
+/// 給設定頁「分析回傳紀錄」用
+NSString *TPAnalyticsLogReport(void) {
+    NSDictionary *counts; NSArray *recent; NSUInteger total;
+    @synchronized ([TPPrefs class]) { counts = [gTPAnaCounts copy]; recent = [gTPAnaLast.allValues sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) { return [b[@"t"] compare:a[@"t"]]; }]; total = gTPAnaTotal; }
+    if (!total) return nil;
+    BOOL zh = ![TPL(@"Top Events") isEqualToString:@"Top Events"];
+    BOOL blocking = [TPPrefs boolForKey:TPKeyBlockAnalytics];
+    NSMutableString *r = [NSMutableString stringWithFormat:@"ThreadsPulse %@\n\n", TP_VERSION];
+    [r appendFormat:@"%@\n", blocking ? TPL(@"Block Analytics: On") : TPL(@"Block Analytics: Off")];
+    [r appendFormat:@"%@\n", blocking ? TPL(@"Nothing below was sent") : TPL(@"Everything below was sent")];
+    [r appendFormat:TPL(@"%lu events while using the app (%lu types)"), (unsigned long)total, (unsigned long)counts.count];
+    [r appendFormat:@"\n\n【%@】\n", TPL(@"Top Events")];
+    NSArray *names = [counts keysSortedByValueUsingComparator:^NSComparisonResult(NSNumber *a, NSNumber *b) { return [b compare:a]; }];
+    NSUInteger i = 0;
+    for (NSString *n in names) {
+        if (i++ >= 60) { [r appendFormat:TPL(@"…and %lu more types"), (unsigned long)(names.count - 60)]; [r appendString:@"\n"]; break; }
+        NSString *desc = TPAnaDescribe(n, zh) ?: TPL(@"Unknown");
+        [r appendFormat:@"\n%@\n%@ · %@\n", desc, [NSString stringWithFormat:TPL(@"%@ times"), counts[n]], n];
+    }
+    [r appendFormat:@"\n【%@】\n%@\n", TPL(@"Recent Events"), TPL(@"Latest one of each type")];
+    NSDateFormatter *f = [NSDateFormatter new]; f.dateFormat = @"HH:mm:ss";
+    for (NSDictionary *it in [recent subarrayWithRange:NSMakeRange(0, MIN(recent.count, kTPAnaRecentMax))]) {
+        NSString *desc = TPAnaDescribe(it[@"n"], zh);
+        [r appendFormat:@"\n%@ %@\n%@%@\n", [f stringFromDate:it[@"t"]], desc ?: it[@"n"],
+                        desc ? [it[@"n"] stringByAppendingString:@"\n"] : @"", TPAnaPayloadString(it[@"e"])];
+    }
+    [r appendFormat:@"\n%@", TPL(@"Contains your user ID and post IDs. Check before sharing.")];
+    return r;
+}
+
 %group BlockAnalytics
 
 %hook FBAnalyticsCoreLogger
 - (void)_captureAnalyticsEvent:(id)event {
-    if ([TPPrefs boolForKey:TPKeyBlockAnalytics]) { __sync_fetch_and_add(&gTPAnalyticsDropped, 1); return; }
+    BOOL block = [TPPrefs boolForKey:TPKeyBlockAnalytics];
+    TPRecordAnalytics(event, block);
+    if (block) { __sync_fetch_and_add(&gTPAnalyticsDropped, 1); return; }
     %orig;
 }
 - (BOOL)_captureAnalyticsEventForBatchUpload:(id)event {   // 備援：萬一有路徑直接進批次上傳
@@ -2391,10 +2732,12 @@ static BOOL TPOpenExternally(id url) {
 
 %end // group ExternalBrowser
 
-#pragma mark - 20) 隱藏個人檔案的 Instagram 按鈕
+#pragma mark - 20) 隱藏個人檔案的 Instagram 按鈕、搜尋按鈕
 
-// 個人檔案上方的 Instagram 按鈕是 BCNProfileViewController 的 appSwitcherButton（點了切換到 Instagram）
-static const void *kTPHiddenIGViewKey = &kTPHiddenIGViewKey;
+// 個人檔案上方的按鈕都是 BCNProfileViewController 的 lazy 屬性：
+//   appSwitcherButton：Instagram 按鈕（點了切換到 Instagram）
+//   searchButton     ：搜尋按鈕
+static const void *kTPHiddenProfileViewsKey = &kTPHiddenProfileViewsKey;
 
 /// 按鈕外面常包著一層只放它的容器（例如毛玻璃圓底），要把整個容器藏起來，旁邊的按鈕才會靠攏
 static UIView *TPIGButtonSlot(UIView *button) {
@@ -2413,44 +2756,58 @@ static void TPResetShifted(UIViewController *vc) {
     objc_setAssociatedObject(vc, kTPShiftedViewsKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static void TPApplyHideIGButton(UIViewController *vc) {
-    BOOL on = [TPPrefs boolForKey:TPKeyHideIGButton];
-    UIView *hidden = ((TPWeakBox *)objc_getAssociatedObject(vc, kTPHiddenIGViewKey)).object;
-    if (!on) {                                                   // 關掉開關：還原
-        if (hidden) { hidden.hidden = NO; objc_setAssociatedObject(vc, kTPHiddenIGViewKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
-        TPResetShifted(vc);
-        return;
-    }
-    Ivar iv = class_getInstanceVariable(object_getClass(vc), "$__lazy_storage_$_appSwitcherButton");
-    UIView *button = iv ? object_getIvar(vc, iv) : nil;
-    if (![button isKindOfClass:[UIView class]] || !button.superview) return;
-    UIView *slot = TPIGButtonSlot(button);
-    slot.hidden = YES;
-    TPWeakBox *box = [TPWeakBox new];
-    box.object = slot;
-    objc_setAssociatedObject(vc, kTPHiddenIGViewKey, box, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if ([slot.superview isKindOfClass:[UIStackView class]]) return;   // 在 stack view 裡：隱藏後會自動靠攏
+static UIView *TPProfileButton(UIViewController *vc, const char *ivar) {
+    Ivar iv = class_getInstanceVariable(object_getClass(vc), ivar);
+    UIView *b = iv ? object_getIvar(vc, iv) : nil;
+    return [b isKindOfClass:[UIView class]] && b.superview ? b : nil;
+}
 
-    // 不在 stack view（Threads 自己算座標）：把同一排的其他按鈕往空位移過去
+static void TPApplyHideIGButton(UIViewController *vc) {
+    // 先還原上次藏起來、移過的
+    for (TPWeakBox *box in (NSArray *)objc_getAssociatedObject(vc, kTPHiddenProfileViewsKey)) ((UIView *)box.object).hidden = NO;
+    objc_setAssociatedObject(vc, kTPHiddenProfileViewsKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     TPResetShifted(vc);
-    CGRect f = slot.frame;
-    NSMutableArray<UIView *> *left = [NSMutableArray array], *right = [NSMutableArray array];
-    CGFloat leftEdge = -CGFLOAT_MAX, rightEdge = CGFLOAT_MAX;
-    for (UIView *v in slot.superview.subviews) {
-        if (v == slot || v.hidden || v.alpha < 0.01) continue;
-        CGRect g = v.frame;
-        if (g.size.width > 100 || g.size.height > 100) continue;                 // 只動按鈕大小的東西，標題等不碰
-        if (CGRectGetMaxY(g) <= CGRectGetMinY(f) || CGRectGetMinY(g) >= CGRectGetMaxY(f)) continue;   // 不同一排
-        if (CGRectGetMaxX(g) <= CGRectGetMinX(f) + 1) { [left addObject:v]; leftEdge = MAX(leftEdge, CGRectGetMaxX(g)); }
-        else if (CGRectGetMinX(g) >= CGRectGetMaxX(f) - 1) { [right addObject:v]; rightEdge = MIN(rightEdge, CGRectGetMinX(g)); }
+
+    NSMutableArray<UIView *> *slots = [NSMutableArray array];
+    if ([TPPrefs boolForKey:TPKeyHideIGButton]) { UIView *b = TPProfileButton(vc, "$__lazy_storage_$_appSwitcherButton"); if (b) [slots addObject:TPIGButtonSlot(b)]; }
+    if ([TPPrefs boolForKey:TPKeyHideProfileSearch]) { UIView *b = TPProfileButton(vc, "$__lazy_storage_$_searchButton"); if (b) [slots addObject:TPIGButtonSlot(b)]; }
+    if (!slots.count) return;
+
+    NSMutableArray *hiddenBoxes = [NSMutableArray array];
+    for (UIView *slot in slots) {
+        slot.hidden = YES;
+        TPWeakBox *box = [TPWeakBox new]; box.object = slot; [hiddenBoxes addObject:box];
     }
-    NSArray *movers; CGFloat dx;
-    if (left.count) { movers = left; dx = CGRectGetMaxX(f) - leftEdge; }        // 靠右的一排：左邊的往右補
-    else if (right.count) { movers = right; dx = CGRectGetMinX(f) - rightEdge; } // 靠左的一排：右邊的往左補
-    else return;
+    objc_setAssociatedObject(vc, kTPHiddenProfileViewsKey, hiddenBoxes, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    // 不在 stack view 裡（Threads 自己算座標）：把同一排的其他按鈕往空位移過去；在 stack view 裡會自動靠攏
+    NSMapTable<UIView *, NSNumber *> *shift = [NSMapTable weakToStrongObjectsMapTable];
+    for (UIView *slot in slots) {
+        if (!slot.superview || [slot.superview isKindOfClass:[UIStackView class]]) continue;
+        CGRect f = slot.frame;
+        NSMutableArray<UIView *> *left = [NSMutableArray array], *right = [NSMutableArray array];
+        CGFloat leftEdge = -CGFLOAT_MAX, rightEdge = CGFLOAT_MAX;
+        for (UIView *v in slot.superview.subviews) {
+            if ([slots containsObject:v] || v.hidden || v.alpha < 0.01) continue;
+            CGRect g = v.frame;
+            if (g.size.width > 100 || g.size.height > 100) continue;             // 只動按鈕大小的東西，標題等不碰
+            if (CGRectGetMaxY(g) <= CGRectGetMinY(f) || CGRectGetMinY(g) >= CGRectGetMaxY(f)) continue;   // 不同一排
+            if (CGRectGetMaxX(g) <= CGRectGetMinX(f) + 1) { [left addObject:v]; leftEdge = MAX(leftEdge, CGRectGetMaxX(g)); }
+            else if (CGRectGetMinX(g) >= CGRectGetMaxX(f) - 1) { [right addObject:v]; rightEdge = MIN(rightEdge, CGRectGetMinX(g)); }
+        }
+        NSArray *movers; CGFloat dx;
+        if (left.count) { movers = left; dx = CGRectGetMaxX(f) - leftEdge; }        // 靠右的一排：左邊的往右補
+        else if (right.count) { movers = right; dx = CGRectGetMinX(f) - rightEdge; } // 靠左的一排：右邊的往左補
+        else continue;
+        for (UIView *v in movers) {
+            // 藏起來的按鈕相鄰時，每顆算出的距離都已經包含另一顆的空位（計算時兩顆都跳過），取較大的就好，不能相加
+            double prev = [[shift objectForKey:v] doubleValue];
+            if (fabs(dx) > fabs(prev)) [shift setObject:@(dx) forKey:v];
+        }
+    }
     NSMutableArray *boxes = [NSMutableArray array];
-    for (UIView *v in movers) {
-        v.transform = CGAffineTransformMakeTranslation(dx, 0);
+    for (UIView *v in shift) {
+        v.transform = CGAffineTransformMakeTranslation([[shift objectForKey:v] doubleValue], 0);
         TPWeakBox *b = [TPWeakBox new]; b.object = v; [boxes addObject:b];
     }
     objc_setAssociatedObject(vc, kTPShiftedViewsKey, boxes, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -2540,11 +2897,532 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
 
 %end // group HomeLongPress
 
+#pragma mark - 22) 私訊：不顯示看過、不顯示輸入中、防止訊息收回
+
+// 不顯示看過：Threads 標記聊天室已讀時，會用 BCNSlideMDCoreMarkThreadReadMutationBuilder 建立「已讀到某個時間」的請求。
+//   把時間改成 0（或已經讓對方看過的位置），伺服器上的已讀位置就不會往前移，對方看不到「看過」；你自己這邊照常當作已經看過。
+//   個別聊天室：按右上角的眼睛可以設定這個聊天室照常顯示「看過」，設定會一直保留。
+//   回覆訊息時：按下送出就補送一次已讀，訊息等「看過」送到才送出，對方會先看到「看過」再看到你的回覆
+static NSString *TPThreadKey(id fbid) {
+    if (!fbid) return nil;
+    if ([fbid isKindOfClass:[NSString class]]) return fbid;
+    if ([fbid isKindOfClass:[NSNumber class]]) return [fbid stringValue];
+    id raw = [TPDownloader safeValue:fbid key:@"rawValue"];
+    if ([raw isKindOfClass:[NSString class]]) return raw;
+    if ([raw isKindOfClass:[NSNumber class]]) return [raw stringValue];
+    // 拿不到原始值時，從描述裡取出最長的一串數字（不能用整段描述，裡面有記憶體位址，每個物件都不一樣）
+    NSString *best = nil;
+    for (NSString *part in [[fbid description] componentsSeparatedByCharactersInSet:[[NSCharacterSet decimalDigitCharacterSet] invertedSet]])
+        if (part.length > best.length) best = part;
+    return best.length >= 6 ? best : [fbid description];
+}
+
+// 目前開著的聊天室（標題列在畫面上），以及它是否設定為顯示「看過」
+static NSString *gTPOpenChatKey;
+static BOOL gTPOpenChatShowsSeen;
+
+static void TPSendSeenNow(NSString *k);
+static BOOL TPChatShowsSeen(NSString *key);
+
+static void TPAllowSeenAfterReply(id fbid) {
+    NSString *k = TPThreadKey(fbid);
+    if (!k.length) return;
+    if (TPChatShowsSeen(k)) return;   // 這個聊天室本來就會顯示「看過」
+    if (![TPPrefs boolForKey:TPKeySeenOnReply]) return;   // 「回覆後顯示看過」關閉：回覆也不送
+    // 1.5 秒內同一個聊天室只算一次
+    static NSMutableDictionary<NSString *, NSNumber *> *lastReply;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    @synchronized ([TPPrefs class]) {
+        if (!lastReply) lastReply = [NSMutableDictionary dictionary];
+        if (now - [lastReply[k] doubleValue] < 1.5) return;
+        lastReply[k] = @(now);
+    }
+    // 按下送出時就補送已讀（在主執行緒就直接送，要比 MDCoreSendService 排訊息早，那邊才知道要先暫停訊息）
+    if ([NSThread isMainThread]) TPSendSeenNow(k);
+    else dispatch_async(dispatch_get_main_queue(), ^{ TPSendSeenNow(k); });
+}
+
+// 個別聊天室設定：這些聊天室照常送出「看過」（其他聊天室依總開關隱藏）。存在手機裡，重開聊天室或 App 都不會變
+static NSString *const kTPSeenChatsKey = @"tp_seen_allowed_chats";
+
+static BOOL TPChatShowsSeen(NSString *key) {
+    if (!key.length) return NO;
+    NSArray *list = [[NSUserDefaults standardUserDefaults] arrayForKey:kTPSeenChatsKey];
+    return [list containsObject:key];
+}
+
+static void TPSetChatShowsSeen(NSString *key, BOOL show) {
+    if (!key.length) return;
+    NSMutableArray *list = [[[NSUserDefaults standardUserDefaults] arrayForKey:kTPSeenChatsKey] mutableCopy] ?: [NSMutableArray array];
+    [list removeObject:key];
+    if (show) [list addObject:key];
+    [[NSUserDefaults standardUserDefaults] setObject:list forKey:kTPSeenChatsKey];
+}
+
+// 補送已讀（回覆時、打開眼睛時）：照著 Threads 平常送已讀的方式送一次。
+//   - 記下每個聊天室上次被擋下的已讀參數（聊天室編號、時間格式）
+//   - 記下 Threads 用哪個 GraphQL 服務、哪個方法送出已讀
+static const void *kTPMarkReadTag = &kTPMarkReadTag;
+static NSMutableDictionary<NSString *, NSDictionary *> *gTPLastReadArgs;
+static __weak id gTPGQLService;
+static int gTPMarkReadVia;                 // 1 handleWithService、2 handleFiniteWithService、3 initiateRequest、4 initiateFiniteRequest
+static BOOL gTPForceSeen;                  // 插件自己補送時，不要被攔下來
+
+static id TPTagMarkRead(id b) {
+    if (b) objc_setAssociatedObject(b, kTPMarkReadTag, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return b;
+}
+
+static NSMutableDictionary<NSString *, NSNumber *> *gTPSeenSentAt;   // 補送成功的時間，送出訊息時判斷要不要先暫停
+// 每個聊天室已經讓對方知道讀到哪個時間（補送或照常送出的）。之後要擋的已讀改送這個時間而不是 0：
+//   送 0 會讓伺服器把已讀位置往回退，對方剛看到的「看過」又消失
+static NSMutableDictionary<NSString *, NSNumber *> *gTPSeenWatermark;
+
+// 等「看過」送到伺服器才送出的訊息：伺服器一回應就放行，最多等 0.8 秒
+static NSMutableDictionary<NSString *, NSMutableArray *> *gTPHeldMessages;
+
+static void TPReleaseHeldMessages(NSString *k) {
+    NSArray *blocks;
+    @synchronized ([TPPrefs class]) { blocks = gTPHeldMessages[k]; [gTPHeldMessages removeObjectForKey:k]; }
+    for (dispatch_block_t b in blocks) b();
+}
+
+static void TPRecordWatermark(NSString *k, id ms) {
+    long long v = [ms respondsToSelector:@selector(longLongValue)] ? [ms longLongValue] : 0;
+    if (!k.length || v <= 0) return;
+    @synchronized ([TPPrefs class]) {
+        if (!gTPSeenWatermark) gTPSeenWatermark = [NSMutableDictionary dictionary];
+        if (v > [gTPSeenWatermark[k] longLongValue]) gTPSeenWatermark[k] = @(v);
+    }
+}
+
+static void TPSendSeenNow(NSString *k) {
+    NSDictionary *args;
+    @synchronized ([TPPrefs class]) { args = gTPLastReadArgs[k]; }
+    id service = gTPGQLService;
+    if (!args) { TPDebugNow(@"Seen: no read to resend for this chat yet"); return; }
+    if (!service || !gTPMarkReadVia) { TPDebugNow(@"Seen: GraphQL service not found"); return; }
+    long long nowMs = (long long)([[NSDate date] timeIntervalSince1970] * 1000);
+    long long otidVal = (nowMs << 22) | arc4random_uniform(1 << 22);
+    BOOL otidStr = [args[@"otidStr"] boolValue], msStr = [args[@"msStr"] boolValue];
+    id otid = otidStr ? [NSString stringWithFormat:@"%lld", otidVal] : @(otidVal);
+    // 用 Threads 原本要送的時間（最新一則訊息）；沒有才用現在。用現在的時間伺服器可能不接受
+    id ms = args[@"ms"] ?: (msStr ? [NSString stringWithFormat:@"%lld", nowMs] : @(nowMs));
+    Class cls = objc_getClass("BCNSlideMDCoreMarkThreadReadMutationBuilder");
+    gTPForceSeen = YES;
+    id b = ((id (*)(id, SEL, id, id, id))objc_msgSend)(cls, @selector(builderWithOfflineThreadingId:threadFbid:timestampMs:), otid, args[@"fbid"], ms);
+    gTPForceSeen = NO;
+    if (!b) { TPDebugNow(@"Seen: builder failed"); return; }
+    TPRecordWatermark(k, ms);
+    @synchronized ([TPPrefs class]) {
+        if (!gTPSeenSentAt) gTPSeenSentAt = [NSMutableDictionary dictionary];
+        gTPSeenSentAt[k] = @(CFAbsoluteTimeGetCurrent());
+    }
+    // 伺服器收下「看過」後，稍等 0.15 秒讓它傳到對方，再放行剛才暫停的訊息
+    void (^update)(id) = ^(id x) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ TPReleaseHeldMessages(k); });
+    };
+    void (^failure)(id) = ^(id e) {
+        TPDebugNow([NSString stringWithFormat:@"Seen: send failed %@", e]);
+        TPReleaseHeldMessages(k);                          // 送不出去也不要卡住訊息
+    };
+    dispatch_queue_t q = dispatch_get_main_queue();
+    @try {
+        switch (gTPMarkReadVia) {
+            case 1: ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(b, @selector(handleWithService:updateCallback:failureCallback:callbackQueue:), service, update, failure, q); break;
+            case 2: ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(b, @selector(handleFiniteWithService:updateCallback:failureCallback:callbackQueue:), service, update, failure, q); break;
+            case 3: ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(service, @selector(initiateRequest:initialData:updateCallback:failureCallback:callbackQueue:), [b request], nil, update, failure, q); break;
+            case 4: ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(service, @selector(initiateFiniteRequest:initialData:updateCallback:failureCallback:callbackQueue:), [b request], nil, update, failure, q); break;
+        }
+        TPDebugNow(TPL(@"Seen sent"));
+    } @catch (NSException *e) {
+        TPDebugNow([NSString stringWithFormat:@"Seen: %@", e.reason]);
+        TPReleaseHeldMessages(k);
+    }
+}
+
+%group NoSeen
+%hook BCNSlideMDCoreMarkThreadReadMutationBuilder
++ (id)builderWithOfflineThreadingId:(id)otid threadFbid:(id)fbid timestampMs:(id)ms {
+    if (gTPForceSeen) return TPTagMarkRead(%orig);
+    if (![TPPrefs boolForKey:TPKeyNoSeen]) return TPTagMarkRead(%orig);
+    // 記下這個聊天室的已讀參數，回覆時補送用
+    NSString *argKey = TPThreadKey(fbid);
+    if (argKey.length && fbid) @synchronized ([TPPrefs class]) {
+        if (!gTPLastReadArgs) gTPLastReadArgs = [NSMutableDictionary dictionary];
+        NSMutableDictionary *d = [@{ @"fbid": fbid, @"otidStr": @([otid isKindOfClass:[NSString class]]),
+                                     @"msStr": @([ms isKindOfClass:[NSString class]]) } mutableCopy];
+        if (ms && [ms longLongValue] > 0) d[@"ms"] = ms;   // Threads 原本要標記的已讀時間（最新一則訊息的時間）
+        gTPLastReadArgs[argKey] = d;
+    }
+    if (TPChatShowsSeen(TPThreadKey(fbid))) { TPRecordWatermark(argKey, ms); return TPTagMarkRead(%orig); }   // 這個聊天室設定為照常顯示「看過」
+    // 保險：開著的聊天室設定為顯示「看過」時也照常送出（萬一兩邊拿到的聊天室編號格式不同）
+    if (gTPOpenChatShowsSeen && gTPOpenChatKey.length) {
+        NSString *k = TPThreadKey(fbid), *otidKey = TPThreadKey(otid);
+        if (!k.length || [k isEqualToString:gTPOpenChatKey] || [gTPOpenChatKey containsString:k] || [k containsString:gTPOpenChatKey]
+            || [otidKey isEqualToString:gTPOpenChatKey]) { TPRecordWatermark(argKey, ms); return TPTagMarkRead(%orig); }
+        TPDebug([NSString stringWithFormat:@"Seen: %@ ≠ %@", k, gTPOpenChatKey]);
+    }
+    long long wm;
+    @synchronized ([TPPrefs class]) { wm = [gTPSeenWatermark[argKey] longLongValue]; }
+    id zero = [ms isKindOfClass:[NSString class]] ? [NSString stringWithFormat:@"%lld", wm] : @(wm);   // 沒送過就是 0
+    // Threads 會反覆送出已讀（例如新訊息進來、捲動時），提示同一個聊天室 1 分鐘只顯示一次
+    static NSMutableDictionary<NSString *, NSNumber *> *lastToast;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ lastToast = [NSMutableDictionary dictionary]; });
+    NSString *k = TPThreadKey(fbid) ?: @"";
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    @synchronized ([TPPrefs class]) {
+        if (now - [lastToast[k] doubleValue] > 60) { lastToast[k] = @(now); TPDebug(TPL(@"Seen status blocked")); }
+    }
+    return TPTagMarkRead(%orig(otid, fbid, zero));
+}
+%end
+
+// 記下 Threads 送出已讀用的服務和方法（補送時照做）
+%hook PNGraphQLQueryBuilder
+- (id)handleWithService:(id)service updateCallback:(id)u failureCallback:(id)f callbackQueue:(id)q {
+    if (objc_getAssociatedObject(self, kTPMarkReadTag)) { gTPGQLService = service; gTPMarkReadVia = 1; }
+    return %orig;
+}
+- (id)handleFiniteWithService:(id)service updateCallback:(id)u failureCallback:(id)f callbackQueue:(id)q {
+    if (objc_getAssociatedObject(self, kTPMarkReadTag)) { gTPGQLService = service; gTPMarkReadVia = 2; }
+    return %orig;
+}
+- (id)request {
+    id r = %orig;
+    if (r && objc_getAssociatedObject(self, kTPMarkReadTag)) objc_setAssociatedObject(r, kTPMarkReadTag, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return r;
+}
+%end
+
+%hook PNPandoGraphQLService
+- (id)initiateRequest:(id)req initialData:(id)d updateCallback:(id)u failureCallback:(id)f callbackQueue:(id)q {
+    if (req && objc_getAssociatedObject(req, kTPMarkReadTag) && gTPMarkReadVia < 1) { gTPGQLService = self; gTPMarkReadVia = 3; }
+    return %orig;
+}
+- (id)initiateFiniteRequest:(id)req initialData:(id)d updateCallback:(id)u failureCallback:(id)f callbackQueue:(id)q {
+    if (req && objc_getAssociatedObject(req, kTPMarkReadTag) && gTPMarkReadVia < 1) { gTPGQLService = self; gTPMarkReadVia = 4; }
+    return %orig;
+}
+%end
+
+// 送出訊息時：Threads 建立「要送出的訊息」（BCNSlideOutgoingMessagePayload）或「對訊息的動作」（回應等，
+//   BCNSlideOutgoingMessageUpdatePayload）時就算回覆。不從 MDCoreSendService 判斷：那裡大多是聊天室更新（例如已讀），
+//   一進聊天室就會排好幾筆，會被誤當成回覆
+// 送出訊息時：如果剛補送「看過」，訊息等伺服器收下「看過」才送（最多 0.8 秒），讓對方先看到「看過」再看到你的回覆
+//   （「看過」跟訊息同時到的話，對方畫面上最後一則變成你的訊息，「看過」就沒地方顯示）
+%hook MDCoreSendService
+- (void)sendMutationWithAppDataModel:(id)model offlineThreadingId:(id)otid optimisticImages:(id)images syncGroupId:(int)group {
+    Ivar iv = model && [TPPrefs boolForKey:TPKeyNoSeen] ? class_getInstanceVariable(object_getClass(model), "_outgoingMessagePayload") : NULL;
+    id payload = iv ? object_getIvar(model, iv) : nil;
+    NSString *k = payload ? TPThreadKey([TPDownloader safeValue:payload key:@"threadFbid"]) : nil;
+    BOOL hold = NO;
+    if (k.length) @synchronized ([TPPrefs class]) { hold = CFAbsoluteTimeGetCurrent() - [gTPSeenSentAt[k] doubleValue] < 2; }
+    if (!hold) { %orig; return; }
+    TPDebug(TPL(@"Seen sent first, message follows"));
+    // 訊息先暫停，等伺服器收下「看過」再送（直接呼叫原本的方法，不會再進到這裡）
+    dispatch_block_t send = ^{ %orig(model, otid, images, group); };
+    __block BOOL done = NO;
+    dispatch_block_t once = ^{ if (done) return; done = YES; send(); };
+    @synchronized ([TPPrefs class]) {
+        if (!gTPHeldMessages) gTPHeldMessages = [NSMutableDictionary dictionary];
+        if (!gTPHeldMessages[k]) gTPHeldMessages[k] = [NSMutableArray array];
+        [gTPHeldMessages[k] addObject:[once copy]];
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), once);   // 保險：最多等 0.8 秒
+}
+%end
+
+%hook BCNSlideOutgoingMessagePayload
+- (id)initWithOfflineThreadingId:(id)otid threadFbid:(id)fbid senderFbid:(id)sender sendDate:(id)date content:(id)content navChain:(id)chain forwardedMessageId:(id)fwd sendAttribution:(id)attr promptSessionId:(id)ps qnaQuestionId:(id)qid qnaQuestion:(id)q {
+    id me = %orig;
+    if (me && [TPPrefs boolForKey:TPKeyNoSeen]) {
+        TPAllowSeenAfterReply(fbid);
+    }
+    return me;
+}
+%end
+%hook BCNSlideOutgoingMessageUpdatePayload
+- (id)initWithOfflineThreadingId:(id)otid messageId:(id)mid threadFbid:(id)fbid sendDate:(id)date action:(id)action navChain:(id)chain {
+    id me = %orig;
+    if (me && [TPPrefs boolForKey:TPKeyNoSeen]) {
+        TPAllowSeenAfterReply(fbid);
+    }
+    return me;
+}
+%end
+
+// 聊天室右上角「…」左邊加一顆眼睛按鈕，個別設定這個聊天室要不要顯示「看過」（設定會保留）：
+//   眼睛加斜線（灰）＝不顯示（跟總開關）；眼睛（主題色）＝這個聊天室照常顯示
+static const void *kTPSeenButtonKey = &kTPSeenButtonKey;
+
+/// 眼睛按鈕的狀態：顯示「看過」＝眼睛（主題色）；隱藏＝眼睛加斜線（灰）
+static void TPSetSeenButtonState(UIButton *b, BOOL showsSeen) {
+    [b setImage:[UIImage systemImageNamed:showsSeen ? @"eye" : @"eye.slash"
+                         withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium]]
+       forState:UIControlStateNormal];
+    b.tintColor = showsSeen ? [TPUI accentIcon] : UIColor.secondaryLabelColor;
+    b.accessibilityValue = TPL(showsSeen ? @"This chat shows Seen" : @"This chat hides Seen");
+}
+
+/// 聊天室的 BCNSlideMessageListViewController（從按鈕往上找）
+static UIViewController *TPChatViewControllerOf(UIView *v) {
+    Class chat = objc_getClass("_TtC21BCNSlideMessageListUI33BCNSlideMessageListViewController");
+    for (UIResponder *r = v; r; r = r.nextResponder) if (chat && [r isKindOfClass:chat]) return (UIViewController *)r;
+    return nil;
+}
+
+static NSString *TPChatKeyOf(UIViewController *chat) {
+    uint8_t *slot = chat ? TPIvarAddress(chat, "threadId") : NULL;
+    uintptr_t p = 0; if (slot) memcpy(&p, slot, 8);
+    id thread = p ? (__bridge id)(void *)p : nil;
+    return thread ? TPThreadKey(thread) : nil;
+}
+
+static UIButton *TPMakeSeenButton(void) {
+    UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
+    objc_setAssociatedObject(btn, kTPSeenButtonKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    btn.accessibilityLabel = TPL(@"Seen for This Chat");
+    TPSetSeenButtonState(btn, NO);
+    __weak UIButton *wb = btn;
+    [btn addAction:[UIAction actionWithHandler:^(UIAction *a) {
+        UIViewController *chat = TPChatViewControllerOf(wb);
+        NSString *key = TPChatKeyOf(chat);
+        if (!key.length) { [TPHUD toast:TPL(@"Couldn't find this chat")]; return; }
+        BOOL show = !TPChatShowsSeen(key);
+        TPSetChatShowsSeen(key, show);
+        gTPOpenChatKey = key; gTPOpenChatShowsSeen = show;
+        [TPUI hapticLight];
+        TPSetSeenButtonState(wb, show);
+        [TPHUD toast:TPL(show ? @"This chat shows Seen" : @"This chat hides Seen")];
+        // 改成顯示：馬上補送一次已讀，對方立刻看到「看過」
+        //   （不假裝離開又回到聊天室：那樣會讓聊天室停止即時接收新訊息）
+        if (show) TPSendSeenNow(key);
+    }] forControlEvents:UIControlEventTouchUpInside];
+    return btn;
+}
+
+// 聊天室標題列（BCNSlideMessageListNavBarTitleView）本身就有「…」（moreButton）：
+//   在它排版時把眼睛放在「…」左邊，跟著標題列一起出現、一起轉場，不會延遲也不會跑到別的畫面
+%hook _TtC21BCNSlideMessageListUI34BCNSlideMessageListNavBarTitleView
+- (void)layoutSubviews {
+    %orig;
+    UIView *me = (UIView *)self;
+    UIButton *btn = objc_getAssociatedObject(me, kTPSeenButtonKey);
+    if (![TPPrefs boolForKey:TPKeyNoSeen]) { btn.hidden = YES; return; }
+    uint8_t *slot = TPIvarAddress(me, "$__lazy_storage_$_moreButton");
+    uintptr_t p = 0; if (slot) memcpy(&p, slot, 8);
+    UIView *more = p ? (__bridge UIView *)(void *)p : nil;
+    if (![more isKindOfClass:[UIView class]] || !more.superview || more.hidden) { btn.hidden = YES; return; }
+    if (!btn) {
+        btn = TPMakeSeenButton();
+        objc_setAssociatedObject(me, kTPSeenButtonKey, btn, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (btn.superview != more.superview) [more.superview addSubview:btn];
+    CGRect m = more.frame;
+    btn.frame = CGRectMake(CGRectGetMinX(m) - 8 - 36, CGRectGetMidY(m) - 18, 36, 36);   // 「…」左邊，間距 8
+    NSString *key = TPChatKeyOf(TPChatViewControllerOf(me));
+    BOOL shows = TPChatShowsSeen(key);
+    if (key.length && me.window) { gTPOpenChatKey = key; gTPOpenChatShowsSeen = shows; }
+    TPSetSeenButtonState(btn, shows);
+    btn.hidden = NO;
+}
+- (void)didMoveToWindow {
+    %orig;
+    if (!((UIView *)self).window) gTPOpenChatShowsSeen = NO;   // 離開聊天室
+}
+%end
+%end // group NoSeen
+
+// 不顯示輸入中：打字時 Threads 用 BCNTypingIndicatorPublishEventMutationBuilder 送出狀態給對方（1＝輸入中、0＝停止輸入）。
+//   開啟時一律改成送 0：請求照常送到正確的聊天室，伺服器只會收到「沒在輸入」，對方就看不到「輸入中…」，
+//   也不會因為請求失敗影響聊天室的即時連線（之前改聊天室編號的做法會讓新訊息要進出聊天室才出現）
+%group NoTyping
+%hook BCNTypingIndicatorPublishEventMutationBuilder
++ (id)builderWithActivityStatus:(id)status threadId:(id)tid {
+    if (![TPPrefs boolForKey:TPKeyNoTyping] || ![status isKindOfClass:[NSNumber class]] || [status integerValue] == 0) return %orig;
+    static CFAbsoluteTime last;
+    if (CFAbsoluteTimeGetCurrent() - last > 60) { last = CFAbsoluteTimeGetCurrent(); TPDebug(TPL(@"Typing status blocked")); }
+    return %orig(@0, tid);
+}
+%end
+%end // group NoTyping
+
+// 防止訊息收回：對方收回訊息時，伺服器送來「刪除訊息」的更新，交給 Swift 的 BCNSlideDeleteMessageHandler 處理。
+//   它透過 MDCoreDeltaApplyingBridge（ObjC 橋接，建立時帶著處理器的型別名稱）產生要套用到本機資料庫的指令；
+//   開關開啟時，把「刪除訊息」處理器產生的刪除指令拿掉，訊息就會留在本機。
+static const void *kTPApplierNameKey = &kTPApplierNameKey;
+
+/// MDCoreMutationCommand 是 enum 包裝，用 match 方法判斷是不是「刪除」指令；是的話回傳裡面的 MDCoreDeleteMutationCommand
+static id TPDeleteCommandPayload(id cmd) {
+    SEL sel = NSSelectorFromString(@"matchUpsertCommand:deleteCommand:updateCommand:deleteAllCommand:deleteFolderCommand:");
+    if (![cmd respondsToSelector:sel]) return nil;
+    __block id payload = nil;
+    __block BOOL del = NO;
+    void (^none)(id) = ^(id x) {};
+    void (^hit)(id) = ^(id x) { del = YES; payload = x; };
+    ((void (*)(id, SEL, id, id, id, id, id))objc_msgSend)(cmd, sel, none, hit, none, none, none);
+    return del ? (payload ?: (id)kCFNull) : nil;
+}
+
+#pragma mark   └ 「已收回」標示
+
+// 被收回的訊息：記下刪除指令裡的訊息識別文字（格式不固定，所以存整段描述，比對時看是否包含訊息 ID）
+static NSString *const kTPUnsentKey = @"tp_unsent_messages";
+static NSMutableArray<NSString *> *gTPUnsent;
+
+static NSMutableArray<NSString *> *TPUnsentList(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:kTPUnsentKey];
+        gTPUnsent = [saved isKindOfClass:[NSArray class]] ? [saved mutableCopy] : [NSMutableArray array];
+    });
+    return gTPUnsent;
+}
+
+// 畫面上的訊息格子：記下來，對方收回訊息時馬上重新排版，「已收回」立刻出現，不用離開聊天室再回來
+static NSHashTable<UIView *> *gTPMessageCells;
+
+static void TPRefreshMessageCells(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (UIView *cell in gTPMessageCells.allObjects) if (cell.window) [cell setNeedsLayout];
+    });
+}
+
+static void TPRememberUnsent(id deletePayload) {
+    id ids = [TPDownloader safeValue:deletePayload key:@"messageAndThreadIds"];
+    if (![ids respondsToSelector:@selector(allObjects)] && ![ids isKindOfClass:[NSArray class]]) return;
+    NSArray *items = [ids isKindOfClass:[NSArray class]] ? ids : [ids allObjects];
+    @synchronized (TPUnsentList()) {
+        for (id e in items) {
+            NSString *d = [e description];
+            if (d.length && ![gTPUnsent containsObject:d]) [gTPUnsent addObject:d];
+        }
+        while (gTPUnsent.count > 500) [gTPUnsent removeObjectAtIndex:0];
+        [[NSUserDefaults standardUserDefaults] setObject:[gTPUnsent copy] forKey:kTPUnsentKey];
+    }
+    TPRefreshMessageCells();
+}
+
+static BOOL TPIsUnsentMessageId(NSString *mid) {
+    if (mid.length < 4) return NO;
+    @synchronized (TPUnsentList()) {
+        for (NSString *d in gTPUnsent) if ([d containsString:mid]) return YES;
+    }
+    return NO;
+}
+
+/// 讀 Swift String（16 bytes）：只接受「短字串」「原生字串」「橋接的 NSString」，讀取前都先確認記憶體位址可用
+static NSString *TPReadSwiftString(const uint8_t *p) {
+    if (!p) return nil;
+    uint64_t w0, w1;
+    memcpy(&w0, p, 8); memcpy(&w1, p + 8, 8);
+    if (w1 & (1ULL << 61)) {                                   // 短字串：內容就放在這 16 bytes 裡
+        NSUInteger n = (w1 >> 56) & 0xF;
+        if (n > 15) return nil;
+        char buf[16]; memcpy(buf, p, 16);
+        return [[NSString alloc] initWithBytes:buf length:n encoding:NSUTF8StringEncoding];
+    }
+    uintptr_t addr = (uintptr_t)(w1 & 0x0FFFFFFFFFFFFFFFULL);
+    if (!addr || !malloc_zone_from_ptr((const void *)addr)) return nil;
+    if ((w1 >> 60) == 0x4) {                                  // 橋接的 NSString
+        id obj = (__bridge id)(void *)addr;
+        return [obj isKindOfClass:[NSString class]] ? obj : nil;
+    }
+    if ((w1 >> 60) != 0) return nil;                          // 其他形式不處理
+    NSUInteger n = (NSUInteger)(w0 & 0x0000FFFFFFFFFFFFULL);   // 原生字串：字元從物件開頭往後 32 bytes
+    if (n == 0 || n > 512 || malloc_size((const void *)addr) < 32 + n) return nil;
+    return [[NSString alloc] initWithBytes:(const void *)(addr + 32) length:n encoding:NSUTF8StringEncoding];
+}
+
+/// 訊息格子的 model（BCNSlideMessageViewModel?）：開頭是 metadata { threadId（物件）, messageId（String）, … }
+static NSString *TPMessageIdOfCell(UIView *cell) {
+    uint8_t *m = TPIvarAddress(cell, "model");
+    if (!m) return nil;
+    uintptr_t thread; memcpy(&thread, m, 8);
+    if (!thread) return nil;                                   // model 是 nil
+    return TPReadSwiftString(m + 8);
+}
+
+static const void *kTPUnsentLabelKey = &kTPUnsentLabelKey;
+
+static void TPUpdateUnsentLabel(UIView *cell) {
+    UILabel *label = objc_getAssociatedObject(cell, kTPUnsentLabelKey);
+    // 不看開關：之前保留下來的訊息，關掉「防止訊息收回」後還是留在聊天室裡，標示也要跟著留著
+    NSString *mid = TPMessageIdOfCell(cell);
+    BOOL show = mid && TPIsUnsentMessageId(mid);
+    if (!show) { label.hidden = YES; return; }
+    uint8_t *slot = TPIvarAddress(cell, "$__lazy_storage_$_messageContentContainerView");
+    UIView *bubble = nil;
+    if (slot) { uintptr_t v; memcpy(&v, slot, 8); bubble = v ? (__bridge UIView *)(void *)v : nil; }
+    if (![bubble isKindOfClass:[UIView class]] || !bubble.superview) return;
+    if (!label) {
+        label = [UILabel new];
+        label.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        label.textColor = UIColor.systemRedColor;
+        label.text = TPL(@"Unsent");
+        [label sizeToFit];
+        objc_setAssociatedObject(cell, kTPUnsentLabelKey, label, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    UIView *host = ((UICollectionViewCell *)cell).contentView;
+    if (label.superview != host) [host addSubview:label];
+    CGRect b = [bubble convertRect:bubble.bounds toView:host];
+    CGSize s = label.bounds.size;
+    BOOL bubbleOnLeft = CGRectGetMidX(b) < host.bounds.size.width / 2;
+    CGFloat x = bubbleOnLeft ? CGRectGetMaxX(b) + 6 : CGRectGetMinX(b) - 6 - s.width;
+    label.frame = CGRectMake(x, CGRectGetMaxY(b) - s.height - 4, s.width, s.height);
+    label.hidden = NO;
+}
+
+%group KeepUnsent
+%hook MDCoreDeltaApplyingBridge
+- (id)initWithWrappedTypeName:(id)name dataRequestHandler:(id)a mutationCommandsHandler:(id)b queueInfoHandler:(id)c {
+    id me = %orig;
+    if (me && name) objc_setAssociatedObject(me, kTPApplierNameKey, name, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return me;
+}
+- (id)mutationCommandsForDeltaWithRequestedState:(id)state currentUserFbid:(id)fbid shouldFallbackToInboxResnapshotOnDeltaHandlingError:(BOOL)fallback {
+    id r = %orig;
+    if (![TPPrefs boolForKey:TPKeyKeepUnsent]) return r;
+    NSString *name = objc_getAssociatedObject(self, kTPApplierNameKey);
+    if (![name isKindOfClass:[NSString class]] || ![name containsString:@"DeleteMessage"]) return r;
+    // 回傳的是 MDCoreDeltaApplicationResult（enum 包裝）；只處理「一組要套用的指令」這一種
+    Class resultCls = objc_getClass("MDCoreDeltaApplicationResult");
+    Ivar iv = resultCls && [r isKindOfClass:resultCls] ? class_getInstanceVariable(resultCls, "_mutationCommands_commands") : NULL;
+    NSArray *cmds = iv ? object_getIvar(r, iv) : nil;
+    if (![cmds isKindOfClass:[NSArray class]]) return r;
+    NSMutableArray *kept = [NSMutableArray array];
+    for (id cmd in cmds) {
+        id payload = TPDeleteCommandPayload(cmd);
+        if (!payload) { [kept addObject:cmd]; continue; }
+        if (payload != (id)kCFNull) TPRememberUnsent(payload);   // 記下來，訊息旁邊才標得出「已收回」
+    }
+    if (kept.count == cmds.count) return r;               // 沒有刪除指令
+    SEL make = NSSelectorFromString(@"mutationCommandsWithCommands:");
+    if (![resultCls respondsToSelector:make]) return r;
+    TPDebug(TPL(@"Unsent message kept"));
+    return ((id (*)(id, SEL, id))objc_msgSend)(resultCls, make, kept);
+}
+%end
+
+%hook _TtC21BCNSlideMessageListUI27BCNSlideMessageListViewCell
+- (void)layoutSubviews {
+    %orig;
+    if (!gTPMessageCells) gTPMessageCells = [NSHashTable weakObjectsHashTable];
+    [gTPMessageCells addObject:(UIView *)self];
+    TPUpdateUnsentLabel((UIView *)self);
+}
+%end
+%end // group KeepUnsent
+
 #pragma mark - 初始化
 
 %ctor {
     @autoreleasepool {
         TPSideloadFixInstall();       // 要在 Threads 開始使用鑰匙圈之前
+        for (NSString *old in @[@"tp_last_logout", @"tp_logout_history", @"tp_logout_keychain"])   // 舊版測試用的登出紀錄
+            [[TPPrefs defaults] removeObjectForKey:old];
         %init(Ads);
         %init(Tracking);
         %init(Download);
@@ -2568,6 +3446,9 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
         %init(ExternalBrowser);
         %init(HideIGButton);
         %init(HomeLongPress);
+        %init(NoSeen);
+        %init(KeepUnsent);
+        %init(NoTyping);
         %init(Menu);
 
         // 進入背景時：記下時間（保留首頁動態位置用），並存下這次的鑰匙圈與分析回傳統計（下次開啟時的除錯提示用）
@@ -2575,8 +3456,8 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
             gTPBackgroundedAt = CFAbsoluteTimeGetCurrent();
-            [[NSUserDefaults standardUserDefaults] setObject:TPSideloadFixStats() forKey:@"tp_sf_last_stats"];
-            [[NSUserDefaults standardUserDefaults] setInteger:gTPAnalyticsDropped forKey:@"tp_analytics_last_dropped"];
+            [[TPPrefs defaults] setObject:TPSideloadFixStats() forKey:@"tp_sf_last_stats"];
+            [[TPPrefs defaults] setInteger:gTPAnalyticsDropped forKey:@"tp_analytics_last_dropped"];
         }];
 
         // 回到 Threads 時檢查剪貼簿裡有沒有連結（稍等一下，讓畫面先就緒）
@@ -2594,25 +3475,21 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
                                                       usingBlock:^(NSNotification *n) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
                 // 顯示這次的狀態，以及上次使用期間（進背景前）鑰匙圈的統計
-                NSString *last = [[NSUserDefaults standardUserDefaults] stringForKey:@"tp_sf_last_stats"];
+                NSString *last = [[TPPrefs defaults] stringForKey:@"tp_sf_last_stats"];
                 NSString *msg = [NSString stringWithFormat:@"%@: %@", TPL(@"Sideload Compatibility Fix"), TPSideloadFixStatus()];
                 if (last.length) msg = [msg stringByAppendingFormat:@"\n%@: %@", TPL(@"Last session"), last];
                 if ([TPPrefs boolForKey:TPKeyBlockAnalytics])
                     msg = [msg stringByAppendingFormat:@"\n%@: %ld", TPL(@"Analytics blocked last session"),
-                           (long)[[NSUserDefaults standardUserDefaults] integerForKey:@"tp_analytics_last_dropped"]];
+                           (long)[[TPPrefs defaults] integerForKey:@"tp_analytics_last_dropped"]];
                 if ([TPPrefs boolForKey:TPKeyDebugToast]) [TPHUD toast:[@"[TP] " stringByAppendingString:msg]];
             });
         }];
 
-        // 第一次啟動時提示入口位置
+        // 還沒看過歡迎畫面的人，回到 App 時顯示一次（介紹怎麼打開插件設定）
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
-            if ([TPPrefs boolForKey:@"tp_intro_shown"]) return;
-            [TPPrefs setBool:YES forKey:@"tp_intro_shown"];
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                [TPHUD toast:TPL(@"ThreadsPulse loaded: tap “Pulse” at the top-right of Settings, or long-press with three fingers for 1 second")];
-            });
+            [TPWelcomeViewController presentIfNeeded];
         }];
     }
 }
