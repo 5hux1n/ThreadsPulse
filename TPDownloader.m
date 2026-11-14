@@ -7,23 +7,19 @@
 #import "TPUI.h"
 #import "TPHUD.h"
 
-/// 依序下載多個項目（影片／圖片），顯示進度視窗並存入「照片」。
 @interface TPDownloadJob : NSObject <NSURLSessionDownloadDelegate>
 - (instancetype)initWithItems:(NSArray<NSDictionary *> *)items;
 - (void)start;
 @end
 
-static NSString *sPendingReport;          // 下一個下載工作結束時要顯示的除錯報告
+static NSString *sPendingReport;
 
 @implementation TPDownloader
-
-#pragma mark - Helpers
 
 + (UIViewController *)topViewController { return TPTopViewController(); }
 
 + (void)toast:(NSString *)text { [TPHUD toast:text]; }
 
-/// 安全取值：避免對 Swift/ObjC 混合物件用 KVC 時因 key 不存在而崩潰。
 static id TPSafeValue(id obj, NSString *key) {
     if (!obj) return nil;
     SEL sel = NSSelectorFromString(key);
@@ -33,7 +29,6 @@ static id TPSafeValue(id obj, NSString *key) {
     return nil;
 }
 
-/// 讀數字：支援 NSNumber，以及 Meta 的 FBBoxedInteger（值放在 value / integerValue 等不同方法裡）
 static NSInteger TPInt(id v) {
     if (!v) return 0;
     if ([v respondsToSelector:@selector(integerValue)]) return [v integerValue];
@@ -47,7 +42,6 @@ static NSInteger TPInt(id v) {
     return 0;
 }
 
-/// 替候選網址打分數：-1 = 排除（純音訊）。數字越大解析度越高。
 static NSInteger TPScoreURL(NSURL *u) {
     NSString *abs = u.absoluteString;
     NSString *tag = @"";
@@ -67,32 +61,28 @@ static NSInteger TPScoreURL(NSURL *u) {
 
     NSInteger score = 1;
     if ([abs.lowercaseString containsString:@".mp4"]) score += 50;
-    if ([lower containsString:@"progressive"]) score += 100000;      // 含音訊的單一 mp4
+    if ([lower containsString:@"progressive"]) score += 100000;
     NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:@"\\.(\\d{3,4})\\." options:0 error:nil];
     NSTextCheckingResult *r = [re firstMatchInString:tag options:0 range:NSMakeRange(0, tag.length)];
     if (r) score += [[tag substringWithRange:[r rangeAtIndex:1]] integerValue];
     return score;
 }
 
-#pragma mark - URL selection
-
 + (NSURL *)bestURLFromObject:(id)obj {
     if (!obj) return nil;
 
-    // 相容：傳進來的可能是 IGVideo，也可能是包了 video 的 IGMedia
     NSArray *versions = TPSafeValue(obj, @"videoVersions");
     if (![versions isKindOfClass:[NSArray class]] || versions.count == 0) {
         id inner = TPSafeValue(obj, @"video");
         versions = TPSafeValue(inner, @"videoVersions");
     }
 
-    NSURL *best = nil;                   // 一律挑最高畫質
+    NSURL *best = nil;
     NSInteger bestScore = -1;
 
     for (id ver in versions) {
         NSString *s = TPSafeValue(ver, @"urlString");
         if (![s isKindOfClass:[NSString class]] || s.length == 0) {
-            // 部分版本只提供 URL 物件
             id u = TPSafeValue(ver, @"url");
             if ([u isKindOfClass:[NSURL class]]) s = [(NSURL *)u absoluteString];
         }
@@ -107,7 +97,6 @@ static NSInteger TPScoreURL(NSURL *u) {
         }
     }
 
-    // 備援：IGVideoURLProvider 的 allVideoURLs / videoURLForCurrentNetworkConditions
     if (!best) {
         id all = TPSafeValue(obj, @"allVideoURLs");
         NSInteger bs = -1;
@@ -125,10 +114,6 @@ static NSInteger TPScoreURL(NSURL *u) {
     return best;
 }
 
-
-#pragma mark - From IGVideoView
-
-/// 以 runtime 讀取 Swift 物件的實例變數（名稱不含底線前綴）。
 static id TPIvarObject(id obj, const char *name) {
     for (Class c = [obj class]; c; c = class_getSuperclass(c)) {
         Ivar iv = class_getInstanceVariable(c, name);
@@ -138,11 +123,10 @@ static id TPIvarObject(id obj, const char *name) {
 }
 
 static id TPResolvePlayer(UIView *view, id hint) {
-    if (hint) return hint;                           // 由播放器回呼記下的物件（最可靠）
-    return TPIvarObject(view, "videoPlayer");        // 備援：直接讀 Swift 實例變數
+    if (hint) return hint;
+    return TPIvarObject(view, "videoPlayer");
 }
 
-/// 外層 IGVideoPlayer(Swift 包裝) → .videoPlayer / _videoPlayer (IGFNFVideoPlayer) → .video (IGVideoURLProvider)
 static id TPInnerPlayer(id player) {
     id inner = TPSafeValue(player, @"videoPlayer");
     if (!inner) inner = TPIvarObject(player, "_videoPlayer");
@@ -156,7 +140,6 @@ static id TPFindProvider(id player) {
     id inner = TPInnerPlayer(player);
     p = TPSafeValue(inner, @"video");
     if (p) return p;
-    // 備援：換影片時暫存的 provider
     return TPIvarObject(player, "pendingVideoToReload");
 }
 
@@ -216,11 +199,6 @@ static NSString *TPShort(id v) {
     });
 }
 
-
-#pragma mark - 從資料物件中找出媒體網址
-
-/// 遞迴走訪物件的實例變數（只看 ObjC 物件型別），蒐集所有 http(s) 網址。
-/// 用於「還沒播放／還沒載入」的項目：GraphQL 資料物件裡通常已經帶有完整的媒體網址。
 static void TPHarvest(id obj, int depth, NSMutableSet<NSValue *> *visited, NSMutableArray<NSURL *> *out, int *budget) {
     if (!obj || depth > 8 || *budget <= 0) return;
     (*budget)--;
@@ -259,7 +237,7 @@ static void TPHarvest(id obj, int depth, NSMutableSet<NSValue *> *visited, NSMut
         Ivar *ivars = class_copyIvarList(c, &n);
         for (unsigned int i = 0; i < n; i++) {
             const char *enc = ivar_getTypeEncoding(ivars[i]);
-            if (!enc || enc[0] != '@' || enc[1] == '?') continue;      // 只處理物件型別，略過 block 與數值
+            if (!enc || enc[0] != '@' || enc[1] == '?') continue;
             id v = object_getIvar(obj, ivars[i]);
             TPHarvest(v, depth + 1, visited, out, budget);
         }
@@ -270,7 +248,7 @@ static void TPHarvest(id obj, int depth, NSMutableSet<NSValue *> *visited, NSMut
 static NSArray<NSURL *> *TPHarvestURLs(id obj) {
     NSMutableArray<NSURL *> *out = [NSMutableArray array];
     NSMutableSet<NSValue *> *visited = [NSMutableSet set];
-    int budget = 4000;                                                   // 節點上限，避免走太深
+    int budget = 4000;
     TPHarvest(obj, 0, visited, out, &budget);
     return out;
 }
@@ -283,11 +261,8 @@ static NSInteger TPImageScore(NSURL *u) {
     return [[s substringWithRange:[m rangeAtIndex:1]] integerValue] * [[s substringWithRange:[m rangeAtIndex:2]] integerValue];
 }
 
-#pragma mark - 對外 API
-
-
 + (NSURL *)bestVideoURLHarvestedFromObject:(id)obj {
-    NSURL *best = nil;                   // 一律挑最高畫質
+    NSURL *best = nil;
     NSInteger bs = -1;
     for (NSURL *u in TPHarvestURLs(obj)) {
         if (![u.path.lowercaseString containsString:@".mp4"]) continue;
@@ -306,7 +281,7 @@ static NSURL *TPBestImageURLIn(id obj) {
         BOOL isImage = NO;
         for (NSString *ext in @[@".jpg", @".jpeg", @".webp", @".heic", @".png"]) if ([path containsString:ext]) { isImage = YES; break; }
         if (!isImage) continue;
-        if ([path containsString:@"-19/"]) continue;                  // 略過大頭貼（Meta CDN 上大頭貼的路徑特徵）
+        if ([path containsString:@"-19/"]) continue;
         NSInteger sc = TPImageScore(u);
         if (sc > bs) { best = u; bs = sc; }
     }
@@ -324,7 +299,7 @@ static NSURL *TPBestImageURLIn(id obj) {
             Ivar *ivars = class_copyIvarList(c, &n);
             for (unsigned int i = 0; i < n; i++) {
                 const char *enc = ivar_getTypeEncoding(ivars[i]);
-                if (!enc || enc[0] != '@' || enc[1] == '?') continue;      // 只看物件型別的欄位
+                if (!enc || enc[0] != '@' || enc[1] == '?') continue;
                 id o = object_getIvar(v, ivars[i]);
                 if (o && ![o isKindOfClass:[UIResponder class]] && ![o isKindOfClass:[CALayer class]]) [models addObject:o];
             }
@@ -335,7 +310,6 @@ static NSURL *TPBestImageURLIn(id obj) {
     }
     return nil;
 }
-
 
 + (id)safeValue:(id)obj key:(NSString *)key { return TPSafeValue(obj, key); }
 
@@ -372,12 +346,8 @@ static NSURL *TPBestImageURLIn(id obj) {
 
 @end
 
-#pragma mark - 下載工作
+static NSMutableSet *sJobs;
 
-static NSMutableSet *sJobs;   // 讓工作在下載期間不被釋放
-
-/// 讀檔頭判斷圖片格式。只回傳照片 App 一定吃得下的格式（jpg／png／heic）；
-/// 其他像 AVIF、WebP 回傳 nil，改走「解碼成 UIImage 再存」。
 static NSString *TPImageExtension(NSURL *file) {
     NSFileHandle *fh = [NSFileHandle fileHandleForReadingFromURL:file error:nil];
     NSData *d = [fh readDataOfLength:16];
@@ -390,10 +360,9 @@ static NSString *TPImageExtension(NSURL *file) {
         NSString *brand = [[NSString alloc] initWithBytes:b + 8 length:4 encoding:NSASCIIStringEncoding];
         if ([@[@"heic", @"heix", @"hevc", @"heim", @"heis", @"mif1", @"msf1"] containsObject:brand]) return @"heic";
     }
-    return nil;                       // avif、webp 等
+    return nil;
 }
 
-/// 檔頭簡述（給診斷用）：例如 "ftyp/avif"、"RIFF/WEBP"、"<htm"
 static NSString *TPMagicString(NSURL *file) {
     NSFileHandle *fh = [NSFileHandle fileHandleForReadingFromURL:file error:nil];
     NSData *d = [fh readDataOfLength:16];
@@ -409,8 +378,6 @@ static NSString *TPMagicString(NSURL *file) {
     return hex;
 }
 
-/// 把任何 UIImage（例如 WebP 解碼出來的）重新繪製成標準 8 位元 sRGB，再轉成 JPEG。
-/// 照片 App 對某些解碼後的像素格式會回 PHPhotosErrorDomain 3302（資源無效），轉成 JPEG 就一定收。
 static NSData *TPJPEGData(UIImage *img) {
     if (!img) return nil;
     CGSize px = CGSizeMake(img.size.width * img.scale, img.size.height * img.scale);
@@ -420,7 +387,7 @@ static NSData *TPJPEGData(UIImage *img) {
     fmt.opaque = YES;
     fmt.preferredRange = UIGraphicsImageRendererFormatRangeStandard;
     UIImage *flat = [[[UIGraphicsImageRenderer alloc] initWithSize:px format:fmt] imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
-        [UIColor.whiteColor setFill];                      // 透明背景補白，避免變黑
+        [UIColor.whiteColor setFill];
         UIRectFill(CGRectMake(0, 0, px.width, px.height));
         [img drawInRect:CGRectMake(0, 0, px.width, px.height)];
     }];
@@ -435,9 +402,9 @@ static NSData *TPJPEGData(UIImage *img) {
     TPHUD *_hud;
     BOOL _cancelled, _allowPhotos;
     NSURL *_pendingFile;
-    NSMutableArray<NSURL *> *_leftovers;   // 沒有相簿權限時，留給分享面板的檔案
-    NSMutableArray<NSString *> *_log;      // 失敗原因（除錯提示開啟時顯示）
-    NSString *_extraReport;                // 附加報告（例如照片可用尺寸）
+    NSMutableArray<NSURL *> *_leftovers;
+    NSMutableArray<NSString *> *_log;
+    NSString *_extraReport;
     NSMutableArray<NSString *> *_savedSizes;
 }
 
@@ -491,8 +458,6 @@ static NSData *TPJPEGData(UIImage *img) {
     return [NSString stringWithFormat:TPL(@"Downloading %ld of %ld"), (long)MIN(_index + 1, (NSInteger)_items.count), (long)_items.count];
 }
 
-#pragma mark - 流程
-
 - (void)nextItem {
     _index++;
     _urlIndex = 0;
@@ -506,7 +471,6 @@ static NSData *TPJPEGData(UIImage *img) {
     NSDictionary *item = _items[_index];
     NSArray<NSURL *> *urls = item[@"urls"];
     if (_urlIndex >= (NSInteger)urls.count) {
-        // 所有網址都失敗：圖片可退而求其次，直接存畫面上已載入的那張
         UIImage *fallback = item[@"image"];
         if ([fallback isKindOfClass:[UIImage class]] && _allowPhotos) {
             [self saveImage:fallback];
@@ -527,7 +491,6 @@ static NSData *TPJPEGData(UIImage *img) {
     [sJobs removeObject:self];
 
     if (_leftovers.count) {
-        // 沒有「照片」權限：讓使用者用分享面板決定存到哪裡
         [_hud dismiss];
         UIViewController *top = TPTopViewController();
         UIActivityViewController *av = [[UIActivityViewController alloc] initWithActivityItems:_leftovers applicationActivities:nil];
@@ -562,8 +525,6 @@ static NSData *TPJPEGData(UIImage *img) {
     }
 }
 
-#pragma mark - NSURLSession
-
 - (void)URLSession:(NSURLSession *)s downloadTask:(NSURLSessionDownloadTask *)t didWriteData:(int64_t)w
  totalBytesWritten:(int64_t)tw totalBytesExpectedToWrite:(int64_t)te {
     if (t != _task || _cancelled) return;
@@ -578,7 +539,7 @@ static NSData *TPJPEGData(UIImage *img) {
 - (void)URLSession:(NSURLSession *)s downloadTask:(NSURLSessionDownloadTask *)t didFinishDownloadingToURL:(NSURL *)loc {
     if (t != _task) return;
     NSInteger code = [t.response isKindOfClass:[NSHTTPURLResponse class]] ? [(NSHTTPURLResponse *)t.response statusCode] : 200;
-    if (code < 200 || code >= 300) return;     // 403 等錯誤頁面不算成功，交給 didComplete 換下一個網址
+    if (code < 200 || code >= 300) return;
     NSURL *dst = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:
                                          [NSString stringWithFormat:@"tp_%@", NSUUID.UUID.UUIDString]]];
     if ([NSFileManager.defaultManager moveItemAtURL:loc toURL:dst error:nil]) _pendingFile = dst;
@@ -593,12 +554,10 @@ static NSData *TPJPEGData(UIImage *img) {
     } else {
         NSInteger code = [t.response isKindOfClass:[NSHTTPURLResponse class]] ? [(NSHTTPURLResponse *)t.response statusCode] : 0;
         [self note:[NSString stringWithFormat:@"HTTP %ld %@", (long)code, error.localizedDescription ?: @""]];
-        _urlIndex++;           // 換下一個候選網址（例如「原圖」失敗就退回一般網址）
+        _urlIndex++;
         [self tryCurrent];
     }
 }
-
-#pragma mark - 存入照片
 
 - (void)note:(NSString *)msg {
     NSArray<NSURL *> *urls = _items[_index][@"urls"];
@@ -610,7 +569,7 @@ static NSData *TPJPEGData(UIImage *img) {
 - (void)handleDownloadedFile:(NSURL *)file {
     BOOL isVideo = [_items[_index][@"video"] boolValue];
 
-    if (!_allowPhotos) {                         // 沒有權限：先留著，最後用分享面板
+    if (!_allowPhotos) {
         NSString *ext = isVideo ? @"mp4" : (TPImageExtension(file) ?: @"jpg");
         NSURL *named = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:
                                                [NSString stringWithFormat:@"threads_%@.%@", NSUUID.UUID.UUIDString, ext]]];
@@ -632,7 +591,6 @@ static NSData *TPJPEGData(UIImage *img) {
         return;
     }
 
-    // ---- 圖片 ----
     NSString *magic = TPMagicString(file);
     if (_extraReport) {
         UIImage *probe = [UIImage imageWithContentsOfFile:file.path];
@@ -648,14 +606,13 @@ static NSData *TPJPEGData(UIImage *img) {
         [self performSave:^{ [PHAssetChangeRequest creationRequestForAssetFromImageAtFileURL:img]; } completion:^(BOOL ok, NSError *e) {
             if (ok) { [NSFileManager.defaultManager removeItemAtURL:img error:nil]; [self itemDone:YES]; return; }
             [self note:[NSString stringWithFormat:@"%@ save file: %@", magic, e.localizedDescription ?: @"?"]];
-            [self saveDecodedImageAt:img magic:magic];          // 照片 App 不收這個檔案 → 解碼後再存
+            [self saveDecodedImageAt:img magic:magic];
         }];
     } else {
-        [self saveDecodedImageAt:file magic:magic];             // AVIF、WebP 等：解碼後以一般圖片存入
+        [self saveDecodedImageAt:file magic:magic];
     }
 }
 
-/// 把檔案解碼成 UIImage 再存；解不開或存不進去 → 換下一個候選網址
 - (void)saveDecodedImageAt:(NSURL *)file magic:(NSString *)magic {
     UIImage *ui = [UIImage imageWithContentsOfFile:file.path];
     [NSFileManager.defaultManager removeItemAtURL:file error:nil];
@@ -682,10 +639,9 @@ static NSData *TPJPEGData(UIImage *img) {
 - (void)tryNextURL {
     if (_cancelled) return;
     _urlIndex++;
-    [self tryCurrent];        // 網址都用完時，tryCurrent 會改存畫面上那張，或記為失敗
+    [self tryCurrent];
 }
 
-/// 只用在「畫面上那張」這種沒有後備的存檔
 - (void)saveImage:(UIImage *)image {
     NSData *jpeg = TPJPEGData(image);
     if (!jpeg) { [self note:@"shown image: can't encode"]; [self itemDone:NO]; return; }
