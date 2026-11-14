@@ -75,6 +75,14 @@ static const TPTheme *TPCurrentTheme(void) {
     }];
 }
 
+static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark ? dark : light;
+    }];
+}
++ (UIColor *)pageColor { return TPDynamic([UIColor colorWithWhite:0.96 alpha:1], [UIColor colorWithWhite:0.063 alpha:1]); }
++ (UIColor *)cardColor { return TPDynamic([UIColor colorWithWhite:1 alpha:0.85], [UIColor colorWithWhite:1 alpha:0.08]); }
+
 + (void)hapticLight {
     UIImpactFeedbackGenerator *g = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
     [g impactOccurred];
