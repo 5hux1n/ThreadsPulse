@@ -1,0 +1,366 @@
+#import "TPWelcomeViewController.h"
+#import "TPSettingsViewController.h"
+#import "TPLocalization.h"
+#import "TPPrefs.h"
+#import "TPUI.h"
+
+static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
+
+@implementation TPWelcomeViewController {
+    UIView *_badge;
+    NSMutableArray<UIView *> *_animated;   // 進場時依序浮現的區塊
+    NSHashTable<UILabel *> *_wrapping;      // 會換行的文字：排版後依實際寬度重新計算高度
+    BOOL _didAnimateIn;
+}
+
+#pragma mark - 顯示
+
++ (void)present { [self presentMarkingShown:NO attempt:0]; }
+
++ (void)presentIfNeeded {
+    if ([TPPrefs boolForKey:kTPWelcomeShownKey]) return;
+    static BOOL scheduled;
+    if (scheduled) return;
+    scheduled = YES;
+    // 等 Threads 自己的畫面出來再顯示
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        scheduled = NO;
+        [self presentMarkingShown:YES attempt:0];
+    });
+}
+
+/// Threads 剛好在切換畫面或跳出提示框時先不顯示，隔 2 秒再試（最多 5 次；這次沒顯示成功，下次回到 App 會再試）
++ (void)presentMarkingShown:(BOOL)mark attempt:(NSInteger)attempt {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (mark && [TPPrefs boolForKey:kTPWelcomeShownKey]) return;
+        UIViewController *top = TPTopViewController();
+        if ([top isKindOfClass:self]) return;   // 已經開著
+        BOOL busy = !top || !top.view.window || top.isBeingPresented || top.isBeingDismissed
+                 || [top isKindOfClass:[UIAlertController class]];
+        if (busy) {
+            if (attempt >= 5) return;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [self presentMarkingShown:mark attempt:attempt + 1];
+            });
+            return;
+        }
+        TPWelcomeViewController *vc = [self new];
+        vc.modalPresentationStyle = UIModalPresentationFullScreen;
+        [top presentViewController:vc animated:YES completion:^{
+            if (mark) [TPPrefs setBool:YES forKey:kTPWelcomeShownKey];
+        }];
+    });
+}
+
+#pragma mark - 畫面
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [TPUI pageColor];
+    self.view.tintColor = [TPUI accent];
+    _animated = [NSMutableArray array];
+    _wrapping = [NSHashTable weakObjectsHashTable];
+
+    UIScrollView *scroll = [UIScrollView new];
+    scroll.alwaysBounceVertical = YES;
+    scroll.showsVerticalScrollIndicator = NO;
+    UIStackView *stack = [UIStackView new];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.spacing = 12;
+    UIView *bottom = [UIView new];
+    for (UIView *v in @[scroll, stack, bottom]) v.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:scroll];
+    [scroll addSubview:stack];
+    [self.view addSubview:bottom];
+
+    // 頂部：Pulse 圖示、標題、副標
+    UIView *hero = [self heroView];
+    [stack addArrangedSubview:hero];
+    [stack setCustomSpacing:28 afterView:hero];
+
+    UILabel *heading = [UILabel new];
+    heading.text = TPL(@"How to Open Settings");
+    heading.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    heading.textColor = UIColor.secondaryLabelColor;
+    [stack addArrangedSubview:[self inset:heading by:4]];
+    [stack setCustomSpacing:8 afterView:stack.arrangedSubviews.lastObject];
+
+    // 三種打開方式
+    [stack addArrangedSubview:[self cardWithSymbol:@"gearshape"
+                                             title:TPL(@"From Threads Settings")
+                                            detail:TPL(@"Open Threads settings, then tap “Pulse” at the top right")
+                                         accessory:nil]];
+    [stack addArrangedSubview:[self cardWithSymbol:@"hand.raised"
+                                             title:TPL(@"Three-Finger Long Press")
+                                            detail:TPL(@"Press anywhere with three fingers for 1 second")
+                                         accessory:nil]];
+    [stack addArrangedSubview:[self cardWithSymbol:@"house"
+                                             title:TPL(@"Long-Press the Home Tab")
+                                            detail:TPL(@"Long-press the Home tab at the bottom")
+                                         accessory:nil]];
+
+    UILabel *note = [UILabel new];
+    note.text = TPL(@"You can see this screen again under Advanced");
+    note.font = [UIFont systemFontOfSize:13];
+    note.textColor = UIColor.tertiaryLabelColor;
+    note.numberOfLines = 0;
+    [self wrap:note];
+    note.textAlignment = NSTextAlignmentCenter;
+    [stack setCustomSpacing:16 afterView:stack.arrangedSubviews.lastObject];
+    [stack addArrangedSubview:note];
+    [_animated addObject:note];
+
+    // 底部按鈕：自己畫，不用系統樣式（Threads 會用全域外觀改掉系統按鈕的顏色）
+    UIButton *primary = [UIButton buttonWithType:UIButtonTypeCustom];
+    [primary setTitle:TPL(@"Open ThreadsPulse Settings") forState:UIControlStateNormal];
+    [primary setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [primary setTitleColor:[UIColor colorWithWhite:1 alpha:0.6] forState:UIControlStateHighlighted];
+    primary.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    primary.backgroundColor = [TPUI accent];
+    primary.layer.cornerRadius = 14;
+    primary.layer.cornerCurve = kCACornerCurveContinuous;
+    __weak typeof(self) weakSelf = self;
+    [primary addAction:[UIAction actionWithHandler:^(UIAction *a) {
+        [TPUI hapticLight];
+        [weakSelf dismissViewControllerAnimated:YES completion:^{ [TPSettingsViewController present]; }];
+    }] forControlEvents:UIControlEventTouchUpInside];
+
+    UIButton *later = [UIButton buttonWithType:UIButtonTypeCustom];
+    [later setTitle:TPL(@"Maybe Later") forState:UIControlStateNormal];
+    [later setTitleColor:[TPUI accentIcon] forState:UIControlStateNormal];
+    [later setTitleColor:[[TPUI accentIcon] colorWithAlphaComponent:0.5] forState:UIControlStateHighlighted];
+    later.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    [later addAction:[UIAction actionWithHandler:^(UIAction *a) {
+        [weakSelf dismissViewControllerAnimated:YES completion:nil];
+    }] forControlEvents:UIControlEventTouchUpInside];
+
+    for (UIView *v in @[primary, later]) { v.translatesAutoresizingMaskIntoConstraints = NO; [bottom addSubview:v]; }
+    [_animated addObject:bottom];
+
+    UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
+    // 內容最寬 520（iPad 上置中，不會拉得太寬）
+    NSLayoutConstraint *fill = [stack.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-40];
+    fill.priority = UILayoutPriorityDefaultHigh;
+    NSLayoutConstraint *bottomFill = [bottom.widthAnchor constraintEqualToAnchor:safe.widthAnchor constant:-40];
+    bottomFill.priority = UILayoutPriorityDefaultHigh;
+    [NSLayoutConstraint activateConstraints:@[
+        [scroll.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [scroll.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [scroll.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [scroll.bottomAnchor constraintEqualToAnchor:bottom.topAnchor constant:-8],
+
+        [scroll.contentLayoutGuide.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor],   // 只上下捲動
+        [stack.topAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.topAnchor constant:36],
+        [stack.bottomAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.bottomAnchor constant:-16],
+        [stack.centerXAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.centerXAnchor],
+        [stack.widthAnchor constraintLessThanOrEqualToConstant:520],
+        fill,
+
+        [bottom.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor],
+        [bottom.widthAnchor constraintLessThanOrEqualToConstant:520],
+        bottomFill,
+        [bottom.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-8],
+
+        [primary.topAnchor constraintEqualToAnchor:bottom.topAnchor],
+        [primary.leadingAnchor constraintEqualToAnchor:bottom.leadingAnchor],
+        [primary.trailingAnchor constraintEqualToAnchor:bottom.trailingAnchor],
+        [primary.heightAnchor constraintEqualToConstant:52],
+        [later.topAnchor constraintEqualToAnchor:primary.bottomAnchor constant:4],
+        [later.centerXAnchor constraintEqualToAnchor:bottom.centerXAnchor],
+        [later.heightAnchor constraintEqualToConstant:44],
+        [later.bottomAnchor constraintEqualToAnchor:bottom.bottomAnchor],
+    ]];
+}
+
+/// 頂部：圖示、歡迎標題、副標
+- (UIView *)heroView {
+    UIView *hero = [UIView new];
+    _badge = [UIView new];
+    _badge.backgroundColor = [TPUI accent];
+    _badge.layer.cornerRadius = 22;
+    _badge.layer.cornerCurve = kCACornerCurveContinuous;
+    _badge.layer.shadowColor = [TPUI accent].CGColor;
+    _badge.layer.shadowOpacity = 0.45;
+    _badge.layer.shadowRadius = 18;
+    _badge.layer.shadowOffset = CGSizeMake(0, 8);
+    UIImageView *glyph = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:@"waveform.path.ecg"
+                withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:36 weight:UIImageSymbolWeightSemibold]]];
+    glyph.tintColor = UIColor.whiteColor;
+    glyph.contentMode = UIViewContentModeCenter;
+
+    UILabel *title = [UILabel new];
+    title.text = TPL(@"Welcome to ThreadsPulse");
+    title.font = [UIFont systemFontOfSize:28 weight:UIFontWeightBold];
+    title.textColor = UIColor.labelColor;
+    title.textAlignment = NSTextAlignmentCenter;
+    title.numberOfLines = 0;
+    title.adjustsFontSizeToFitWidth = YES;
+    title.minimumScaleFactor = 0.8;
+
+    UILabel *subtitle = [UILabel new];
+    subtitle.text = TPL(@"ThreadsPulse is installed and running");
+    subtitle.font = [UIFont systemFontOfSize:16];
+    subtitle.textColor = UIColor.secondaryLabelColor;
+    subtitle.textAlignment = NSTextAlignmentCenter;
+    subtitle.numberOfLines = 0;
+    for (UILabel *l in @[title, subtitle]) [self wrap:l];
+
+    for (UIView *v in @[_badge, glyph, title, subtitle]) v.translatesAutoresizingMaskIntoConstraints = NO;
+    [hero addSubview:_badge];
+    [_badge addSubview:glyph];
+    [hero addSubview:title];
+    [hero addSubview:subtitle];
+    [NSLayoutConstraint activateConstraints:@[
+        [_badge.topAnchor constraintEqualToAnchor:hero.topAnchor],
+        [_badge.centerXAnchor constraintEqualToAnchor:hero.centerXAnchor],
+        [_badge.widthAnchor constraintEqualToConstant:84],
+        [_badge.heightAnchor constraintEqualToConstant:84],
+        [glyph.centerXAnchor constraintEqualToAnchor:_badge.centerXAnchor],
+        [glyph.centerYAnchor constraintEqualToAnchor:_badge.centerYAnchor],
+        [title.topAnchor constraintEqualToAnchor:_badge.bottomAnchor constant:24],
+        [title.leadingAnchor constraintEqualToAnchor:hero.leadingAnchor],
+        [title.trailingAnchor constraintEqualToAnchor:hero.trailingAnchor],
+        [subtitle.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:8],
+        [subtitle.leadingAnchor constraintEqualToAnchor:hero.leadingAnchor],
+        [subtitle.trailingAnchor constraintEqualToAnchor:hero.trailingAnchor],
+        [subtitle.bottomAnchor constraintEqualToAnchor:hero.bottomAnchor],
+    ]];
+    [_animated addObject:hero];
+    return hero;
+}
+
+/// 一種打開方式：左邊圖示、標題、說明，右邊可以放開關
+- (UIView *)cardWithSymbol:(NSString *)symbol title:(NSString *)titleText detail:(NSString *)detailText accessory:(UIView *)accessory {
+    UIView *card = [UIView new];
+    card.backgroundColor = [TPUI cardColor];
+    card.layer.cornerRadius = 16;
+    card.layer.cornerCurve = kCACornerCurveContinuous;
+
+    UIView *tile = [UIView new];
+    tile.backgroundColor = [[TPUI accent] colorWithAlphaComponent:0.16];
+    tile.layer.cornerRadius = 11;
+    tile.layer.cornerCurve = kCACornerCurveContinuous;
+    UIImageView *icon = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:symbol
+                withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightMedium]]];
+    icon.tintColor = [TPUI accentIcon];
+    icon.contentMode = UIViewContentModeCenter;
+
+    UILabel *title = [UILabel new];
+    title.text = titleText;
+    title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    title.textColor = UIColor.labelColor;
+    title.numberOfLines = 0;
+    UILabel *detail = [UILabel new];
+    detail.text = detailText;
+    detail.font = [UIFont systemFontOfSize:14];
+    detail.textColor = UIColor.secondaryLabelColor;
+    detail.numberOfLines = 0;
+    for (UILabel *l in @[title, detail]) [self wrap:l];
+
+    NSMutableArray<UIView *> *views = [@[tile, icon, title, detail] mutableCopy];
+    if (accessory) [views addObject:accessory];
+    for (UIView *v in views) v.translatesAutoresizingMaskIntoConstraints = NO;
+    [card addSubview:tile];
+    [tile addSubview:icon];
+    [card addSubview:title];
+    [card addSubview:detail];
+
+    NSLayoutAnchor *textTrailing = card.trailingAnchor;
+    CGFloat trailingGap = -16;
+    if (accessory) {
+        [card addSubview:accessory];
+        [accessory setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        [accessory setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        [NSLayoutConstraint activateConstraints:@[
+            [accessory.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16],
+            [accessory.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        ]];
+        textTrailing = accessory.leadingAnchor;
+        trailingGap = -12;
+    }
+    [NSLayoutConstraint activateConstraints:@[
+        [tile.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
+        [tile.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        [tile.widthAnchor constraintEqualToConstant:42],
+        [tile.heightAnchor constraintEqualToConstant:42],
+        [icon.centerXAnchor constraintEqualToAnchor:tile.centerXAnchor],
+        [icon.centerYAnchor constraintEqualToAnchor:tile.centerYAnchor],
+        [title.topAnchor constraintEqualToAnchor:card.topAnchor constant:14],
+        [title.leadingAnchor constraintEqualToAnchor:tile.trailingAnchor constant:14],
+        [title.trailingAnchor constraintEqualToAnchor:textTrailing constant:trailingGap],
+        [detail.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:3],
+        [detail.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
+        [detail.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
+        [detail.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14],
+        [card.heightAnchor constraintGreaterThanOrEqualToConstant:70],
+    ]];
+    [_animated addObject:card];
+    return card;
+}
+
+/// 小標題左右縮一點，對齊卡片裡的內容
+- (UIView *)inset:(UIView *)view by:(CGFloat)inset {
+    UIView *wrap = [UIView new];
+    view.translatesAutoresizingMaskIntoConstraints = NO;
+    [wrap addSubview:view];
+    [NSLayoutConstraint activateConstraints:@[
+        [view.topAnchor constraintEqualToAnchor:wrap.topAnchor],
+        [view.bottomAnchor constraintEqualToAnchor:wrap.bottomAnchor],
+        [view.leadingAnchor constraintEqualToAnchor:wrap.leadingAnchor constant:inset],
+        [view.trailingAnchor constraintEqualToAnchor:wrap.trailingAnchor constant:-inset],
+    ]];
+    [_animated addObject:wrap];
+    return wrap;
+}
+
+#pragma mark - 文字換行
+
+/// 會換行的文字：高度不能被壓扁，排版後依實際寬度重算
+- (void)wrap:(UILabel *)label {
+    label.numberOfLines = 0;
+    label.lineBreakMode = NSLineBreakByWordWrapping;
+    [label setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisVertical];
+    [_wrapping addObject:label];
+}
+
+/// 第一次算高度時寬度可能還不是最後的寬度（例如先用整個螢幕寬算成一行），
+/// 之後變窄也不會重算，文字就被「…」截掉。每次排版後用實際寬度再算一次，任何尺寸的裝置都能完整換行
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    BOOL changed = NO;
+    for (UILabel *l in _wrapping.allObjects) {
+        CGFloat w = CGRectGetWidth(l.bounds);
+        if (w > 0 && fabs(l.preferredMaxLayoutWidth - w) > 0.5) { l.preferredMaxLayoutWidth = w; changed = YES; }
+    }
+    if (changed) [self.view layoutIfNeeded];
+}
+
+#pragma mark - 進場動畫
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (_didAnimateIn || UIAccessibilityIsReduceMotionEnabled()) return;
+    for (UIView *v in _animated) {
+        v.alpha = 0;
+        v.transform = CGAffineTransformMakeTranslation(0, 18);
+    }
+    _badge.transform = CGAffineTransformMakeScale(0.6, 0.6);
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    if (_didAnimateIn) return;
+    _didAnimateIn = YES;
+    if (UIAccessibilityIsReduceMotionEnabled()) return;
+    // 各區塊由上到下依序浮現，圖示帶一點彈跳
+    [_animated enumerateObjectsUsingBlock:^(UIView *v, NSUInteger i, BOOL *stop) {
+        [UIView animateWithDuration:0.5 delay:0.06 * i usingSpringWithDamping:0.85 initialSpringVelocity:0.3 options:0
+                         animations:^{ v.alpha = 1; v.transform = CGAffineTransformIdentity; } completion:nil];
+    }];
+    [UIView animateWithDuration:0.7 delay:0.05 usingSpringWithDamping:0.55 initialSpringVelocity:0.6 options:0
+                     animations:^{ self->_badge.transform = CGAffineTransformIdentity; } completion:nil];
+}
+
+@end
