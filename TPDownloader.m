@@ -42,6 +42,8 @@ static NSInteger TPInt(id v) {
     return 0;
 }
 
+// Scores candidate video URLs; audio-only DASH tracks return -1. The efg query parameter is a
+// base64 JSON tag that names the encoding (progressive, resolution, audio).
 static NSInteger TPScoreURL(NSURL *u) {
     NSString *abs = u.absoluteString;
     NSString *tag = @"";
@@ -199,6 +201,8 @@ static NSString *TPShort(id v) {
     });
 }
 
+// Walks an object's ObjC ivars collecting http(s) URLs. GraphQL models already hold full media
+// URLs for items that were never played or loaded.
 static void TPHarvest(id obj, int depth, NSMutableSet<NSValue *> *visited, NSMutableArray<NSURL *> *out, int *budget) {
     if (!obj || depth > 8 || *budget <= 0) return;
     (*budget)--;
@@ -348,6 +352,8 @@ static NSURL *TPBestImageURLIn(id obj) {
 
 static NSMutableSet *sJobs;
 
+// Only formats Photos always accepts (jpg, png, heic) are saved as-is; AVIF and WebP are
+// decoded and re-encoded instead.
 static NSString *TPImageExtension(NSURL *file) {
     NSFileHandle *fh = [NSFileHandle fileHandleForReadingFromURL:file error:nil];
     NSData *d = [fh readDataOfLength:16];
@@ -378,6 +384,8 @@ static NSString *TPMagicString(NSURL *file) {
     return hex;
 }
 
+// Some decoded pixel formats are rejected by Photos with PHPhotosErrorDomain 3302. Redrawing
+// into 8-bit sRGB before encoding JPEG avoids that.
 static NSData *TPJPEGData(UIImage *img) {
     if (!img) return nil;
     CGSize px = CGSizeMake(img.size.width * img.scale, img.size.height * img.scale);
