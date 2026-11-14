@@ -97,11 +97,11 @@ After installing, go to **Settings › Apps › Safari › Extensions** (on iOS 
 
 **Common errors**
 
-| Error (shown in Chinese) | Meaning | Cause |
-|---|---|---|
-| 下載的檔案不是 IPA | The downloaded file isn't an IPA | The link opens a web page instead of downloading directly |
-| 這個 IPA 尚未解密 | This IPA isn't decrypted | It's the encrypted App Store version; use a decrypted IPA |
-| 執行檔的 header 空間不足 | Not enough header space in the executable | Very rare; please report your Threads version |
+| Error | Cause |
+|---|---|
+| The downloaded file is not an IPA | The link opens a web page instead of downloading directly |
+| This IPA is not decrypted | It's the encrypted App Store version; use a decrypted IPA |
+| Not enough header space in the executable | Very rare; please report your Threads version |
 
 > Please don't upload the IPA to a public Release or anywhere public.
 
@@ -176,7 +176,7 @@ ThreadsPulse/
 ├── TPDownloader.h/.m               URL selection, downloads, WebP → JPEG, diagnostics
 ├── TPHUD.h/.m                      Progress view, toasts, prompt banner
 ├── TPUI.h/.m                       Round frosted buttons, long-press menus, haptics, theme colors
-├── TPSettingsViewController.h/.m   Settings page (data model between TP_MODEL_BEGIN and TP_MODEL_END)
+├── TPSettingsViewController.h/.m   Settings page
 ├── TPWelcomeViewController.h/.m    Full-screen welcome screen shown on first launch
 ├── TPLocalization.h/.m             TPL() localization
 ├── TPSideloadFix.h/.m              Sideload compatibility fix (keychain, app groups)
