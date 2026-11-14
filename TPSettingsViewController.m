@@ -4,10 +4,13 @@
 #import "TPLocalization.h"
 #import "TPHUD.h"
 #import "TPUI.h"
+#import "TPWelcomeViewController.h"
 #import <SafariServices/SafariServices.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #import "TPVersion.h"
+
+extern NSString *TPAnalyticsLogReport(void);   // Tweak.x
 static NSString *const kTPDonateURL = @"https://ko-fi.com/mumuisdog";
 
 #pragma mark - 樣式（霧面卡片）
@@ -17,21 +20,15 @@ static UIColor *TPDyn(UIColor *light, UIColor *dark) {
         return t.userInterfaceStyle == UIUserInterfaceStyleDark ? dark : light;
     }];
 }
-/// 頁面底色：深色接近 Threads 的 #101010
-static UIColor *TPPageColor(void) {
-    return TPDyn([UIColor colorWithWhite:0.96 alpha:1], [UIColor colorWithWhite:0.063 alpha:1]);
-}
-/// 霧面卡片底色：半透明白（深色）／半透明黑（淺色）
-static UIColor *TPCardColor(void) {
-    return TPDyn([UIColor colorWithWhite:1 alpha:0.85], [UIColor colorWithWhite:1 alpha:0.08]);
-}
+static UIColor *TPPageColor(void) { return [TPUI pageColor]; }
+static UIColor *TPCardColor(void) { return [TPUI cardColor]; }
 static UIColor *TPHairlineColor(void) {
     return TPDyn([UIColor colorWithWhite:0 alpha:0.08], [UIColor colorWithWhite:1 alpha:0.10]);
 }
 static UIColor *TPKofiColor(void) {
     return [UIColor colorWithRed:1.00 green:0.37 blue:0.36 alpha:1];
 }
-/// 主題色（開關、分段選中、完成按鈕、操作文字），依「主題配色」設定
+/// 主題色（開關、分段選中、完成按鈕、操作文字），依「插件主題色」設定
 static UIColor *TPAccent(void) { return [TPUI accent]; }
 /// 圖示用的主題色：深色模式稍亮，淺色模式稍深，兩邊都清楚
 static UIColor *TPAccentIcon(void) { return [TPUI accentIcon]; }
@@ -83,6 +80,8 @@ static NSString *TPTimePreview(NSInteger mode) {
 /// 最上方的狀態卡：Pulse 圖示、版本號、運作中・已開啟幾項功能
 @interface TPSettingsHeaderView : UIView
 - (void)setEnabledCount:(NSInteger)count;
+/// 點了主題色圓點（已經存好設定、發出通知），設定頁用來重新套用顏色
+@property (nonatomic, copy) void (^onThemeChange)(void);
 @end
 
 @implementation TPSettingsHeaderView {
@@ -93,6 +92,9 @@ static NSString *TPTimePreview(NSInteger mode) {
     UILabel *_title;
     UILabel *_subtitle;
     UIView *_dot;
+    UIView *_sep;                     // 資訊卡下半部：主題色
+    UILabel *_themeLabel;
+    NSArray<UIButton *> *_swatches;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -141,6 +143,42 @@ static NSString *TPTimePreview(NSInteger mode) {
         _subtitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
         _subtitle.textColor = UIColor.secondaryLabelColor;
         [_card addSubview:_subtitle];
+
+        _sep = [UIView new];
+        _sep.backgroundColor = [accent colorWithAlphaComponent:0.30];
+        [_card addSubview:_sep];
+        _themeLabel = [UILabel new];
+        _themeLabel.text = TPL(@"Theme");
+        _themeLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
+        _themeLabel.textColor = UIColor.secondaryLabelColor;
+        [_card addSubview:_themeLabel];
+        NSInteger cur = [TPPrefs integerForKey:TPKeyTheme];
+        NSMutableArray *sw = [NSMutableArray array];
+        __weak typeof(self) weakSelf = self;
+        for (NSInteger i = 0; i < [TPUI themeCount]; i++) {
+            UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
+            b.backgroundColor = [TPUI themeColorAtIndex:i];
+            b.layer.cornerRadius = 12;
+            b.accessibilityLabel = TPL([TPUI themeNameAtIndex:i]);
+            if (i == cur) {
+                b.layer.borderWidth = 2;
+                b.layer.borderColor = UIColor.labelColor.CGColor;
+                [b setImage:[[UIImage systemImageNamed:@"checkmark"
+                                      withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:10 weight:UIImageSymbolWeightBold]]
+                             imageWithTintColor:UIColor.whiteColor renderingMode:UIImageRenderingModeAlwaysOriginal]
+                   forState:UIControlStateNormal];
+            }
+            [b addAction:[UIAction actionWithHandler:^(UIAction *a) {
+                if ([TPPrefs integerForKey:TPKeyTheme] == i) return;
+                [TPPrefs setInteger:i forKey:TPKeyTheme];
+                [TPUI hapticLight];
+                [[NSNotificationCenter defaultCenter] postNotificationName:TPThemeDidChangeNotification object:nil];
+                if (weakSelf.onThemeChange) weakSelf.onThemeChange();
+            }] forControlEvents:UIControlEventTouchUpInside];
+            [_card addSubview:b];
+            [sw addObject:b];
+        }
+        _swatches = sw;
     }
     return self;
 }
@@ -154,7 +192,12 @@ static NSString *TPTimePreview(NSInteger mode) {
     CGFloat w = self.bounds.size.width, inset = 16, d = 46;
     _card.frame = CGRectMake(inset, 6, w - inset * 2, self.bounds.size.height - 12);
     _gradient.frame = _card.bounds;
-    CGFloat h = _card.bounds.size.height;
+    CGFloat cw = _card.bounds.size.width, h = 80;               // 上半部：插件資訊；下半部（44pt）：主題色
+    _sep.frame = CGRectMake(14, h, cw - 28, 0.5);
+    CGFloat sd = 24, gap = 10, sx = cw - 14 - (sd * _swatches.count + gap * (_swatches.count - 1));
+    _themeLabel.frame = CGRectMake(14, h + 1, MAX(0, sx - 22), 43);
+    for (NSUInteger i = 0; i < _swatches.count; i++)
+        _swatches[i].frame = CGRectMake(sx + i * (sd + gap), h + 1 + (43 - sd) / 2, sd, sd);
     _badge.frame = CGRectMake(14, (h - d) / 2, d, d);
     _glyph.frame = _badge.bounds;
     CGFloat x = CGRectGetMaxX(_badge.frame) + 12, tw = _card.bounds.size.width - x - 14;
@@ -174,6 +217,70 @@ static NSString *TPTimePreview(NSInteger mode) {
     CGFloat _headerWidth;
     UIButton *_doneButton;
     TPSettingsHeaderView *_header;
+    NSArray<NSDictionary *> *_allSections;   // 全部分類（主頁用來算數量）
+    NSInteger _category;                      // -1 = 主頁；否則是這一頁顯示的分類
+    BOOL _showAbout;                          // 「進階」頁最後加上版本與重設
+    NSMutableDictionary<NSNumber *, NSArray *> *_shownRows;   // 每個區塊目前畫面上的列（顯示／隱藏條件列時比對用）
+}
+
+/// 主頁的分類分組（值是分類標題的英文 key）
+static NSArray<NSArray<NSString *> *> *TPRootGroups(void) {
+    return @[ @[@"Ads & Privacy", @"Media Download", @"Player", @"Home Feed"],
+              @[@"Hidden Items", @"Links", @"Messages", @"Interface & Interactions"],
+              @[@"Backup", @"Advanced"],
+              @[@"Donate"] ];
+}
+
+static NSString *TPCategoryIcon(NSString *header) {
+    NSDictionary *m = @{ @"Ads & Privacy": @"shield", @"Media Download": @"arrow.down.circle", @"Player": @"play.rectangle",
+                         @"Home Feed": @"house", @"Hidden Items": @"eye.slash", @"Links": @"link",
+                         @"Messages": @"bubble.left.and.bubble.right", @"Interface & Interactions": @"slider.horizontal.3",
+                         @"Backup": @"archivebox", @"Advanced": @"wrench.and.screwdriver", @"Donate": @"cup.and.saucer.fill" };
+    return m[header] ?: @"circle";
+}
+
+/// 分類圖示：圓角方塊底色＋白色圖案（像 iOS 設定）
+static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
+    CGFloat d = 30;
+    UIImage *glyph = [[UIImage systemImageNamed:symbol withConfiguration:
+                       [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightSemibold]]
+                      imageWithTintColor:UIColor.whiteColor renderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIGraphicsImageRenderer *r = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(d, d)];
+    return [r imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [bg setFill];
+        [[UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, d, d) cornerRadius:8] fill];
+        CGSize g = glyph.size;
+        [glyph drawInRect:CGRectMake((d - g.width) / 2, (d - g.height) / 2, g.width, g.height)];
+    }];
+}
+
+- (instancetype)initWithCategory:(NSInteger)category {
+    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) _category = category;
+    return self;
+}
+
+- (instancetype)initWithStyle:(UITableViewStyle)style {
+    if ((self = [super initWithStyle:style])) _category = -1;
+    return self;
+}
+
+- (BOOL)isRoot { return _category < 0; }
+
+- (NSDictionary *)sectionWithHeader:(NSString *)h {
+    for (NSDictionary *sec in _allSections) if ([sec[@"header"] isEqualToString:h]) return sec;
+    return nil;
+}
+
+/// 分類裡的開關：開了幾個／共幾個（沒有開關的分類回傳 nil）
+- (NSString *)summaryForSection:(NSDictionary *)sec {
+    if ([sec[@"header"] isEqualToString:@"Advanced"]) return nil;
+    NSInteger on = 0, total = 0;
+    for (NSDictionary *row in sec[@"rows"]) {
+        if (![row[@"type"] isEqualToString:@"switch"]) continue;
+        total++;
+        if ([TPPrefs boolForKey:row[@"key"]]) on++;
+    }
+    return total ? [NSString stringWithFormat:@"%ld／%ld", (long)on, (long)total] : nil;
 }
 
 + (void)present {
@@ -187,6 +294,16 @@ static NSString *TPTimePreview(NSInteger mode) {
         nav.modalPresentationStyle = UIModalPresentationPageSheet;
         nav.navigationBar.tintColor = TPAccent();
         nav.view.tintColor = TPAccent();
+        // 導覽列用不透明的頁面底色：透明的話，切換頁面時會透出上一頁的內容
+        UINavigationBarAppearance *ap = [UINavigationBarAppearance new];
+        [ap configureWithOpaqueBackground];
+        ap.backgroundColor = TPPageColor();
+        ap.shadowColor = UIColor.clearColor;
+        ap.titleTextAttributes = @{ NSForegroundColorAttributeName: UIColor.labelColor };
+        ap.largeTitleTextAttributes = @{ NSForegroundColorAttributeName: UIColor.labelColor };
+        nav.navigationBar.standardAppearance = ap;
+        nav.navigationBar.scrollEdgeAppearance = ap;
+        nav.navigationBar.compactAppearance = ap;
         if (@available(iOS 15.0, *)) {
             nav.sheetPresentationController.detents = @[UISheetPresentationControllerDetent.largeDetent];
             nav.sheetPresentationController.prefersGrabberVisible = YES;
@@ -197,7 +314,6 @@ static NSString *TPTimePreview(NSInteger mode) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.navigationItem.title = nil;
     // 完成按鈕自己畫（主題色圓底＋白色勾勾）：Threads 會用全域外觀改掉導覽列按鈕的顏色，深色、淺色模式都可能看不清楚
     UIButton *doneButton = [UIButton buttonWithType:UIButtonTypeCustom];
     _doneButton = doneButton;
@@ -237,7 +353,7 @@ static NSString *TPTimePreview(NSInteger mode) {
                   @"detail": @"Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links",
                   @"icon": @"scissors" },
            ]},
-        @{ @"header": @"Download",
+        @{ @"header": @"Media Download",
            @"footer": @"If the original size isn't available, the regular size is downloaded.\nTo save a profile picture, long-press it on a profile, or open it full screen and tap ↓ in the bottom-right corner.",
            @"rows": @[
                @{ @"type": @"switch", @"key": TPKeyShowDownloadBtn, @"title": @"Download Button",
@@ -250,8 +366,8 @@ static NSString *TPTimePreview(NSInteger mode) {
                   @"detail": @"Long-press a profile picture on a profile to save it",
                   @"icon": @"person.crop.circle" },
            ]},
-        @{ @"header": @"Video",
-           @"footer": @"Videos play at this speed by default, and return to it after you let go of a long-press 2x.",
+        @{ @"header": @"Player",
+           @"footer": @"Videos play at the selected speed, and return to it after you release a long-press 2x.",
            @"rows": @[
                @{ @"type": @"switch", @"key": TPKeyNoAutoplay, @"title": @"Disable Autoplay",
                   @"detail": @"Videos in the feed won't play until you tap them",
@@ -269,7 +385,7 @@ static NSString *TPTimePreview(NSInteger mode) {
                @{ @"type": @"segment", @"key": TPKeyKeepFeedLimit, @"title": @"Keep For", @"detail": @"",
                   @"icon": @"timer",
                   @"segments": @[@"10 min", @"30 min", @"No Limit"], @"showIf": @[TPKeyKeepFeed, @1],
-                  @"note": @"If you're away longer than this, the feed refreshes as usual" },
+                  @"note": @"Come back within this time to keep your place; after that, the feed refreshes as usual" },
                @{ @"type": @"switch", @"key": TPKeyNoPullRefresh, @"title": @"Disable Pull to Refresh",
                   @"detail": @"Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing",
                   @"icon": @"arrow.down.to.line" },
@@ -282,16 +398,26 @@ static NSString *TPTimePreview(NSInteger mode) {
                   @"icon": @"arrow.clockwise" },
            ]},
         @{ @"header": @"Hidden Items",
+           @"groups": @[@"Suggested Content", @"Interface Buttons"],   // 分類頁裡再分成兩張卡片
            @"rows": @[
-               @{ @"type": @"switch", @"key": TPKeyHideFollowSuggest, @"title": @"Hide Follow Suggestions",
-                  @"detail": @"Stop the follow suggestions sheet from popping up",
-                  @"icon": @"person.crop.circle.badge.xmark" },
-               @{ @"type": @"switch", @"key": TPKeyHideIGButton, @"title": @"Hide Instagram Button",
-                  @"detail": @"Hide the Instagram button at the top of profiles",
-                  @"icon": @"minus.square" },
-               @{ @"type": @"switch", @"key": TPKeyHideFeedSuggest, @"title": @"Hide Suggested Accounts in Feed",
-                  @"detail": @"Hide suggested-account cards in the feed, and the \"Suggested for you\" section on profiles and after you follow someone",
+               @{ @"type": @"switch", @"group": @"Suggested Content", @"key": TPKeyHideFeedSuggest, @"title": @"Suggested Accounts",
+                  @"detail": @"Hide \"Suggested for you\" in the feed & on profiles",
                   @"icon": @"person.badge.minus" },
+               @{ @"type": @"switch", @"group": @"Suggested Content", @"key": TPKeyHideSearchSuggest, @"title": @"Search Suggestions",
+                  @"detail": @"Hide \"Suggested to follow\" on the search page",
+                  @"icon": @"magnifyingglass" },
+               @{ @"type": @"switch", @"group": @"Suggested Content", @"key": TPKeyHideFollowSuggest, @"title": @"Follow Suggestion Pop-ups",
+                  @"detail": @"Stop \"Follow suggestions\" from popping up automatically",
+                  @"icon": @"person.crop.circle.badge.xmark" },
+               @{ @"type": @"switch", @"group": @"Suggested Content", @"key": TPKeyHidePostFeedback, @"title": @"Post Interest Prompts",
+                  @"detail": @"Stop asking if you're interested in posts",
+                  @"icon": @"hand.thumbsup" },
+               @{ @"type": @"switch", @"group": @"Interface Buttons", @"key": TPKeyHideProfileSearch, @"title": @"Search Button",
+                  @"detail": @"Hide the search button on profiles",
+                  @"icon": @"magnifyingglass.circle" },
+               @{ @"type": @"switch", @"group": @"Interface Buttons", @"key": TPKeyHideIGButton, @"title": @"Instagram Button",
+                  @"detail": @"Hide the Instagram button on profiles",
+                  @"icon": @"minus.square" },
            ]},
         @{ @"header": @"Links",
            @"footer": @"Auto-open reads the clipboard directly. If iOS asks to allow pasting every time, go to Settings › Threads › Paste from Other Apps and choose Allow.",
@@ -310,9 +436,26 @@ static NSString *TPTimePreview(NSInteger mode) {
                   @"detail": @"Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app",
                   @"icon": @"safari" },
            ]},
+        @{ @"header": @"Messages",
+           @"rows": @[
+               @{ @"type": @"switch", @"key": TPKeyNoSeen, @"title": @"Hide Seen Status",
+                  @"detail": @"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat.",
+                  @"icon": @"eye.slash.circle" },
+               @{ @"type": @"switch", @"key": TPKeySeenOnReply, @"title": @"Show Seen When You Reply",
+                  @"detail": @"Let the other person see \"Seen\" once you reply",
+                  @"icon": @"arrowshape.turn.up.left", @"showIf": @[TPKeyNoSeen, @1] },
+               @{ @"type": @"action", @"action": @"resetSeenChats", @"title": @"Reset Chats",
+                  @"detail": @"Chats where you tapped the eye to show \"Seen\" go back to hiding it",
+                  @"icon": @"arrow.counterclockwise", @"showIf": @[TPKeyNoSeen, @1] },
+               @{ @"type": @"switch", @"key": TPKeyNoTyping, @"title": @"Hide Typing Status",
+                  @"detail": @"The other person won't see \"typing…\" while you write a message",
+                  @"icon": @"ellipsis.bubble" },
+               @{ @"type": @"switch", @"key": TPKeyKeepUnsent, @"title": @"Keep Unsent Messages",
+                  @"detail": @"When someone unsends a message, it stays in your chat marked \"Unsent\"",
+                  @"icon": @"arrow.uturn.backward.circle" },
+           ]},
         @{ @"header": @"Interface & Interactions",
            @"rows": @[
-               @{ @"type": @"theme", @"title": @"Theme Color", @"icon": @"paintpalette" },
                @{ @"type": @"switch", @"key": TPKeyConfirmLike, @"title": @"Like Confirmation",
                   @"detail": @"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask.",
                   @"icon": @"heart" },
@@ -342,6 +485,12 @@ static NSString *TPTimePreview(NSInteger mode) {
                @{ @"type": @"switch", @"key": TPKeyDebugToast, @"title": @"Debug Hints",
                   @"detail": @"Turn on when a feature stops working. Hints show which features are active, to help report problems.",
                   @"icon": @"ladybug" },
+               @{ @"type": @"action", @"action": @"analyticsLog", @"title": @"Analytics Log",
+                  @"detail": @"Shows the usage data Threads collects and what it contains. The log never leaves your device",
+                  @"icon": @"chart.bar.doc.horizontal" },
+               @{ @"type": @"action", @"action": @"welcome", @"title": @"Welcome Screen",
+                  @"detail": @"See how to open ThreadsPulse settings again",
+                  @"icon": @"hand.wave" },
                @{ @"type": @"switch", @"key": TPKeySideloadFix, @"title": @"Sideload Compatibility Fix",
                   @"detail": @"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads",
                   @"icon": @"key" },
@@ -355,15 +504,56 @@ static NSString *TPTimePreview(NSInteger mode) {
            ]},
     ];
     // TP_MODEL_END
+    _allSections = _sections;
+    if (self.isRoot) {
+        _sections = @[];
+        self.navigationItem.title = @"Pulse";
+        self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+        self.navigationItem.backButtonTitle = @"Pulse";
+    } else {
+        NSDictionary *sec = _allSections[_category];
+        _sections = @[sec];
+        // 分類裡再分組的（例如「隱藏項目」）：每組一張卡片，卡片上方用主題色標題
+        NSArray *groups = sec[@"groups"];
+        if (groups.count) {
+            NSMutableArray *parts = [NSMutableArray array];
+            for (NSString *g in groups) {
+                NSMutableArray *rows = [NSMutableArray array];
+                for (NSDictionary *row in sec[@"rows"]) if ([row[@"group"] isEqualToString:g]) [rows addObject:row];
+                if (rows.count) [parts addObject:@{ @"header": sec[@"header"], @"groupTitle": g, @"rows": rows }];
+            }
+            if (parts.count) _sections = parts;
+        }
+        _showAbout = [sec[@"header"] isEqualToString:@"Advanced"];
+        self.navigationItem.title = TPL(sec[@"header"]);
+        self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+    }
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (self.isRoot) [self applyTheme];   // 從分類頁回來：數量、主題色都要更新
 }
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     CGFloat w = self.tableView.bounds.size.width;
-    if (w > 0 && w != _headerWidth) {          // 寬度改變才重設，避免無限重排
+    if (!self.isRoot && w > 0 && w != _headerWidth) {         // 分類頁：表格最上方放大標題（跟著表格捲動，不靠導覽列的大標題）
         _headerWidth = w;
-        _header = [[TPSettingsHeaderView alloc] initWithFrame:CGRectMake(0, 0, w, 92)];
+        UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 56)];
+        UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(20, 4, w - 40, 44)];
+        l.text = self.navigationItem.title;
+        l.font = [UIFont systemFontOfSize:30 weight:UIFontWeightHeavy];
+        l.textColor = UIColor.labelColor;
+        [box addSubview:l];
+        self.tableView.tableHeaderView = box;
+    }
+    if (self.isRoot && w > 0 && w != _headerWidth) {          // 寬度改變才重設，避免無限重排
+        _headerWidth = w;
+        _header = [[TPSettingsHeaderView alloc] initWithFrame:CGRectMake(0, 0, w, 136)];
         [_header setEnabledCount:[self enabledFeatureCount]];
+        __weak typeof(self) weakSelf = self;
+        _header.onThemeChange = ^{ [weakSelf applyTheme]; };
         self.tableView.tableHeaderView = _header;
     }
 }
@@ -373,7 +563,7 @@ static NSString *TPTimePreview(NSInteger mode) {
 /// 已開啟的功能數（所有開關，不含「除錯提示」）
 - (NSInteger)enabledFeatureCount {
     NSInteger n = 0;
-    for (NSDictionary *sec in _sections)
+    for (NSDictionary *sec in _allSections)
         for (NSDictionary *row in sec[@"rows"])
             if ([row[@"type"] isEqualToString:@"switch"] && ![row[@"key"] isEqualToString:TPKeyDebugToast]
                 && [TPPrefs boolForKey:row[@"key"]]) n++;
@@ -393,18 +583,43 @@ static NSString *TPTimePreview(NSInteger mode) {
 
 #pragma mark - Table
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tv { return _sections.count + 1; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tv {
+    if (self.isRoot) return TPRootGroups().count;
+    return _sections.count + (_showAbout ? 1 : 0);
+}
 
 - (NSInteger)tableView:(UITableView *)tv numberOfRowsInSection:(NSInteger)s {
-    return s < (NSInteger)_sections.count ? [self visibleRowsInSection:s].count : 2;
+    if (self.isRoot) return TPRootGroups()[s].count;
+    if (s >= (NSInteger)_sections.count) return 2;
+    NSArray *rows = [self visibleRowsInSection:s];
+    if (!_shownRows) _shownRows = [NSMutableDictionary dictionary];
+    _shownRows[@(s)] = rows;
+    return rows.count;
 }
 
 - (NSString *)tableView:(UITableView *)tv titleForHeaderInSection:(NSInteger)s {
-    return TPL(s < (NSInteger)_sections.count ? _sections[s][@"header"] : @"About");
+    if (self.isRoot) return nil;
+    if (s >= (NSInteger)_sections.count) return TPL(@"About");
+    NSString *g = _sections[s][@"groupTitle"];                       // 分組標題；分類本身的標題已經在最上方
+    return g.length ? TPL(g) : nil;
+}
+
+/// 分組標題用主題色粗體，比一般灰色小標題明顯
+- (void)tableView:(UITableView *)tv willDisplayHeaderView:(UIView *)view forSection:(NSInteger)s {
+    if (self.isRoot || s >= (NSInteger)_sections.count || ![_sections[s][@"groupTitle"] length]) return;
+    if (![view isKindOfClass:[UITableViewHeaderFooterView class]]) return;
+    UITableViewHeaderFooterView *h = (UITableViewHeaderFooterView *)view;
+    h.textLabel.textColor = TPAccentIcon();
+    h.textLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
 }
 
 - (NSString *)tableView:(UITableView *)tv titleForFooterInSection:(NSInteger)s {
-    if (s >= (NSInteger)_sections.count) return @"Made by h4x_0x30vm";
+    if (self.isRoot) {
+        if (s != (NSInteger)TPRootGroups().count - 1) return nil;
+        NSString *f = [self sectionWithHeader:@"Donate"][@"footer"];
+        return [NSString stringWithFormat:@"%@\n\nMade by h4x_0x30vm", f.length ? TPL(f) : @""];
+    }
+    if (s >= (NSInteger)_sections.count) return nil;
     NSString *f = _sections[s][@"footer"];
     if (!TPConditionMet(_sections[s][@"footerIf"])) return nil;
     return f.length ? TPL(f) : nil;
@@ -438,14 +653,35 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
 - (NSDictionary *)rowAt:(NSIndexPath *)ip { return [self visibleRowsInSection:ip.section][ip.row]; }
 
 /// 某個設定改變後，依賴它的列要顯示或隱藏（例如「提示位置」只在「詢問」時出現）
+///   只插入／移除有變的列，其他列原地不動。整個區塊重新載入的話，新舊畫面交疊淡入淡出，會看到殘影
 - (void)refreshConditionalRowsForKey:(NSString *)key {
     for (NSInteger sec = 0; sec < (NSInteger)_sections.count; sec++) {
-        BOOL affected = TPConditionUsesKey(_sections[sec][@"footerIf"], key);
+        BOOL footerAffected = TPConditionUsesKey(_sections[sec][@"footerIf"], key);
+        BOOL rowsAffected = NO;
         for (NSDictionary *row in _sections[sec][@"rows"])
-            if (TPConditionUsesKey(row[@"showIf"], key)) affected = YES;
-        if (affected)
-            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:sec]
-                          withRowAnimation:UITableViewRowAnimationFade];
+            if (TPConditionUsesKey(row[@"showIf"], key)) rowsAffected = YES;
+        if (!rowsAffected && !footerAffected) continue;
+
+        NSArray *before = _shownRows[@(sec)] ?: [self visibleRowsInSection:sec];
+        NSArray *after = [self visibleRowsInSection:sec];
+        NSMutableArray *deletes = [NSMutableArray array], *inserts = [NSMutableArray array];
+        [before enumerateObjectsUsingBlock:^(id row, NSUInteger i, BOOL *stop) {
+            if ([after indexOfObjectIdenticalTo:row] == NSNotFound) [deletes addObject:[NSIndexPath indexPathForRow:i inSection:sec]];
+        }];
+        [after enumerateObjectsUsingBlock:^(id row, NSUInteger i, BOOL *stop) {
+            if ([before indexOfObjectIdenticalTo:row] == NSNotFound) [inserts addObject:[NSIndexPath indexPathForRow:i inSection:sec]];
+        }];
+        NSString *footer = [self tableView:self.tableView titleForFooterInSection:sec];
+        UITableViewHeaderFooterView *fv = [self.tableView footerViewForSection:sec];
+        BOOL footerNeedsReload = footerAffected && !fv && footer.length;
+        [self.tableView performBatchUpdates:^{
+            if (deletes.count) [self.tableView deleteRowsAtIndexPaths:deletes withRowAnimation:UITableViewRowAnimationFade];
+            if (inserts.count) [self.tableView insertRowsAtIndexPaths:inserts withRowAnimation:UITableViewRowAnimationFade];
+            if (footerAffected && fv) { fv.textLabel.text = footer; [fv setNeedsLayout]; }   // 說明文字直接換，不重新載入
+        } completion:^(BOOL finished) {
+            if (footerNeedsReload)
+                [UIView performWithoutAnimation:^{ [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:sec] withRowAnimation:UITableViewRowAnimationNone]; }];
+        }];
     }
 }
 
@@ -466,74 +702,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
         [l.trailingAnchor constraintLessThanOrEqualToAnchor:m.trailingAnchor],
         [l.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:12],
         [l.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-4],
-    ]];
-    return cell;
-}
-
-/// 主題配色：標題＋目前主題名稱，下方一排色票
-- (UITableViewCell *)themeCellForRow:(NSDictionary *)row {
-    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
-    cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    TPApplyCardBackground(cell);
-    UIView *cv = cell.contentView;
-    NSInteger cur = [TPPrefs integerForKey:TPKeyTheme];
-
-    UIImageView *icon = [[UIImageView alloc] initWithImage:TPLineIcon(row[@"icon"])];
-    icon.tintColor = TPAccentIcon();
-    icon.contentMode = UIViewContentModeCenter;
-    UILabel *title = [UILabel new];
-    title.text = TPL(row[@"title"]);
-    title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
-    title.textColor = UIColor.labelColor;
-    UILabel *name = [UILabel new];
-    name.text = TPL([TPUI themeNameAtIndex:cur]);
-    name.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    name.textColor = TPAccentIcon();
-    UIStackView *dots = [UIStackView new];
-    dots.axis = UILayoutConstraintAxisHorizontal;
-    dots.distribution = UIStackViewDistributionEqualSpacing;
-    dots.alignment = UIStackViewAlignmentCenter;
-
-    __weak typeof(self) weakSelf = self;
-    for (NSInteger i = 0; i < [TPUI themeCount]; i++) {
-        UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
-        b.backgroundColor = [TPUI themeColorAtIndex:i];
-        b.layer.cornerRadius = 15;
-        b.accessibilityLabel = TPL([TPUI themeNameAtIndex:i]);
-        if (i == cur) {
-            b.layer.borderWidth = 2.5;
-            b.layer.borderColor = UIColor.labelColor.CGColor;
-            [b setImage:[[UIImage systemImageNamed:@"checkmark"
-                                  withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightBold]]
-                         imageWithTintColor:UIColor.whiteColor renderingMode:UIImageRenderingModeAlwaysOriginal]
-               forState:UIControlStateNormal];
-        }
-        [b.widthAnchor constraintEqualToConstant:30].active = YES;
-        [b.heightAnchor constraintEqualToConstant:30].active = YES;
-        [b addAction:[UIAction actionWithHandler:^(UIAction *a) {
-            if ([TPPrefs integerForKey:TPKeyTheme] == i) return;
-            [TPPrefs setInteger:i forKey:TPKeyTheme];
-            [TPUI hapticLight];
-            [[NSNotificationCenter defaultCenter] postNotificationName:TPThemeDidChangeNotification object:nil];
-            [weakSelf applyTheme];
-        }] forControlEvents:UIControlEventTouchUpInside];
-        [dots addArrangedSubview:b];
-    }
-    for (UIView *v in @[icon, title, name, dots]) { v.translatesAutoresizingMaskIntoConstraints = NO; [cv addSubview:v]; }
-    UILayoutGuide *m = cv.layoutMarginsGuide;
-    [NSLayoutConstraint activateConstraints:@[
-        [icon.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
-        [icon.widthAnchor constraintEqualToConstant:26],
-        [icon.centerYAnchor constraintEqualToAnchor:title.centerYAnchor],
-        [title.leadingAnchor constraintEqualToAnchor:icon.trailingAnchor constant:12],
-        [title.topAnchor constraintEqualToAnchor:cv.topAnchor constant:14],
-        [name.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
-        [name.firstBaselineAnchor constraintEqualToAnchor:title.firstBaselineAnchor],
-        [name.leadingAnchor constraintGreaterThanOrEqualToAnchor:title.trailingAnchor constant:8],
-        [dots.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:12],
-        [dots.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
-        [dots.trailingAnchor constraintEqualToAnchor:m.trailingAnchor constant:-4],
-        [dots.bottomAnchor constraintEqualToAnchor:cv.bottomAnchor constant:-14],
     ]];
     return cell;
 }
@@ -633,7 +801,33 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     return cell;
 }
 
+- (UITableViewCell *)rootCellAt:(NSIndexPath *)ip {
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
+    NSString *h = TPRootGroups()[ip.section][ip.row];
+    NSDictionary *sec = [self sectionWithHeader:h];
+    BOOL donate = [h isEqualToString:@"Donate"];
+    NSDictionary *link = donate ? [sec[@"rows"] firstObject] : nil;
+    UIListContentConfiguration *c = [UIListContentConfiguration valueCellConfiguration];
+    c.text = TPL(donate ? link[@"title"] : h);
+    c.secondaryText = donate ? nil : [self summaryForSection:sec];
+    c.secondaryTextProperties.color = UIColor.secondaryLabelColor;
+    c.image = TPSquareIcon(TPCategoryIcon(h), donate ? TPKofiColor() : TPAccent());
+    c.imageToTextPadding = 14;
+    cell.contentConfiguration = c;
+    TPApplyCardBackground(cell);
+    if (donate) {
+        UIBackgroundConfiguration *bg = [UIBackgroundConfiguration listGroupedCellConfiguration];
+        bg.backgroundColor = [TPKofiColor() colorWithAlphaComponent:0.12];
+        bg.strokeColor = [TPKofiColor() colorWithAlphaComponent:0.40];
+        bg.strokeWidth = 0.5;
+        cell.backgroundConfiguration = bg;
+    }
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    return cell;
+}
+
 - (UITableViewCell *)tableView:(UITableView *)tv cellForRowAtIndexPath:(NSIndexPath *)ip {
+    if (self.isRoot) return [self rootCellAt:ip];
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
 
     // ---- 關於 ----
@@ -660,7 +854,6 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     NSDictionary *row = [self rowAt:ip];
     NSString *type = row[@"type"];
     if ([type isEqualToString:@"segment"]) return [self segmentCellForRow:row];
-    if ([type isEqualToString:@"theme"])   return [self themeCellForRow:row];
     if ([type isEqualToString:@"caption"]) return [self captionCellForRow:row];
     NSString *detail = row[@"detail"];
 
@@ -712,6 +905,15 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
 
 - (void)tableView:(UITableView *)tv didSelectRowAtIndexPath:(NSIndexPath *)ip {
     [tv deselectRowAtIndexPath:ip animated:YES];
+    if (self.isRoot) {
+        NSString *h = TPRootGroups()[ip.section][ip.row];
+        if ([h isEqualToString:@"Donate"]) { [self openLink:[[self sectionWithHeader:h][@"rows"] firstObject][@"url"]]; return; }
+        NSUInteger idx = [_allSections indexOfObject:[self sectionWithHeader:h]];
+        if (idx == NSNotFound) return;
+        TPSettingsViewController *detail = [[TPSettingsViewController alloc] initWithCategory:idx];
+        [self.navigationController pushViewController:detail animated:YES];
+        return;
+    }
     UITableViewCell *cell = [tv cellForRowAtIndexPath:ip];
 
     if (ip.section >= (NSInteger)_sections.count) {
@@ -722,6 +924,9 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     NSString *type = row[@"type"];
     if ([type isEqualToString:@"action"]) {
         if ([row[@"action"] isEqualToString:@"export"]) [self exportSettingsFrom:cell];
+        else if ([row[@"action"] isEqualToString:@"resetSeenChats"]) [self confirmResetSeenChats];
+        else if ([row[@"action"] isEqualToString:@"analyticsLog"]) [self showAnalyticsLog];
+        else if ([row[@"action"] isEqualToString:@"welcome"]) [TPWelcomeViewController present];
         else [self importSettings];
     } else if ([type isEqualToString:@"link"]) {
         [self openLink:row[@"url"]];
@@ -749,6 +954,28 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
         [TPPrefs resetAll];
         [[NSNotificationCenter defaultCenter] postNotificationName:TPThemeDidChangeNotification object:nil];
         [self applyTheme];
+    }]];
+    [self presentViewController:a animated:YES completion:nil];
+}
+
+/// 分析回傳紀錄：本次啟動 Threads 收集了哪些使用紀錄（排行＋最近幾筆的內容）
+- (void)showAnalyticsLog {
+    NSString *r = TPAnalyticsLogReport();
+    if (!r) { [TPHUD toast:TPL(@"No analytics recorded yet")]; return; }
+    [TPDownloader showReport:r];
+}
+
+/// 個別聊天室的「看過」設定全部清掉，所有聊天室回到跟總開關一樣（不顯示）
+- (void)confirmResetSeenChats {
+    NSArray *list = [[NSUserDefaults standardUserDefaults] arrayForKey:@"tp_seen_allowed_chats"];
+    if (!list.count) { [TPHUD toast:TPL(@"No chats set to show Seen")]; return; }
+    NSString *msg = [NSString stringWithFormat:TPL(@"%lu chats will hide \"Seen\" again"), (unsigned long)list.count];
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:TPL(@"Reset Chats") message:msg
+                                                        preferredStyle:UIAlertControllerStyleAlert];
+    [a addAction:[UIAlertAction actionWithTitle:TPL(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
+    [a addAction:[UIAlertAction actionWithTitle:TPL(@"Reset") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *x) {
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"tp_seen_allowed_chats"];
+        [TPHUD toast:TPL(@"All chats hide Seen")];
     }]];
     [self presentViewController:a animated:YES completion:nil];
 }
