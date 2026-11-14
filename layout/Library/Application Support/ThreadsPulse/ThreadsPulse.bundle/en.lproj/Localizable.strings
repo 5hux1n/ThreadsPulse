@@ -1,11 +1,8 @@
-/* ThreadsPulse — en */
-
 "Block Ads" = "Block Ads";
 "Remove URL Tracking" = "Remove URL Tracking";
-"Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links" = "Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links";
+"Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links" = "Automatically removes tracking parameters such as xmt, igshid and utm_* when copying, sharing or opening links";
 "Download" = "Download";
 "Download Button" = "Download Button";
-"Video" = "Video";
 "Default Playback Speed" = "Default Playback Speed";
 "Post Time Format" = "Post Time Format";
 "Backup" = "Backup";
@@ -20,7 +17,6 @@
 "Reset All Settings?" = "Reset All Settings?";
 "Cancel" = "Cancel";
 "Reset" = "Reset";
-"ThreadsPulse loaded: tap “Pulse” at the top-right of Settings, or long-press with three fingers for 1 second" = "ThreadsPulse loaded: tap “Pulse” at the top-right of Settings, or long-press with three fingers for 1 second";
 "Blocked an ad request" = "Blocked an ad request";
 "Dropped sponsored items" = "Dropped sponsored items";
 "Blocked ad insertion" = "Blocked ad insertion";
@@ -61,15 +57,15 @@
 "With Seconds" = "With Seconds";
 "Example: %@" = "Example: %@";
 "3h" = "3h";
-"Turning ad blocking on or off takes effect after refreshing the feed or restarting the app." = "Turning ad blocking on or off takes effect after refreshing the feed or restarting the app.";
+"Turning ad blocking on or off takes effect after refreshing the feed or restarting the app." = "Turning Remove Ads on or off takes effect after refreshing the feed or restarting the app.";
 "Hide sponsored posts in the feed" = "Hide sponsored posts in the feed";
 "Download Original Size" = "Download Original-Size Photos";
 "Like Confirmation" = "Like Confirmation";
-"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "Ask before a like is sent, to prevent accidental taps. Removing a like won't ask.";
-"Turn on when a feature stops working. Hints show which features are active, to help report problems." = "Turn on when a feature stops working. Hints show which features are active, to help report problems.";
+"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "Tapping the heart shows a confirmation first; removing a like won't ask";
+"Turn on when a feature stops working. Hints show which features are active, to help report problems." = "Turn on when a feature misbehaves; hints show each feature's status to help report problems";
 "Diagnostics" = "Diagnostics";
 "Getting original photos…" = "Getting original photos…";
-"Long-press: choose photos or videos only\nTap: download all photos and videos" = "Long-press: choose photos or videos only\nTap: download all photos and videos";
+"Long-press: choose photos or videos only\nTap: download all photos and videos" = "Tap: download all photos and videos\nLong-press: choose photos or videos only";
 "Download Original Profile Pictures" = "Download Original-Size Profile Pictures";
 "Getting original photo…" = "Getting original photo…";
 "Done" = "Done";
@@ -86,64 +82,53 @@
 "Middle" = "Middle";
 "Bottom" = "Bottom";
 
-/* 首頁動態 */
 "Home Feed" = "Home Feed";
 "Keep Feed Position" = "Keep Feed Position";
-"Coming back from the background won't refresh the home feed, jump to the top or switch tabs" = "Coming back from the background won't refresh the home feed, jump to the top or switch tabs";
+"Coming back from the background won't refresh the home feed, jump to the top or switch tabs" = "When returning from the background, the home feed won't refresh, jump to the top or switch tabs";
 "Keep For" = "Keep For";
 "10 min" = "10 min";
 "30 min" = "30 min";
 "No Limit" = "No Limit";
 "Disable Pull to Refresh" = "Disable Pull to Refresh";
-"Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing" = "Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing";
+"Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing" = "Pulling down at the top of the home feed won't refresh or bounce";
 "Feed position kept" = "Feed position kept";
 "Pull to refresh blocked" = "Pull to refresh blocked";
 "Scroll to top blocked" = "Scroll to top blocked";
 "Home tab refresh blocked" = "Home tab refresh blocked";
 
-/* 追蹤建議 */
-"Hide Follow Suggestions" = "Hide Follow Suggestions";
 "Follow suggestions hidden" = "Follow suggestions hidden";
 
-/* 介面 */
 "Keep Tab Bar Visible" = "Keep Tab Bar Visible";
-"Scrolling won't hide the tab bar at the bottom; it always stays on screen" = "Scrolling won't hide the tab bar at the bottom; it always stays on screen";
+"Scrolling won't hide the tab bar at the bottom; it always stays on screen" = "The bottom tab bar won't hide while scrolling";
 
-/* 1.15.2 排版調整 */
 "Ads & Privacy" = "Ads & Privacy";
 "When you come back or switch accounts, detect a copied Threads link and open it" = "When you come back or switch accounts, detect a copied Threads link and open it";
-"With everything here turned on, new posts only load after you fully close and reopen Threads." = "With everything here turned on, new posts only load after you fully close and reopen Threads.";
-"If you're away longer than this, the feed refreshes as usual" = "If you're away longer than this, the feed refreshes as usual";
+"With everything here turned on, new posts only load after you fully close and reopen Threads." = "With all of the above on, new posts load only after Threads is fully closed and reopened.";
+"Come back within this time to keep your place; after that, the feed refreshes as usual" = "Come back within this time to keep your place; after that, the feed refreshes as usual";
 
-/* 1.15.3 文字修正 */
 "Auto-open reads the clipboard directly. If iOS asks to allow pasting every time, go to Settings › Threads › Paste from Other Apps and choose Allow." = "Auto-open reads the clipboard directly. If iOS asks to allow pasting every time, go to Settings › Threads › Paste from Other Apps and choose Allow.";
-"If the original size isn't available, the regular size is downloaded.\nTo save a profile picture, long-press it on a profile, or open it full screen and tap ↓ in the bottom-right corner." = "If the original size isn't available, the regular size is downloaded.\nTo save a profile picture, long-press it on a profile, or open it full screen and tap ↓ in the bottom-right corner.";
-"Videos play at this speed by default, and return to it after you let go of a long-press 2x." = "Videos play at this speed by default, and return to it after you let go of a long-press 2x.";
-"When you're scrolled down the home feed, tapping the Home tab won't jump back to the top, so you stay where you were" = "When you're scrolled down the home feed, tapping the Home tab won't jump back to the top, so you stay where you were";
-"When you're already at the top of the home feed, tapping the Home tab won't refresh or load new posts" = "When you're already at the top of the home feed, tapping the Home tab won't refresh or load new posts";
+"If the original size isn't available, the regular size is downloaded.\nTo save a profile picture, long-press it on a profile, or open it full screen and tap ↓ in the bottom-right corner." = "If the original size isn't available, the regular size is downloaded.";
+"Videos play at the selected speed, and return to it after you release a long-press 2x." = "Videos play at the selected speed, and return to it after you release a long-press 2x.";
+"When you're scrolled down the home feed, tapping the Home tab won't jump back to the top, so you stay where you were" = "Tapping the Home tab keeps your current position instead of jumping to the top";
+"When you're already at the top of the home feed, tapping the Home tab won't refresh or load new posts" = "At the top of the home feed, tapping the Home tab won't refresh or load new posts";
 "Detect Copied Links" = "Detect Copied Links";
 
-/* 複製個人檔案資訊 */
 "Copy Profile Info" = "Copy Profile Info";
-"On a profile, long-press the name, username, bio or profile picture to copy the name, username or bio" = "On a profile, long-press the name, username, bio or profile picture to copy the name, username or bio";
+"On a profile, long-press the name, username, bio or profile picture to copy the name, username or bio" = "On a profile, long-press the name, username, bio or profile picture to copy its details";
 "Copy Username" = "Copy Username";
 "Copy Bio" = "Copy Bio";
 "Copied" = "Copied";
 
-/* 側載相容修正 */
 "Sideload Compatibility Fix" = "Sideload Compatibility Fix";
-"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads";
+"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "Keeps you signed in and app group data intact after re-signing; applies only to re-signed apps and needs Threads to be reopened after changes";
 "Copy Name" = "Copy Name";
 "Last session" = "Last session";
 "Block Screenshot Detection" = "Block Screenshot Detection";
 "Threads won't know when you take a screenshot or record the screen" = "Threads won't know when you take a screenshot or record the screen";
 "Screenshot detection blocked" = "Screenshot detection blocked";
 
-"Stop the follow suggestions sheet from popping up" = "Stop the follow suggestions sheet from popping up";
-"Hide Suggested Accounts in Feed" = "Hide Suggested Accounts in Feed";
-"Hide suggested-account cards in the feed, and the \"Suggested for you\" section on profiles and after you follow someone" = "Hide suggested-account cards in the feed, and the \"Suggested for you\" section on profiles and after you follow someone";
 "Disable Autoplay" = "Disable Autoplay";
-"Videos in the feed won't play until you tap them" = "Videos in the feed won't play until you tap them";
+"Videos in the feed won't play until you tap them" = "Videos won't play automatically while you browse the feed; they start only after you tap them";
 "Autoplay blocked" = "Autoplay blocked";
 "Playback allowed" = "Playback allowed";
 "Tap: no video player found" = "Tap: no video player found";
@@ -151,21 +136,18 @@
 "Tap: video is playing" = "Tap: video is playing";
 "Tap: video still not playing" = "Tap: video still not playing";
 "Block Analytics" = "Block Analytics";
-"Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate" = "Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate";
+"Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate" = "Stops sending usage data such as views, time spent and taps; recommendations may be less accurate";
 "Analytics blocked last session" = "Analytics blocked last session";
-"Hide Instagram Button" = "Hide Instagram Button";
-"Hide the Instagram button at the top of profiles" = "Hide the Instagram button at the top of profiles";
 "Open Links in External Browser" = "Open Links in External Browser";
-"Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app" = "Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app";
+"Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app" = "Links in posts and bios open in Safari or your default browser; Threads links still open in the app";
 "Hidden Items" = "Hidden Items";
 "Links" = "Links";
 "Interface & Interactions" = "Interface & Interactions";
 "Fetch the highest resolution from the web version" = "Fetch the highest resolution from the web version";
-"Long-press a profile picture on a profile to save it" = "Long-press a profile picture on a profile to save it";
+"Long-press a profile picture on a profile to save it" = "Long-press the profile picture on a profile, or view it full screen and tap ↓ at the bottom right to save";
 "When Tapping the Home Tab" = "When Tapping the Home Tab";
 "Don't Scroll to Top" = "Don't Scroll to Top";
 "Don't Refresh" = "Don't Refresh";
-"Theme Color" = "Theme Color";
 "Coral" = "Coral";
 "Ocean" = "Ocean";
 "Mint" = "Mint";
@@ -175,3 +157,77 @@
 "Long-Press Home Tab for Settings" = "Long-Press Home Tab for Settings";
 "Long-pressing the Home tab at the bottom opens ThreadsPulse settings instead" = "Long-pressing the Home tab at the bottom opens ThreadsPulse settings instead";
 "Running · %ld features on" = "Running · %ld features on";
+"Long-press tab" = "Long-press tab";
+"feature is off" = "feature is off";
+"Home tab" = "Home tab";
+"not the Home tab" = "not the Home tab";
+"Messages" = "Messages";
+"Hide Seen Status" = "Hide Seen Status";
+"Keep Unsent Messages" = "Keep Unsent Messages";
+"Hide Typing Status" = "Hide Typing Status";
+"The other person won't see \"typing…\" while you write a message" = "The other person won't see the typing indicator (…) while you write a message";
+"Typing status blocked" = "Typing status blocked";
+"Seen status blocked" = "Seen status blocked";
+"Unsent message kept" = "Unsent message kept";
+"Unsent" = "Unsent";
+"Couldn't find this chat" = "Couldn't find this chat";
+"This chat shows Seen" = "This chat shows \"Seen\"";
+"This chat hides Seen" = "This chat hides \"Seen\"";
+"Seen for This Chat" = "Seen for This Chat";
+"Reset Chats" = "Reset Chats";
+"Chats where you tapped the eye to show \"Seen\" go back to hiding it" = "All chats set to show \"Seen\" with the eye icon go back to hiding it";
+"No chats set to show Seen" = "No chats set to show Seen";
+"%lu chats will hide \"Seen\" again" = "%lu chats will hide \"Seen\" again";
+"All chats hide Seen" = "All chats now hide Seen";
+"Seen sent" = "Seen sent";
+"Seen sent first, message follows" = "Seen sent first, message follows";
+"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat." = "Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat";
+"When someone unsends a message, it stays in your chat marked \"Unsent\"" = "When someone unsends a message, it stays in your chat marked \"Unsent\"";
+"Show Seen When You Reply" = "Show Seen When You Reply";
+"Let the other person see \"Seen\" once you reply" = "On: \"Seen\" shows to the other person only after you reply\nOff: \"Seen\" won't show to the other person, even after you reply";
+"Welcome to ThreadsPulse" = "Welcome to ThreadsPulse";
+"ThreadsPulse is installed and running" = "ThreadsPulse is installed and running";
+"How to Open Settings" = "How to Open ThreadsPulse Settings";
+"From Threads Settings" = "From Threads Settings";
+"Open Threads settings, then tap “Pulse” at the top right" = "Open Threads settings, then tap “Pulse” at the top right";
+"Three-Finger Long Press" = "Three-Finger Long Press";
+"Press anywhere with three fingers for 1 second" = "Press anywhere with three fingers for 1 second";
+"Long-Press the Home Tab" = "Long-Press the Home Tab";
+"Long-press the Home tab at the bottom" = "Long-press the Home tab at the bottom";
+"You can see this screen again under Advanced" = "You can see this screen again in ThreadsPulse settings under Advanced";
+"Open ThreadsPulse Settings" = "Open ThreadsPulse Settings";
+"Maybe Later" = "Maybe Later";
+"Welcome Screen" = "Welcome Screen";
+"See how to open ThreadsPulse settings again" = "See how to open ThreadsPulse settings again";
+"Suggested Accounts" = "Suggested Accounts";
+"Hide \"Suggested for you\" in the feed & on profiles" = "Hide \"Suggested for you\" in the feed & on profiles";
+"Search Suggestions" = "Search Suggestions";
+"Hide \"Suggested to follow\" on the search page" = "Hide \"Suggested to follow\" on the search page";
+"Follow Suggestion Pop-ups" = "Follow Suggestion Pop-ups";
+"Stop \"Follow suggestions\" from popping up automatically" = "Stop \"Follow suggestions\" from popping up automatically";
+"Post Interest Prompts" = "Post Interest Prompts";
+"Stop asking if you're interested in posts" = "Stop asking if you're interested in posts";
+"Instagram Button" = "Instagram Button";
+"Hide the Instagram button on profiles" = "Hide the Instagram button on profiles";
+"Media Download" = "Media Download";
+"Player" = "Player";
+"Search Button" = "Search Button";
+"Hide the search button on profiles" = "Hide the search button on profiles";
+"Suggested Content" = "Suggested Content";
+"Interface Buttons" = "Interface Buttons";
+"Analytics Log" = "Analytics Log";
+"Shows the usage data Threads collects and what it contains. The log never leaves your device" = "Shows the usage data Threads collects and what it contains. The log never leaves your device";
+"No analytics recorded yet" = "No analytics recorded yet";
+"Top Events" = "Top Events";
+"…and %lu more types" = "…and %lu more types";
+"Recent Events" = "Recent Events";
+"Contains your user ID and post IDs. Check before sharing." = "Contains your user ID and post IDs. Check before sharing.";
+"Block Analytics: On" = "Block Analytics: On";
+"Block Analytics: Off" = "Block Analytics: Off";
+"Nothing below was sent" = "Nothing below was sent";
+"Everything below was sent" = "Everything below was sent";
+"%lu events while using the app (%lu types)" = "%lu events while using the app (%lu types)";
+"%@ times" = "%@ times";
+"Unknown" = "Unknown";
+"Latest one of each type" = "Latest one of each type";
+"Theme" = "Theme";
