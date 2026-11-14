@@ -8,11 +8,9 @@
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         s = [NSSet setWithArray:@[
-            // Threads / Instagram / Meta
             @"xmt", @"slof", @"igshid", @"igsh", @"ig_rid", @"ig_mid", @"ig_cache_key",
             @"fbclid", @"mibextid", @"__tn__", @"__cft__", @"__xts__", @"fb_action_ids",
             @"fb_source", @"ref_src", @"ref_url",
-            // 常見第三方
             @"gclid", @"gclsrc", @"dclid", @"msclkid", @"twclid", @"yclid", @"_hsenc", @"_hsmi",
             @"mc_cid", @"mc_eid", @"si"
         ]];
@@ -49,18 +47,16 @@
     NSURLComponents *c = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
     if (!c) return url;
 
-    // 1) 解開跳轉包裝 (https://l.threads.com/?u=<真正網址>&e=<追蹤碼>)
     if ([self isRedirectHost:c.host]) {
         for (NSURLQueryItem *item in c.queryItems) {
             if ([item.name isEqualToString:@"u"] && item.value.length) {
                 NSURL *inner = [NSURL URLWithString:item.value];
-                if (inner) return [self cleanURL:inner];   // 內層網址也要清一次
+                if (inner) return [self cleanURL:inner];
             }
         }
         return url;
     }
 
-    // 2) 移除追蹤參數
     if (c.queryItems.count) {
         NSMutableArray<NSURLQueryItem *> *kept = [NSMutableArray array];
         BOOL changed = NO;
@@ -69,7 +65,7 @@
             [kept addObject:item];
         }
         if (!changed) return url;
-        c.queryItems = kept.count ? kept : nil;   // 全部移除時連 "?" 也不留
+        c.queryItems = kept.count ? kept : nil;
     }
     return c.URL ?: url;
 }
@@ -87,7 +83,7 @@
 
     NSMutableString *out = [string mutableCopy];
     NSArray *matches = [det matchesInString:string options:0 range:NSMakeRange(0, string.length)];
-    for (NSTextCheckingResult *m in [matches reverseObjectEnumerator]) {   // 由後往前替換，range 不會位移
+    for (NSTextCheckingResult *m in [matches reverseObjectEnumerator]) {
         NSURL *u = m.URL;
         if (!u) continue;
         NSURL *cleaned = [self cleanURL:u];
