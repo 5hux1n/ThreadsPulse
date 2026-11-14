@@ -8,12 +8,10 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
 
 @implementation TPWelcomeViewController {
     UIView *_badge;
-    NSMutableArray<UIView *> *_animated;   // 進場時依序浮現的區塊
-    NSHashTable<UILabel *> *_wrapping;      // 會換行的文字：排版後依實際寬度重新計算高度
+    NSMutableArray<UIView *> *_animated;
+    NSHashTable<UILabel *> *_wrapping;
     BOOL _didAnimateIn;
 }
-
-#pragma mark - 顯示
 
 + (void)present { [self presentMarkingShown:NO attempt:0]; }
 
@@ -22,19 +20,17 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     static BOOL scheduled;
     if (scheduled) return;
     scheduled = YES;
-    // 等 Threads 自己的畫面出來再顯示
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         scheduled = NO;
         [self presentMarkingShown:YES attempt:0];
     });
 }
 
-/// Threads 剛好在切換畫面或跳出提示框時先不顯示，隔 2 秒再試（最多 5 次；這次沒顯示成功，下次回到 App 會再試）
 + (void)presentMarkingShown:(BOOL)mark attempt:(NSInteger)attempt {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (mark && [TPPrefs boolForKey:kTPWelcomeShownKey]) return;
         UIViewController *top = TPTopViewController();
-        if ([top isKindOfClass:self]) return;   // 已經開著
+        if ([top isKindOfClass:self]) return;
         BOOL busy = !top || !top.view.window || top.isBeingPresented || top.isBeingDismissed
                  || [top isKindOfClass:[UIAlertController class]];
         if (busy) {
@@ -51,8 +47,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
         }];
     });
 }
-
-#pragma mark - 畫面
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -73,7 +67,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     [scroll addSubview:stack];
     [self.view addSubview:bottom];
 
-    // 頂部：Pulse 圖示、標題、副標
     UIView *hero = [self heroView];
     [stack addArrangedSubview:hero];
     [stack setCustomSpacing:28 afterView:hero];
@@ -85,7 +78,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     [stack addArrangedSubview:[self inset:heading by:4]];
     [stack setCustomSpacing:8 afterView:stack.arrangedSubviews.lastObject];
 
-    // 三種打開方式
     [stack addArrangedSubview:[self cardWithSymbol:@"gearshape"
                                              title:TPL(@"From Threads Settings")
                                             detail:TPL(@"Open Threads settings, then tap “Pulse” at the top right")
@@ -110,7 +102,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     [stack addArrangedSubview:note];
     [_animated addObject:note];
 
-    // 底部按鈕：自己畫，不用系統樣式（Threads 會用全域外觀改掉系統按鈕的顏色）
     UIButton *primary = [UIButton buttonWithType:UIButtonTypeCustom];
     [primary setTitle:TPL(@"Open ThreadsPulse Settings") forState:UIControlStateNormal];
     [primary setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
@@ -138,7 +129,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     [_animated addObject:bottom];
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
-    // 內容最寬 520（iPad 上置中，不會拉得太寬）
     NSLayoutConstraint *fill = [stack.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-40];
     fill.priority = UILayoutPriorityDefaultHigh;
     NSLayoutConstraint *bottomFill = [bottom.widthAnchor constraintEqualToAnchor:safe.widthAnchor constant:-40];
@@ -149,7 +139,7 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
         [scroll.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [scroll.bottomAnchor constraintEqualToAnchor:bottom.topAnchor constant:-8],
 
-        [scroll.contentLayoutGuide.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor],   // 只上下捲動
+        [scroll.contentLayoutGuide.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor],
         [stack.topAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.topAnchor constant:36],
         [stack.bottomAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.bottomAnchor constant:-16],
         [stack.centerXAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.centerXAnchor],
@@ -172,7 +162,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     ]];
 }
 
-/// 頂部：圖示、歡迎標題、副標
 - (UIView *)heroView {
     UIView *hero = [UIView new];
     _badge = [UIView new];
@@ -230,7 +219,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     return hero;
 }
 
-/// 一種打開方式：左邊圖示、標題、說明，右邊可以放開關
 - (UIView *)cardWithSymbol:(NSString *)symbol title:(NSString *)titleText detail:(NSString *)detailText accessory:(UIView *)accessory {
     UIView *card = [UIView new];
     card.backgroundColor = [TPUI cardColor];
@@ -300,7 +288,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     return card;
 }
 
-/// 小標題左右縮一點，對齊卡片裡的內容
 - (UIView *)inset:(UIView *)view by:(CGFloat)inset {
     UIView *wrap = [UIView new];
     view.translatesAutoresizingMaskIntoConstraints = NO;
@@ -315,9 +302,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     return wrap;
 }
 
-#pragma mark - 文字換行
-
-/// 會換行的文字：高度不能被壓扁，排版後依實際寬度重算
 - (void)wrap:(UILabel *)label {
     label.numberOfLines = 0;
     label.lineBreakMode = NSLineBreakByWordWrapping;
@@ -325,8 +309,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     [_wrapping addObject:label];
 }
 
-/// 第一次算高度時寬度可能還不是最後的寬度（例如先用整個螢幕寬算成一行），
-/// 之後變窄也不會重算，文字就被「…」截掉。每次排版後用實際寬度再算一次，任何尺寸的裝置都能完整換行
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     BOOL changed = NO;
@@ -336,8 +318,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     }
     if (changed) [self.view layoutIfNeeded];
 }
-
-#pragma mark - 進場動畫
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
@@ -354,7 +334,6 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     if (_didAnimateIn) return;
     _didAnimateIn = YES;
     if (UIAccessibilityIsReduceMotionEnabled()) return;
-    // 各區塊由上到下依序浮現，圖示帶一點彈跳
     [_animated enumerateObjectsUsingBlock:^(UIView *v, NSUInteger i, BOOL *stop) {
         [UIView animateWithDuration:0.5 delay:0.06 * i usingSpringWithDamping:0.85 initialSpringVelocity:0.3 options:0
                          animations:^{ v.alpha = 1; v.transform = CGAffineTransformIdentity; } completion:nil];
