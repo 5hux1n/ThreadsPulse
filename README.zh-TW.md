@@ -176,7 +176,7 @@ ThreadsPulse/
 ├── TPDownloader.h/.m               網址選擇、下載、WebP→JPEG、診斷報告
 ├── TPHUD.h/.m                      進度視窗、toast、提示橫幅
 ├── TPUI.h/.m                       圓形毛玻璃按鈕、長按選單、觸覺回饋、主題色
-├── TPSettingsViewController.h/.m   設定頁（資料模型在 TP_MODEL_BEGIN～TP_MODEL_END 之間）
+├── TPSettingsViewController.h/.m   設定頁
 ├── TPWelcomeViewController.h/.m    第一次開啟時的全螢幕歡迎畫面
 ├── TPLocalization.h/.m             TPL() 多語系
 ├── TPSideloadFix.h/.m              側載相容修正（鑰匙圈、App 群組）
