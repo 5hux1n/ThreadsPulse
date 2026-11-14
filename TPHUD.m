@@ -18,8 +18,6 @@ static const CGFloat kRing  = 64;
     BOOL _finished;
 }
 
-#pragma mark - 建立
-
 + (instancetype)showWithTitle:(NSString *)title cancel:(void (^)(void))cancel {
     TPHUD *h = [TPHUD new];
     [h buildWithTitle:title cancel:cancel];
@@ -115,8 +113,6 @@ static const CGFloat kRing  = 64;
                      completion:nil];
 }
 
-#pragma mark - 更新
-
 - (void)setTitle:(NSString *)title {
     dispatch_async(dispatch_get_main_queue(), ^{ self->_titleLabel.text = title; });
 }
@@ -140,8 +136,6 @@ static const CGFloat kRing  = 64;
     if (cb) cb();
 }
 
-#pragma mark - 結束狀態
-
 - (void)finishWithSymbol:(NSString *)symbol color:(UIColor *)color message:(NSString *)message hold:(NSTimeInterval)hold {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self->_finished || !self->_overlay) return;
@@ -164,7 +158,6 @@ static const CGFloat kRing  = 64;
         self->_subLabel.text = @"";
         [self->_cancelButton removeFromSuperview];
 
-        // 卡片收成較矮的樣式
         [UIView animateWithDuration:0.25 animations:^{
             CGPoint c = self->_card.center;
             self->_card.bounds = CGRectMake(0, 0, kCardW, 156);
@@ -199,9 +192,6 @@ static const CGFloat kRing  = 64;
     });
 }
 
-#pragma mark - Toast
-
-// 同時出現多則提示時往上疊，不互相蓋住；最新的在最下面
 static NSMutableArray<UIView *> *sTPToasts;
 
 static void TPLayoutToasts(UIWindow *win, BOOL animated) {
@@ -245,16 +235,14 @@ static void TPLayoutToasts(UIWindow *win, BOOL animated) {
         pill.frame = CGRectMake((win.bounds.size.width - w) / 2, 0, w, h);
         [sTPToasts addObject:pill];
         [win addSubview:pill];
-        TPLayoutToasts(win, YES);                 // 舊的往上推，新的放最下面
+        TPLayoutToasts(win, YES);
         pill.alpha = 0;
         pill.transform = CGAffineTransformMakeTranslation(0, 14);
 
-        // 多行的提示停久一點，讓人看得完；除錯提示（[TP] 開頭）停 4 秒方便截圖
         NSTimeInterval stay = ([text hasPrefix:@"[TP]"] ? 4.0 : 2.0)
                             + MAX(0, (NSInteger)[text componentsSeparatedByString:@"\n"].count - 1) * 1.5;
         [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:0.8 initialSpringVelocity:0.5 options:0
                          animations:^{ pill.alpha = 1; pill.transform = CGAffineTransformIdentity; } completion:nil];
-        // 用計時器決定何時消失：鍵盤切換之類的畫面更新會中斷動畫，用動畫的延遲會讓提示一閃就不見
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((0.3 + stay) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [UIView animateWithDuration:0.3 animations:^{ pill.alpha = 0; } completion:^(BOOL f2) {
                 [pill removeFromSuperview];
@@ -266,7 +254,6 @@ static void TPLayoutToasts(UIWindow *win, BOOL animated) {
         });
     });
 }
-#pragma mark - Banner
 
 static UIView *sTPBanner;
 
@@ -294,7 +281,7 @@ static UIView *sTPBanner;
         UIVisualEffectView *bar = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark]];
         CGFloat y;
         if (position == 1)      y = (win.bounds.size.height - h) / 2;
-        else if (position == 2) y = win.bounds.size.height - win.safeAreaInsets.bottom - h - 84;   // 分頁列上方
+        else if (position == 2) y = win.bounds.size.height - win.safeAreaInsets.bottom - h - 84;
         else                    y = win.safeAreaInsets.top + 8;
         bar.frame = CGRectMake((win.bounds.size.width - w) / 2, y, w, h);
         bar.layer.cornerRadius = h / 2;
@@ -361,4 +348,3 @@ static UIView *sTPBanner;
     [TPHUD dismissBanner:g.view];
 }
 @end
-
