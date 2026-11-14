@@ -20,10 +20,14 @@ extern NSString *const TPThemeDidChangeNotification;
                             diameter:(CGFloat)d
                              onTap:(void (^)(void))tap
                          menuItems:(NSArray<TPMenuItem *> *)menuItems;
-/// 插件主題色（設定頁開關、按鈕等）；依「主題配色」設定變化
+/// 插件主題色（設定頁開關、按鈕等）；依「插件主題色」設定變化
 + (UIColor *)accent;
 /// 圖示用的主題色：深色模式稍亮、淺色模式稍深
 + (UIColor *)accentIcon;
+/// 插件頁面底色（設定頁、歡迎畫面）：深色接近 Threads 的 #101010
++ (UIColor *)pageColor;
+/// 霧面卡片底色：半透明白（深色）／半透明黑（淺色）
++ (UIColor *)cardColor;
 + (NSInteger)themeCount;
 + (UIColor *)themeColorAtIndex:(NSInteger)i;
 /// 主題名稱（英文 key，顯示時經 TPL 翻譯）
