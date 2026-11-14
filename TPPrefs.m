@@ -21,6 +21,13 @@ NSString *const TPKeyBlockScreenshotDetect = @"tp_block_screenshot_detect";
 NSString *const TPKeyBlockAnalytics  = @"tp_block_analytics";
 NSString *const TPKeyExternalBrowser = @"tp_external_browser";
 NSString *const TPKeyHideIGButton    = @"tp_hide_ig_button";
+NSString *const TPKeyNoSeen          = @"tp_no_seen";
+NSString *const TPKeyKeepUnsent      = @"tp_keep_unsent";
+NSString *const TPKeyNoTyping        = @"tp_no_typing";
+NSString *const TPKeySeenOnReply     = @"tp_seen_on_reply";
+NSString *const TPKeyHidePostFeedback = @"tp_hide_post_feedback";
+NSString *const TPKeyHideSearchSuggest = @"tp_hide_search_suggest";
+NSString *const TPKeyHideProfileSearch = @"tp_hide_profile_search";
 NSString *const TPKeyHomeLongPress   = @"tp_home_long_press";
 NSString *const TPKeyTheme           = @"tp_theme";
 NSString *const TPKeyHideFeedSuggest = @"tp_hide_feed_suggest";
@@ -35,7 +42,7 @@ static NSString *const kSuite = @"com.example.threadspulse";
 
 static NSArray<NSString *> *TPBoolKeys(void) {
     return @[TPKeyBlockAds, TPKeyStripTracking, TPKeyShowDownloadBtn, TPKeyDebugToast,
-             TPKeyOriginalImage, TPKeyOriginalAvatar, TPKeyClipboardLinks, TPKeyConfirmLike, TPKeyKeepFeed, TPKeyHideFollowSuggest, TPKeyPinTabBar, TPKeyCopyProfile, TPKeySideloadFix, TPKeyBlockScreenshotDetect, TPKeyBlockAnalytics, TPKeyExternalBrowser, TPKeyHideIGButton, TPKeyHomeLongPress, TPKeyHideFeedSuggest, TPKeyNoAutoplay,
+             TPKeyOriginalImage, TPKeyOriginalAvatar, TPKeyClipboardLinks, TPKeyConfirmLike, TPKeyKeepFeed, TPKeyHideFollowSuggest, TPKeyPinTabBar, TPKeyCopyProfile, TPKeySideloadFix, TPKeyBlockScreenshotDetect, TPKeyBlockAnalytics, TPKeyExternalBrowser, TPKeyHideIGButton, TPKeyHomeLongPress, TPKeyNoSeen, TPKeyKeepUnsent, TPKeyNoTyping, TPKeySeenOnReply, TPKeyHidePostFeedback, TPKeyHideSearchSuggest, TPKeyHideProfileSearch, TPKeyHideFeedSuggest, TPKeyNoAutoplay,
              TPKeyNoPullRefresh, TPKeyTabNoScrollTop, TPKeyTabNoRefresh];
 }
 static NSArray<NSString *> *TPIntKeys(void) {
@@ -64,7 +71,7 @@ static NSInteger TPIntMax(NSString *key) {
             TPKeyDebugToast: @NO,       TPKeyOriginalImage: @YES,
             TPKeyPlaySpeed: @0,
             TPKeyExactTime: @0,         TPKeyConfirmLike: @NO,      TPKeyOriginalAvatar: @YES,  TPKeyClipboardLinks: @NO,  TPKeyClipboardMode: @0,  TPKeyBannerPosition: @0,
-            TPKeyHideFollowSuggest: @YES, TPKeyPinTabBar: @NO, TPKeyCopyProfile: @YES, TPKeySideloadFix: @YES, TPKeyBlockScreenshotDetect: @YES, TPKeyBlockAnalytics: @NO, TPKeyExternalBrowser: @NO, TPKeyHideIGButton: @NO, TPKeyHomeLongPress: @NO, TPKeyTheme: @0, TPKeyHideFeedSuggest: @YES, TPKeyNoAutoplay: @NO, TPKeyKeepFeed: @NO,         TPKeyKeepFeedLimit: @0,
+            TPKeyHideFollowSuggest: @YES, TPKeyPinTabBar: @NO, TPKeyCopyProfile: @YES, TPKeySideloadFix: @YES, TPKeyBlockScreenshotDetect: @YES, TPKeyBlockAnalytics: @NO, TPKeyExternalBrowser: @NO, TPKeyHideIGButton: @NO, TPKeyHomeLongPress: @YES, TPKeyNoSeen: @NO, TPKeyKeepUnsent: @NO, TPKeyNoTyping: @NO, TPKeySeenOnReply: @YES, TPKeyHidePostFeedback: @YES, TPKeyHideSearchSuggest: @YES, TPKeyHideProfileSearch: @NO, TPKeyTheme: @0, TPKeyHideFeedSuggest: @YES, TPKeyNoAutoplay: @NO, TPKeyKeepFeed: @NO,         TPKeyKeepFeedLimit: @0,
             TPKeyNoPullRefresh: @NO,    TPKeyTabNoScrollTop: @NO,   TPKeyTabNoRefresh: @NO,
         }];
     });
