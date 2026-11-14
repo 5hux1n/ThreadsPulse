@@ -1,18 +1,3 @@
-// 側載相容修正：重新簽名後，讓 Threads 的鑰匙圈與 App 群組照常運作
-//
-// Threads 原本的權限（Meta 的 Team ID：MH9GU9K5PX）：
-//   keychain-access-groups：MH9GU9K5PX.platformFamily、MH9GU9K5PX.shared
-//   application-groups    ：group.com.burbn.instagram、group.com.facebook.family、group.com.burbn.family
-// 重新簽名後 Team ID 改變，這些群組都對不上：
-//   - 鑰匙圈：存取指定群組會失敗（errSecMissingEntitlement），登入資料存不進去 → 一直被登出
-//   - App 群組：containerURLForSecurityApplicationGroupIdentifier: 回傳 nil → 讀寫共用資料失敗
-//
-// 修正方式：
-//   1. 鑰匙圈：把各個已載入映像檔對 SecItemAdd／CopyMatching／Update／Delete 的呼叫，改接到我們的函式，
-//      把指定的存取群組換成這個 App 實際可用的群組。
-//   2. App 群組：拿不到群組資料夾時，改用 App 自己資料夾裡的替代資料夾。
-// 用原本的 Meta 簽名執行（例如越獄安裝）時，偵測到 Team ID 沒變就完全不啟用。
-
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 #import <objc/runtime.h>
@@ -21,6 +6,7 @@
 #import <mach-o/nlist.h>
 #import <mach/mach.h>
 #import <dlfcn.h>
+#import <pthread.h>
 #import "TPPrefs.h"
 #import "TPSideloadFix.h"
 
@@ -31,10 +17,9 @@ static OSStatus (*orig_SecItemCopyMatching)(CFDictionaryRef, CFTypeRef *);
 static OSStatus (*orig_SecItemUpdate)(CFDictionaryRef, CFDictionaryRef);
 static OSStatus (*orig_SecItemDelete)(CFDictionaryRef);
 
-static NSString *gTPAccessGroup;      // 這個 App 實際可用的鑰匙圈群組（例如 ABCDE12345.com.example.threads）
-static NSString *gTPFixStatus;        // 給除錯提示看的狀態
+static NSString *gTPAccessGroup;
+static NSString *gTPFixStatus;
 
-// ---- 診斷：記錄這次啟動期間鑰匙圈的讀寫與錯誤次數 ----
 static volatile int32_t gTPCalls, gTPRewrites, gTPErrors;
 static OSStatus gTPLastError;
 static char gTPLastErrorWhere[96];
@@ -57,17 +42,23 @@ NSString *TPSideloadFixStats(void) {
     return r;
 }
 
-#pragma mark - 鑰匙圈
+static NSString *TPResolveAccessGroup(void);
+static BOOL gTPNativeSignature;
 
-/// 存取群組不是我們能用的 → 換成實際可用的群組
 static CFDictionaryRef TPFixQuery(CFDictionaryRef query, CFMutableDictionaryRef *owned) {
     *owned = NULL;
-    if (!query || !gTPAccessGroup) return query;
+    if (!query) return query;
     CFTypeRef group = CFDictionaryGetValue(query, kSecAttrAccessGroup);
     if (!group || CFGetTypeID(group) != CFStringGetTypeID()) return query;
-    if (CFEqual(group, (__bridge CFStringRef)gTPAccessGroup)) return query;
+
+    if (CFStringHasPrefix(group, CFSTR("com.apple."))) return query;
+    NSString *ours = TPResolveAccessGroup();
+    if (!ours && gTPNativeSignature) return query;
+    if (ours && CFEqual(group, (__bridge CFStringRef)ours)) return query;
     CFMutableDictionaryRef copy = CFDictionaryCreateMutableCopy(kCFAllocatorDefault, 0, query);
-    CFDictionarySetValue(copy, kSecAttrAccessGroup, (__bridge CFStringRef)gTPAccessGroup);
+
+    if (ours) CFDictionarySetValue(copy, kSecAttrAccessGroup, (__bridge CFStringRef)ours);
+    else CFDictionaryRemoveValue(copy, kSecAttrAccessGroup);
     *owned = copy;
     return copy;
 }
@@ -105,28 +96,50 @@ static OSStatus tp_SecItemDelete(CFDictionaryRef query) {
     return s;
 }
 
-/// 存一筆測試資料再讀回來，取得系統實際指派給這個 App 的預設群組
 static NSString *TPDetectAccessGroup(void) {
-    NSDictionary *query = @{ (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
-                             (__bridge id)kSecAttrAccount: @"ThreadsPulse.accessGroupProbe",
-                             (__bridge id)kSecAttrService: @"ThreadsPulse",
-                             (__bridge id)kSecReturnAttributes: @YES };
+    NSDictionary *common = @{ (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+                              (__bridge id)kSecAttrAccount: @"ThreadsPulse.accessGroupProbe.afu",
+                              (__bridge id)kSecAttrService: @"ThreadsPulse",
+                              (__bridge id)kSecReturnAttributes: @YES };
+    NSMutableDictionary *search = [common mutableCopy];
+    search[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
     CFTypeRef result = NULL;
-    OSStatus s = orig_SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
-    if (s == errSecItemNotFound) s = orig_SecItemAdd((__bridge CFDictionaryRef)query, &result);
-    if (s != errSecSuccess || !result) return nil;
+    OSStatus s = orig_SecItemCopyMatching((__bridge CFDictionaryRef)search, &result);
+    if (s == errSecItemNotFound) {
+        NSMutableDictionary *add = [common mutableCopy];
+        add[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlock;
+        add[(__bridge id)kSecValueData] = [NSData data];
+        s = orig_SecItemAdd((__bridge CFDictionaryRef)add, &result);
+    }
+    if (s != errSecSuccess || !result) { if (result) CFRelease(result); return nil; }
     NSDictionary *attrs = (__bridge_transfer NSDictionary *)result;
     id group = [attrs isKindOfClass:[NSDictionary class]] ? attrs[(__bridge id)kSecAttrAccessGroup] : nil;
     return [group isKindOfClass:[NSString class]] ? group : nil;
 }
 
-#pragma mark - 改接 C 函式（在每個映像檔的符號指標表裡換掉目標函式的位址）
+static NSString *TPResolveAccessGroup(void) {
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    if (gTPAccessGroup || gTPNativeSignature) return gTPAccessGroup;
+    pthread_mutex_lock(&lock);
+    if (!gTPAccessGroup && !gTPNativeSignature) {
+        NSString *group = TPDetectAccessGroup();
+        NSString *team = [group componentsSeparatedByString:@"."].firstObject;
+        if (group.length && team.length) {
+            if ([team isEqualToString:kTPOriginalTeam]) { gTPNativeSignature = YES; gTPFixStatus = @"original signature, not needed"; }
+            else {
+                gTPAccessGroup = [group copy];
+                gTPFixStatus = [NSString stringWithFormat:@"active (%@)%@", team, gTPFixStatus.length && [gTPFixStatus hasSuffix:@"+defaults"] ? @" +defaults" : @""];
+            }
+        }
+    }
+    pthread_mutex_unlock(&lock);
+    return gTPAccessGroup;
+}
 
 typedef struct { const char *name; void *replacement; } TPRebinding;
 static TPRebinding gTPRebindings[4];
-static char *gTPAppPath;              // 「/Threads.app/」：只處理 App 本身的檔案（主程式與 Frameworks），不碰系統框架
+static char *gTPAppPath;
 
-/// readOnly：區段位在唯讀的 __DATA_CONST／__AUTH_CONST，寫入前要暫時改成可寫、寫完再改回唯讀
 static void TPRebindSection(const struct section_64 *sect, intptr_t slide, BOOL readOnly,
                             const struct nlist_64 *symtab, const char *strtab, const uint32_t *indirect) {
     uint32_t *indices = (uint32_t *)indirect + sect->reserved1;
@@ -141,7 +154,7 @@ static void TPRebindSection(const struct section_64 *sect, intptr_t slide, BOOL 
         for (size_t r = 0; r < sizeof(gTPRebindings) / sizeof(gTPRebindings[0]); r++) {
             if (strcmp(name + 1, gTPRebindings[r].name) != 0) continue;
             if (slots[i] == gTPRebindings[r].replacement) break;
-            if (!readOnly) { slots[i] = gTPRebindings[r].replacement; break; }   // __DATA 本來就可寫
+            if (!readOnly) { slots[i] = gTPRebindings[r].replacement; break; }
             vm_address_t page = (vm_address_t)&slots[i] & ~(vm_address_t)(PAGE_SIZE - 1);
             if (vm_protect(mach_task_self(), page, PAGE_SIZE, false,
                            VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY) != KERN_SUCCESS) break;
@@ -158,10 +171,10 @@ static void TPRebindImage(const struct mach_header *header, intptr_t slide) {
 
     static const void *selfBase;
     if (!selfBase) { Dl_info me; if (dladdr((void *)TPRebindImage, &me)) selfBase = me.dli_fbase; }
-    if ((const void *)mh == selfBase) return;                  // 自己的呼叫要走原本的函式
+    if ((const void *)mh == selfBase) return;
     Dl_info info;
     if (!gTPAppPath || !dladdr(mh, &info) || !info.dli_fname ||
-        !strstr(info.dli_fname, gTPAppPath)) return;          // 路徑可能有或沒有 /private 前綴，所以比對 App 資料夾名稱
+        !strstr(info.dli_fname, gTPAppPath)) return;
 
     const struct segment_command_64 *linkedit = NULL;
     const struct symtab_command *symtabCmd = NULL;
@@ -195,11 +208,8 @@ static void TPRebindImage(const struct mach_header *header, intptr_t slide) {
     }
 }
 
-#pragma mark - App 群組
-
 static IMP orig_containerURL;
 
-/// 拿不到群組資料夾時，改用 App 自己資料夾裡的 Library/ThreadsPulseAppGroups/<群組>
 static NSURL *tp_containerURL(id self, SEL _cmd, NSString *group) {
     NSURL *url = ((NSURL *(*)(id, SEL, NSString *))orig_containerURL)(self, _cmd, group);
     if (url || ![group isKindOfClass:[NSString class]] || !group.length) return url;
@@ -209,7 +219,21 @@ static NSURL *tp_containerURL(id self, SEL _cmd, NSString *group) {
     return [NSURL fileURLWithPath:path isDirectory:YES];
 }
 
-#pragma mark - 安裝
+static IMP orig_initSuite;
+
+static id tp_initSuite(id self, SEL _cmd, NSString *suite, NSURL *container) {
+    if (!container && [suite isKindOfClass:[NSString class]] && [suite hasPrefix:@"group."] && orig_containerURL) {
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSURL *real = ((NSURL *(*)(id, SEL, NSString *))orig_containerURL)(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), suite);
+        if (!real) {
+            container = tp_containerURL(fm, @selector(containerURLForSecurityApplicationGroupIdentifier:), suite);
+
+            NSString *prefs = [container.path stringByAppendingPathComponent:@"Library/Preferences"];
+            if (![fm createDirectoryAtPath:prefs withIntermediateDirectories:YES attributes:nil error:nil]) container = nil;
+        }
+    }
+    return ((id (*)(id, SEL, NSString *, NSURL *))orig_initSuite)(self, _cmd, suite, container);
+}
 
 NSString *TPSideloadFixStatus(void) { return gTPFixStatus; }
 
@@ -225,23 +249,22 @@ void TPSideloadFixInstall(void) {
         return;
     }
 
-    NSString *group = TPDetectAccessGroup();
-    NSString *team = [group componentsSeparatedByString:@"."].firstObject;
-    if (!group.length || !team.length) { gTPFixStatus = @"access group not detected"; return; }
-    if ([team isEqualToString:kTPOriginalTeam]) { gTPFixStatus = @"original signature, not needed"; return; }
-    gTPAccessGroup = [group copy];
+    TPResolveAccessGroup();
+    if (gTPNativeSignature) return;
 
-    // 1) 鑰匙圈
     gTPAppPath = strdup([NSString stringWithFormat:@"/%@/", NSBundle.mainBundle.bundlePath.lastPathComponent].fileSystemRepresentation);
     gTPRebindings[0] = (TPRebinding){ "SecItemAdd",          (void *)tp_SecItemAdd };
     gTPRebindings[1] = (TPRebinding){ "SecItemCopyMatching", (void *)tp_SecItemCopyMatching };
     gTPRebindings[2] = (TPRebinding){ "SecItemUpdate",       (void *)tp_SecItemUpdate };
     gTPRebindings[3] = (TPRebinding){ "SecItemDelete",       (void *)tp_SecItemDelete };
-    _dyld_register_func_for_add_image(TPRebindImage);         // 已載入的會立即處理一次，之後載入的也會處理
+    _dyld_register_func_for_add_image(TPRebindImage);
 
-    // 2) App 群組
     Method m = class_getInstanceMethod([NSFileManager class], @selector(containerURLForSecurityApplicationGroupIdentifier:));
     if (m) orig_containerURL = method_setImplementation(m, (IMP)tp_containerURL);
+    Method d = class_getInstanceMethod([NSUserDefaults class], NSSelectorFromString(@"_initWithSuiteName:container:"));
+    if (d && orig_containerURL) orig_initSuite = method_setImplementation(d, (IMP)tp_initSuite);
 
-    gTPFixStatus = [NSString stringWithFormat:@"active (%@)", team];
+    NSString *team = [gTPAccessGroup componentsSeparatedByString:@"."].firstObject;
+    gTPFixStatus = [NSString stringWithFormat:@"active (%@) +defaults", team ?: @"group pending"];
+    if (!orig_initSuite) gTPFixStatus = [gTPFixStatus stringByReplacingOccurrencesOfString:@" +defaults" withString:@""];
 }
