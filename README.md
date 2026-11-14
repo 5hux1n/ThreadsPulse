@@ -2,7 +2,7 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
-An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.20.2**
+An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.27.0**
 
 No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using GitHub Actions, then install it with your own signing tool.
 
@@ -14,32 +14,43 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 | | Block Screenshot Detection | Threads won't know when you take a screenshot or record the screen |
 | | Block Analytics | Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate (off by default) |
 | | Remove URL Tracking | Strip `xmt`, `igshid`, `utm_*` and more when copying, sharing or opening links, and unwrap `l.threads.com` redirects |
-| Download | Download Button | ↓ at the top-right of a post: tap to download all photos and videos; long-press to download only photos or only videos |
-| | Download Original-Size Photos | Fetches the original resolution from threads.com; WebP is converted to JPEG for Photos |
-| | Download Original-Size Profile Pictures | Long-press a profile picture on a profile, or open it full screen and tap ↓ |
-| Video | Disable Autoplay | Videos in the feed won't play until you tap them |
-| | Default Playback Speed | 1x / 1.25x / 1.5x / 2x |
-| Home Feed | Keep Feed Position | Coming back from the background won't refresh the home feed or jump to the top. Keep for 10 min / 30 min / No Limit |
-| | Disable Pull to Refresh | Pulling down at the top of the home feed won't refresh it |
-| | Home Tab: Don't Scroll to Top | When you're scrolled down, tapping the Home tab keeps you where you were |
-| | Home Tab: Don't Refresh | When you're at the top, tapping the Home tab won't load new posts |
-| Hidden Items | Hide Follow Suggestions | Stop the follow suggestions sheet from popping up |
-| | Hide Instagram Button | Hide the Instagram button at the top of profiles |
-| | Hide Suggested Accounts in Feed | Hide suggested-account cards in the feed, and the "Suggested for you" section on profiles and after you follow someone |
-| Links | Detect Copied Links | When you come back or switch accounts, detect a copied Threads link and open that post |
+| Media Download | Download Button | ↓ at the top-right of a post: tap to download all photos and videos; long-press to choose photos or videos only |
+| | Download Original Size | Fetches the highest resolution from the web version; WebP is converted to JPEG for Photos |
+| | Download Original Profile Pictures | Long-press the profile picture on a profile, or view it full screen and tap ↓ at the bottom right |
+| Player | Disable Autoplay | Videos in the feed won't play until you tap them |
+| | Default Playback Speed | 1x / 1.25x / 1.5x / 2x; videos return to it after you release a long-press 2x |
+| Home Feed | Keep Feed Position | Coming back from the background won't refresh the home feed, jump to the top or switch tabs. Keep for 10 min / 30 min / No Limit |
+| | Disable Pull to Refresh | Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing |
+| | When Tapping the Home Tab: Don't Scroll to Top | When you're scrolled down, tapping the Home tab keeps you where you were |
+| | When Tapping the Home Tab: Don't Refresh | When you're at the top, tapping the Home tab won't refresh or load new posts |
+| Hidden Items: Suggested Content | Suggested Accounts | Hide "Suggested for you" in the feed and on profiles |
+| | Search Suggestions | Hide "Suggested to follow" on the search page |
+| | Follow Suggestion Pop-ups | Stop "Follow suggestions" from popping up automatically |
+| | Post Interest Prompts | Stop asking if you're interested in posts |
+| Hidden Items: Interface Buttons | Search Button | Hide the search button on profiles (off by default) |
+| | Instagram Button | Hide the Instagram button on profiles (off by default) |
+| Links | Detect Copied Links | When you come back or switch accounts, detect a copied Threads link and open it |
 | | When a Link Is Found | **Ask** shows a prompt (Top / Middle / Bottom); **Auto-open** opens it right away |
 | | Open Links in External Browser | Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app |
-| Interface & Interactions | Theme Color | Accent color of the plugin: Coral / Ocean / Mint / Lavender / Sakura / Amber |
-| | Like Confirmation | Ask before a like is sent, to prevent accidental taps |
+| Messages | Hide Seen Status | Viewing messages won't notify the other person. To show "Seen" normally in a specific chat, tap the eye icon at the top right of that chat (off by default) |
+| | Show Seen When You Reply | On: "Seen" shows to the other person only after you reply. Off: "Seen" won't show to the other person, even after you reply |
+| | Reset Chats | Chats where you tapped the eye to show "Seen" go back to hiding it |
+| | Hide Typing Status | The other person won't see "…" while you write a message (off by default) |
+| | Keep Unsent Messages | When someone unsends a message, it stays in your chat marked "Unsent" (off by default) |
+| Interface & Interactions | Like Confirmation | Ask before a like is sent, to prevent accidental taps. Removing a like won't ask |
 | | Post Time Format | Relative / Date & Time / With Seconds |
-| | Keep Tab Bar Visible | The tab bar at the bottom no longer hides while scrolling |
+| | Keep Tab Bar Visible | Scrolling won't hide the tab bar at the bottom |
 | | Copy Profile Info | On a profile, long-press the name, username, bio or profile picture to copy the name, username or bio |
-| | Long-Press Home Tab for Settings | Long-pressing the Home tab at the bottom opens ThreadsPulse settings instead (off by default) |
-| Backup | Export / Import Settings | JSON file |
-| Advanced | Debug Hints | Shows `[TP]` hints when features are active, to find out which one broke after a Threads update |
-| | Sideload Compatibility Fix | Keeps you signed in and app group data working after re-signing. Turns itself off on the original signature (jailbreak) |
+| | Long-Press Home Tab for Settings | Long-pressing the Home tab at the bottom opens ThreadsPulse settings instead (on by default) |
+| Backup | Export / Import Settings | Export your settings to a JSON file, and import it after reinstalling or on another device |
+| Advanced | Debug Hints | Turn on when a feature stops working. Hints show which features are active, to help report problems |
+| | Analytics Log | Shows the usage data Threads collects and what it contains: a ranking of events with plain-language descriptions and the latest payload of each, ready to copy. The log never leaves your device |
+| | Welcome Screen | See how to open ThreadsPulse settings again |
+| | Sideload Compatibility Fix | Keeps you signed in and app group data working after re-signing. Only active on re-signed apps |
 
-**Settings**: tap **〰 Pulse** at the top-right of Threads' Settings page, long-press anywhere with three fingers for 1 second, or (with **Long-Press Home Tab for Settings** on) long-press the Home tab.
+**Theme**: in the info card at the top of the settings page, tap a color dot to switch (Coral / Ocean / Mint / Lavender / Sakura / Amber). It only changes the color of ThreadsPulse buttons and settings.
+
+**Settings**: tap **〰 Pulse** at the top-right of Threads' Settings page, long-press the Home tab at the bottom, or long-press anywhere with three fingers for 1 second. A welcome screen explains these the first time you open Threads.
 
 ---
 
@@ -112,8 +123,8 @@ Pushing to `main` / `master`, opening a pull request, or running **Build** → *
 Pushing a tag that starts with `v` also creates a Release with these four files (Threads itself is not included):
 
 ```bash
-git tag v1.20.2
-git push origin v1.20.2
+git tag v1.27.0
+git push origin v1.27.0
 ```
 
 ### Build locally
@@ -164,8 +175,9 @@ ThreadsPulse/
 ├── TPURLCleaner.h/.m               URL tracking removal
 ├── TPDownloader.h/.m               URL selection, downloads, WebP → JPEG, diagnostics
 ├── TPHUD.h/.m                      Progress view, toasts, prompt banner
-├── TPUI.h/.m                       Round frosted buttons, long-press menus, haptics
+├── TPUI.h/.m                       Round frosted buttons, long-press menus, haptics, theme colors
 ├── TPSettingsViewController.h/.m   Settings page (data model between TP_MODEL_BEGIN and TP_MODEL_END)
+├── TPWelcomeViewController.h/.m    Full-screen welcome screen shown on first launch
 ├── TPLocalization.h/.m             TPL() localization
 ├── TPSideloadFix.h/.m              Sideload compatibility fix (keychain, app groups)
 ├── TPVersion.h                     Version number (change it only here)
@@ -203,10 +215,18 @@ ThreadsPulse/
 - **Keep Tab Bar Visible**: keeps `scrollViewDidScroll:` / `scrollViewDidEndScrolling:` from reaching `BCNLucentTabBarCoordinator`, and sets iOS 26's `tabBarMinimizeBehavior` to never.
 - **Sideload Compatibility Fix**: on load, stores a probe item in the keychain and reads back the access group the system actually assigned. It only activates when the Team ID isn't Meta's (`MH9GU9K5PX`). It rewrites `SecItemAdd` / `CopyMatching` / `Update` / `Delete` in the symbol pointer tables of the app's own images (main executable and `Frameworks/`) to swap Threads' access groups for the usable one, and falls back to `Library/ThreadsPulseAppGroups/<group>` when `containerURLForSecurityApplicationGroupIdentifier:` returns nil. Threads doesn't use iCloud, so CloudKit isn't touched.
 - **Copy Profile Info**: copies the name (`fullNameLabel`), username (`usernameLabel`, without `@`) or bio. Adds long-press gestures to the profile picture, `fullNameLabel`, `usernameLabel` and `IGProfileBioView` in `BCNProfileHeaderView`. The full bio comes from `_fullCollapsibleBioString` (when collapsed) or `_stringForView`. When the feature is off the gestures don't begin, so Threads' own long-press works as usual.
-- **Hide Instagram Button**: hides `$__lazy_storage_$_appSwitcherButton` (the Instagram app-switcher button) of `BCNProfileViewController` in `viewDidLayoutSubviews`, together with any wrapper view that holds only it. Inside a stack view the gap closes by itself; otherwise the buttons in the same row are shifted with a transform to fill it.
+- **Hide Search / Instagram Button**: hides `$__lazy_storage_$_searchButton` and `$__lazy_storage_$_appSwitcherButton` of `BCNProfileViewController` in `viewDidLayoutSubviews`, together with any wrapper view that holds only them. Inside a stack view the gap closes by itself; otherwise the buttons in the same row are shifted with a transform to fill it (when both are hidden, the larger shift is used rather than the sum).
+- **Suggested Accounts / Search Suggestions**: `BCNAYMFSectionController` (the "Suggested for you" unit) is checked by its `placement`: 0 (home feed) and 3 (profiles) follow Suggested Accounts, 2 (search page) follows Search Suggestions.
+- **Post Interest Prompts**: `BCNFeedItemSeeMoreSeeLessCell` returns a height of 0 and is hidden, and the batched prompt's section controller returns 0 items.
 - **Open Links in External Browser**: hooks both `handleLinkWithURL:` methods of `BCNLinkHandlerImpl` (an ObjC protocol, so calls go through ObjC dispatch). `l.threads.com` redirect wrappers are unwrapped first; `threads.net` / `threads.com` and non-web links keep the original behaviour, everything else is opened with `-[UIApplication openURL:]` (tracking parameters are removed when Remove URL Tracking is on).
+- **Three-finger long-press**: the recognizer runs simultaneously with others and, once it begins, briefly disables the other recognizers on the same touches, so lifting your fingers doesn't also trigger the button you first touched.
 - **Long-Press Home Tab for Settings**: hooks `-[BCNLucentTabBarCoordinator handleTabBarLongPress:]`. When the press begins on the first (Home) tab button, ThreadsPulse settings open and the rest of that gesture is swallowed; long-presses on other tabs (e.g. switching accounts on the profile tab) work as usual.
+- **Hide Seen Status**: `+[BCNSlideMDCoreMarkThreadReadMutationBuilder builderWithOfflineThreadingId:threadFbid:timestampMs:]` is called with the position this chat has already shown to the other person (0 if none), so the read position on the server neither moves forward nor goes back; the thread still shows as read on your side. The eye icon at the top right of a chat lets that chat send reads as usual.
+- **Show Seen When You Reply**: when Threads builds an outgoing message (`BCNSlideOutgoingMessagePayload`) or a message action (`BCNSlideOutgoingMessageUpdatePayload`), the read request is rebuilt from the stored arguments and sent through the same GraphQL service Threads uses for reads. The message is held in `-[MDCoreSendService sendMutationWithAppDataModel:…]` until the server accepts the read (0.8 s at most), so the other person sees "Seen" before your reply arrives.
+- **Hide Typing Status**: the status passed to `+[BCNTypingIndicatorPublishEventMutationBuilder builderWithActivityStatus:threadId:]` is always set to 0 (stopped typing). The thread ID is left alone, so live message delivery isn't affected.
+- **Keep Unsent Messages**: an incoming unsend is handled by Swift's `BCNSlideDeleteMessageHandler`, which reaches the local store through `MDCoreDeltaApplyingBridge` (created with the handler's type name). When the setting is on, the delete commands returned by `mutationCommandsForDeltaWithRequestedState:…` for that handler are removed, so the message stays on your device and is marked "Unsent" right away (the label stays even if you turn the setting off later). Messages that were already removed, or that disappear when the chat is fully reloaded from the server, can't be brought back.
 - **Block Analytics**: usage events are dropped where they are collected (`-[FBAnalyticsCoreLogger _captureAnalyticsEvent:]`, `_captureAnalyticsEventForBatchUpload:`, and `_shouldStreamEvent:` returns NO), and uploads of anything already stored go through Meta's own `FBAnalyticsNoOpNetworkConfigurator` instead of `IGAnalyticsNetworkConfigurator`, so no request is sent. Normal API calls (login, posting, loading the feed) don't go through this path.
+- **Analytics Log**: `_captureAnalyticsEvent:` counts each `FBAnalyticsEvent` by `eventName` and keeps the latest event object of each kind; `eventPayload` is only read when you open the log. Everything stays in memory and is cleared when the app closes.
 - **Disable Autoplay**: when a feed video scrolls into view (`-[IGFNFVideoPlayer playWithReason:callsiteContext:]`, reason 1), Threads is allowed to start playback as usual so its UI (including the sound icon) appears, but the underlying `FNFPlayer` is held: its first `play` runs with volume 0 so Threads reaches "initial play" and shows the sound icon, then it is paused on the first frame (`videoPlayerDidInitialPlay:`); later `play` / `playWithContext:` calls are ignored. Tapping the video (a touch that barely moved, so scrolling doesn't count) releases the hold and starts `FNFPlayer`. Other play reasons (full screen, etc.) and videos outside the feed play as usual. Once started, the same player isn't held again until it's stopped. The single-video download button now reads the URL from nearby data objects first, so videos that never played can still be downloaded.
 - **Hide Follow Suggestions**: intercepts `presentViewController:` when `BCNUserRecommendationsViewController` is presented as a sheet; pushed pages aren't affected.
 
