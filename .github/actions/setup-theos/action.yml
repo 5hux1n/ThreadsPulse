@@ -1,37 +1,37 @@
 name: Setup Theos
-description: 安裝 Theos、iOS SDK，並輸出 ThreadsPulse 版本號
+description: Install Theos and the iOS SDK, and output the ThreadsPulse version
 
 inputs:
   sdk-version:
-    description: 編譯用的 iOS SDK 版本（取自 theos/sdks）
+    description: iOS SDK version to build with (from theos/sdks)
     default: '16.5'
 
 outputs:
   version:
-    description: ThreadsPulse 版本號（取自 TPVersion.h）
+    description: ThreadsPulse version (from TPVersion.h)
     value: ${{ steps.ver.outputs.version }}
 
 runs:
   using: composite
   steps:
-    - name: 安裝相依工具
+    - name: Install dependencies
       shell: bash
       run: brew install ldid make dpkg xz
 
-    - name: 安裝 Theos
+    - name: Install Theos
       shell: bash
       run: |
         git clone --recursive --depth 1 https://github.com/theos/theos.git "$HOME/theos"
         echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
-    - name: 快取 iOS SDK
+    - name: Cache iOS SDK
       id: sdk-cache
       uses: actions/cache@v4
       with:
         path: ~/theos-sdk
         key: theos-sdk-${{ inputs.sdk-version }}
 
-    - name: 下載 iOS SDK
+    - name: Download iOS SDK
       if: steps.sdk-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
@@ -43,16 +43,16 @@ runs:
         mkdir -p "$HOME/theos-sdk"
         mv "iPhoneOS${SDK_VERSION}.sdk" "$HOME/theos-sdk/"
 
-    - name: 放入 SDK
+    - name: Install SDK
       shell: bash
       env:
         SDK_VERSION: ${{ inputs.sdk-version }}
       run: cp -R "$HOME/theos-sdk/iPhoneOS${SDK_VERSION}.sdk" "$THEOS/sdks/"
 
-    - name: 讀取版本號
+    - name: Read version
       id: ver
       shell: bash
       run: |
         VERSION=$(grep -oE 'TP_VERSION @"[^"]+"' TPVersion.h | grep -oE '[0-9][0-9.]*')
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-        echo "ThreadsPulse 版本：$VERSION"
+        echo "ThreadsPulse version: $VERSION"
