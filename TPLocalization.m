@@ -8,14 +8,12 @@ static NSBundle *TPBundle(void) {
         NSString *const rel = @"/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle";
         NSMutableArray<NSString *> *paths = [NSMutableArray array];
 
-        // Roothide：越獄根目錄是隨機路徑。有 libroothide 時直接問 jbroot()
         const char *(*jbroot)(const char *) = dlsym(RTLD_DEFAULT, "jbroot");
         if (jbroot) {
             const char *r = jbroot(rel.fileSystemRepresentation);
             if (r) [paths addObject:[NSString stringWithUTF8String:r]];
         }
 
-        // 從 dylib 自己的位置推算越獄根目錄（Roothide／無根／有根都適用）
         Dl_info me;
         if (dladdr((const void *)&TPBundle, &me) && me.dli_fname) {
             NSString *dylib = [NSString stringWithUTF8String:me.dli_fname];
@@ -28,10 +26,9 @@ static NSBundle *TPBundle(void) {
             }
         }
 
-        [paths addObject:[@"/var/jb" stringByAppendingString:rel]];   // 無根越獄
-        [paths addObject:rel];                                         // 有根越獄
+        [paths addObject:[@"/var/jb" stringByAppendingString:rel]];
+        [paths addObject:rel];
 
-        // 側載：bundle 放在 App 內（與 dylib 同層或 Frameworks 內）
         NSString *inApp = [NSBundle.mainBundle pathForResource:@"ThreadsPulse" ofType:@"bundle"];
         if (inApp) [paths addObject:inApp];
         [paths addObject:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks/ThreadsPulse.bundle"]];
