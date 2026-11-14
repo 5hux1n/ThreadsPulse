@@ -622,6 +622,8 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
 
 - (NSDictionary *)rowAt:(NSIndexPath *)ip { return [self visibleRowsInSection:ip.section][ip.row]; }
 
+// Rows that depend on a setting are inserted or removed individually. Reloading the whole
+// section cross-fades the old and new rows and leaves a visible ghost.
 - (void)refreshConditionalRowsForKey:(NSString *)key {
     for (NSInteger sec = 0; sec < (NSInteger)_sections.count; sec++) {
         BOOL footerAffected = TPConditionUsesKey(_sections[sec][@"footerIf"], key);
