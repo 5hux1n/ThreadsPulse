@@ -6,6 +6,10 @@ extern NSString *const TPKeyShowDownloadBtn;
 extern NSString *const TPKeyDebugToast;
 extern NSString *const TPKeyOriginalAvatar;
 extern NSString *const TPKeyOriginalImage;
+extern NSString *const TPKeyVideoQuality;   // 0 highest, 1 720p, 2 ask
+extern NSString *const TPKeyVideoFormat;    // 0 keep HDR, 1 compatible (H.264 SDR)
+extern NSString *const TPKeySaveToAlbum;
+extern NSString *const TPKeyParallelDownload;
 extern NSString *const TPKeyClipboardLinks;
 extern NSString *const TPKeyConfirmLike;
 extern NSString *const TPKeyHideFollowSuggest;
