@@ -11,6 +11,7 @@ static const CGFloat kRing  = 64;
     CAShapeLayer *_track;
     CAShapeLayer *_ring;
     UIImageView *_icon;
+    UILabel *_pctLabel;
     UILabel *_titleLabel;
     UILabel *_subLabel;
     UIButton *_cancelButton;
@@ -34,7 +35,8 @@ static const CGFloat kRing  = 64;
     _overlay.backgroundColor = [UIColor colorWithWhite:0 alpha:0.35];
     _overlay.alpha = 0;
 
-    CGFloat cardH = cancel ? 206 : 170;
+    // ring · title · two info lines (size / speed) · cancel
+    CGFloat cardH = cancel ? 222 : 186;
     _card = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark]];
     _card.frame = CGRectMake(0, 0, kCardW, cardH);
     _card.center = CGPointMake(CGRectGetMidX(win.bounds), CGRectGetMidY(win.bounds));
@@ -75,6 +77,17 @@ static const CGFloat kRing  = 64;
                           withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightSemibold]];
     [content addSubview:_icon];
 
+    // Percentage inside the ring; the arrow shows until the first progress update.
+    _pctLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, kRing - 12, 24)];
+    _pctLabel.center = c;
+    _pctLabel.font = [UIFont monospacedDigitSystemFontOfSize:17 weight:UIFontWeightSemibold];
+    _pctLabel.textColor = UIColor.whiteColor;
+    _pctLabel.textAlignment = NSTextAlignmentCenter;
+    _pctLabel.adjustsFontSizeToFitWidth = YES;
+    _pctLabel.minimumScaleFactor = 0.7;
+    _pctLabel.hidden = YES;
+    [content addSubview:_pctLabel];
+
     _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 100, kCardW - 32, 24)];
     _titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     _titleLabel.textColor = UIColor.whiteColor;
@@ -84,20 +97,23 @@ static const CGFloat kRing  = 64;
     _titleLabel.text = title;
     [content addSubview:_titleLabel];
 
-    _subLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 126, kCardW - 32, 20)];
-    _subLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
+    _subLabel = [[UILabel alloc] initWithFrame:CGRectMake(16, 127, kCardW - 32, 38)];
+    _subLabel.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightRegular];
+    _subLabel.numberOfLines = 2;
     _subLabel.textColor = [UIColor colorWithWhite:1 alpha:0.6];
     _subLabel.textAlignment = NSTextAlignmentCenter;
-    _subLabel.text = @"0%";
+    _subLabel.adjustsFontSizeToFitWidth = YES;
+    _subLabel.minimumScaleFactor = 0.75;
+    _subLabel.text = @"";
     [content addSubview:_subLabel];
 
     if (cancel) {
-        UIView *line = [[UIView alloc] initWithFrame:CGRectMake(0, 160, kCardW, 0.5)];
+        UIView *line = [[UIView alloc] initWithFrame:CGRectMake(0, 176, kCardW, 0.5)];
         line.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
         [content addSubview:line];
 
         _cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        _cancelButton.frame = CGRectMake(0, 160.5, kCardW, 45);
+        _cancelButton.frame = CGRectMake(0, 176.5, kCardW, 45);
         _cancelButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
         [_cancelButton setTitle:TPL(@"Cancel") forState:UIControlStateNormal];
         [_cancelButton setTitleColor:[UIColor colorWithWhite:1 alpha:0.85] forState:UIControlStateNormal];
@@ -120,12 +136,16 @@ static const CGFloat kRing  = 64;
 - (void)setProgress:(CGFloat)progress subtitle:(NSString *)subtitle {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self->_finished) return;
-        CGFloat p = MAX(0.02, MIN(1.0, progress));
+        CGFloat raw = MAX(0.0, MIN(1.0, progress));
+        CGFloat p = MAX(0.02, raw);
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
         self->_ring.strokeEnd = p;
         [CATransaction commit];
-        self->_subLabel.text = subtitle ?: [NSString stringWithFormat:@"%.0f%%", p * 100];
+        self->_pctLabel.text = [NSString stringWithFormat:@"%.0f%%", floor(raw * 100)];
+        self->_pctLabel.hidden = NO;
+        self->_icon.hidden = YES;
+        self->_subLabel.text = subtitle ?: @"";
     });
 }
 
@@ -147,6 +167,8 @@ static const CGFloat kRing  = 64;
         self->_ring.strokeEnd = 1.0;
         [CATransaction commit];
 
+        self->_pctLabel.hidden = YES;
+        self->_icon.hidden = NO;
         self->_icon.tintColor = color;
         self->_icon.image = [UIImage systemImageNamed:symbol
                                     withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:28 weight:UIImageSymbolWeightBold]];
