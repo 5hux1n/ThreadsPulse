@@ -17,6 +17,10 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 | 媒體下載 | 下載按鈕 | 串文右上角 ↓：點選下載全部圖片與影片，長按選擇只下載圖片或影片 |
 | | 下載原始尺寸圖片 | 從網頁版取得最高解析度；WebP 會轉成 JPEG 存入照片 |
 | | 下載原始尺寸大頭貼 | 在個人檔案長按大頭貼，或全螢幕檢視後點選右下角 ↓ 儲存 |
+| | 同時下載多個檔案 | 下載整則串文時，最多同時下載 4 個檔案；進度視窗會顯示下載速度 |
+| | 儲存至「Threads」相簿 | 下載的項目將同步加入「Threads」相簿，首次使用需授予照片「完整取用權限」（預設關閉） |
+| | 影片畫質 | 最高／720p／每次詢問。「最高」從 Threads 的 DASH 串流取得最高 1080p 的影片，VP9、AV1 格式會在裝置上轉檔；任何步驟失敗都會改下載 720p |
+| | 影片格式 | 保留 HDR（HEVC 10-bit，保留 HLG／PQ）或相容性優先（H.264 SDR） |
 | 播放器 | 停用自動播放 | 瀏覽動態時，影片不會自動播放，點選後才會開始播放 |
 | | 預設播放速度 | 1x／1.25x／1.5x／2x，長按 2 倍速放開後也會回到此速度 |
 | 首頁動態 | 保留動態位置 | 從背景返回時，首頁不重新整理、不跳回頂端，也不切換分頁；保留時間可選 10 分鐘／30 分鐘／不限時間 |
@@ -26,7 +30,7 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 | 隱藏項目：推薦內容 | 推薦帳號 | 隱藏動態與個人檔案頁面的「為你推薦」 |
 | | 追蹤建議 | 隱藏搜尋頁面的「追蹤建議」 |
 | | 追蹤對象建議 | 避免自動跳出「追蹤對象建議」 |
-| | 貼文興趣詢問 | 不再詢問你對貼文有沒有興趣 |
+| | 串文興趣詢問 | 不再詢問你對串文有沒有興趣 |
 | 隱藏項目：介面按鈕 | 搜尋按鈕 | 隱藏個人檔案頁面的搜尋按鈕（預設關閉） |
 | | Instagram 按鈕 | 隱藏個人檔案頁面的 Instagram 按鈕（預設關閉） |
 | 連結 | 偵測剪貼簿連結 | 回到 Threads 或切換帳號時，偵測剪貼簿裡的 Threads 連結並開啟 |
@@ -173,13 +177,15 @@ ThreadsPulse/
 ├── Tweak.x                         所有 hook（Logos）
 ├── TPPrefs.h/.m                    設定存取、預設值、匯出匯入
 ├── TPURLCleaner.h/.m               移除網址追蹤碼
-├── TPDownloader.h/.m               網址選擇、下載、WebP→JPEG、診斷報告
+├── TPDownloader.h/.m               網址選擇、下載、WebP→JPEG、DASH 1080p（合併／VP9、AV1 轉檔）、診斷報告
 ├── TPHUD.h/.m                      進度視窗、toast、提示橫幅
 ├── TPUI.h/.m                       圓形毛玻璃按鈕、長按選單、觸覺回饋、主題色
 ├── TPSettingsViewController.h/.m   設定頁
 ├── TPWelcomeViewController.h/.m    第一次開啟時的全螢幕歡迎畫面
 ├── TPLocalization.h/.m             TPL() 多語系
 ├── TPSideloadFix.h/.m              側載相容修正（鑰匙圈、App 群組）
+├── vendor/libvpx/                  預先編譯的 VP9 解碼器（arm64 iOS 靜態函式庫）、標頭檔、授權
+├── vendor/dav1d/                   預先編譯的 AV1 解碼器（arm64 iOS 靜態函式庫）、標頭檔、授權
 ├── TPVersion.h                     版本號（只在這裡改）
 ├── scripts/inject_ipa.py           把插件注入 IPA
 ├── OpenThreadsSafariExtension/     「Open in Threads」Safari 延伸功能（只放進 sideload 版）
@@ -206,6 +212,8 @@ ThreadsPulse/
 
 - **Swift 類別**：以 mangled name hook（例如 `_TtC6BCNUFI12BCNUFIButton`），透過 runtime 讀取 ivar；讀取 Swift enum 記憶體前會先驗證指標與類別，避免閃退。
 - **批次下載**：從輪播 cell 的資料模型（`BCNFeedMediaViewModel` → `IGPhoto`／`IGVideo`）讀取全部項目，不受 cell 重用影響。
+- **1080p 影片**：Threads 提供的影音合一 MP4 最高只有 720p，更高畫質只在 DASH 清單（`IGVideo.dashManifestData`）裡，而且影像與音訊分開。插件挑解析度最高的影像與最好的音訊（優先 AAC，其次 Opus），下載後在裝置上合併：H.264／HEVC 直接沿用（`AVAssetExportSession` passthrough，音訊需要重新編碼時改用 `AVAssetWriter`）；VP9 用 libvpx、AV1 用 dav1d 解碼，再以 VideoToolbox 重新編碼——格式代碼標示 HLG／PQ 時輸出 HEVC Main10（保留 HDR），其他輸出 H.264；選「相容性優先」時先用 `VTPixelTransferSession` 把 HDR 畫面轉成 BT.709。任何步驟失敗都會改下載 720p MP4，不會存成沒有聲音的影片。「每次詢問」的選單會出現在點選的下載按鈕旁邊。
+- **同時下載多個檔案**：目前項目之後的檔案，用第二個 `NSURLSession` 提前下載（3 條連線加上主連線）；存入照片仍依原本順序。
 - **原始圖片／大頭貼**：抓 `https://www.threads.com/t/<code>` 或 `/@<username>` 頁面，從 JSON 候選網址中以檔名比對出最大尺寸。
 - **剪貼簿**：先用 `detectPatternsForPatterns:` 判斷有沒有網址（不會跳出貼上詢問），使用者點「開啟」或設為自動開啟時才讀取內容；以 `NSUserActivity`（BrowsingWeb）交給 Threads 自己處理跳轉。
 - **切換帳號**：hook `IGAccountSwitcher`，最後一次切換事件後 1.5 秒檢查剪貼簿；從其他 App 回到 Threads 則是 0.8 秒。
@@ -233,6 +241,15 @@ ThreadsPulse/
 ## 注意事項
 
 Threads 更新後，部分功能可能會暫時失效（不會閃退）。打開「除錯提示」可以看出是哪一項，歡迎回報。
+
+## 第三方函式庫
+
+| 函式庫 | 用途 | 授權 |
+|---|---|---|
+| [libvpx](https://chromium.googlesource.com/webm/libvpx) | VP9 解碼 | BSD 3-Clause（`vendor/libvpx/LICENSE`、`PATENTS`） |
+| [dav1d](https://code.videolan.org/videolan/dav1d) | AV1 解碼 | BSD 2-Clause（`vendor/dav1d/COPYING`） |
+
+兩者都以預先編譯的靜態函式庫內附，確切版本與編譯選項記錄在各資料夾的 `VERSION.txt`。
 
 ## 免責聲明
 
