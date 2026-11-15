@@ -2,6 +2,9 @@
 
 UIWindow *TPKeyWindow(void);
 UIViewController *TPTopViewController(void);
+// The download button the user last tapped, so follow-up menus can appear next to it.
+void TPSetMenuAnchor(UIView *view);
+UIView *TPMenuAnchor(void);
 
 @interface TPMenuItem : NSObject
 @property (nonatomic, copy) NSString *title;
