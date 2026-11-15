@@ -418,6 +418,16 @@ static BOOL TPCodecOK(NSString *codecs) {
     return NO;
 }
 
+// HLG (18) or PQ (16) in the codec string's transfer field:
+// vp09.PP.LL.DD.CC.cp.tc.mc.FF   av01.P.LLT.DD.M.CCC.cp.tc.mc.F
+static BOOL TPCodecIsHDR(NSString *codec) {
+    NSArray<NSString *> *f = [codec.lowercaseString componentsSeparatedByString:@"."];
+    NSInteger tc = 0;
+    if ([codec.lowercaseString hasPrefix:@"vp09"] && f.count >= 7) tc = f[6].integerValue;
+    else if ([codec.lowercaseString hasPrefix:@"av01"] && f.count >= 8) tc = f[7].integerValue;
+    return tc == 16 || tc == 18;
+}
+
 static NSDictionary *TPDashInfoFromManifest(NSData *mpd, NSInteger progressivePixels) {
     if (!mpd.length) return nil;
     NSXMLParser *xp = [[NSXMLParser alloc] initWithData:mpd];
@@ -450,7 +460,12 @@ static NSDictionary *TPDashInfoFromManifest(NSData *mpd, NSInteger progressivePi
                    || (px == bestPx && pass == bestPass && bw > bestVBw);
         if (better) { bestV = r; bestPx = px; bestVBw = bw; bestPass = pass; }
     }
-    if (!bestV || bestPx <= progressivePixels) return nil;
+    if (!bestV) return nil;
+    // Use DASH when it's sharper than the progressive MP4 — or, with "Keep HDR", when it's the same
+    // size but HDR: the progressive MP4 is SDR, so it would lose the HDR look.
+    BOOL hdr = TPCodecIsHDR(bestV[@"codecs"] ?: @"");
+    BOOL keepHDR = hdr && [TPPrefs integerForKey:TPKeyVideoFormat] == 0;
+    if (bestPx < progressivePixels || (bestPx == progressivePixels && !keepHDR)) return nil;
 
     NSURL *vu = [NSURL URLWithString:bestV[@"BaseURL"]];
     if (!vu) return nil;
@@ -462,6 +477,7 @@ static NSDictionary *TPDashInfoFromManifest(NSData *mpd, NSInteger progressivePi
     NSInteger w = [bestV[@"width"] integerValue], h = [bestV[@"height"] integerValue];
     NSString *label = bestV[@"FBQualityLabel"];
     if (!label.length && w && h) label = [NSString stringWithFormat:@"%ldp", (long)MIN(w, h)];
+    if (keepHDR && label.length && ![label.uppercaseString containsString:@"HDR"]) label = [label stringByAppendingString:@" HDR"];
     if (label.length) out[@"dashLabel"] = label;
     out[@"dashSize"] = [NSString stringWithFormat:@"%ldx%ld %@", (long)w, (long)h, bestV[@"codecs"] ?: @""];
     if (!bestPass) out[@"dashTranscode"] = @YES;
@@ -523,7 +539,7 @@ static NSString *TPDashDiag(NSString *label, NSArray *objs, NSInteger prog) {
         [r appendFormat:@"  head: %@\n", x.length > 600 ? [x substringToIndex:600] : x];
     }
     NSDictionary *best = TPDashInfoFromManifest(mpd, prog);
-    [r appendFormat:@"  chosen: %@%@\n", best ? best[@"dashSize"] : @"none (not larger / codec)",
+    [r appendFormat:@"  chosen: %@%@\n", best ? best[@"dashSize"] : @"none (not larger, not HDR / codec)",
          [best[@"dashTranscode"] boolValue] ? [@" → " stringByAppendingString:TPTranscodeTarget(best[@"dashCodec"])] : @""];
     [r appendFormat:@"  HW decode vp09 %@ · av01 %@\n",
          VTIsHardwareDecodeSupported('vp09') ? @"yes" : @"no", VTIsHardwareDecodeSupported('av01') ? @"yes" : @"no"];
@@ -1337,6 +1353,69 @@ static TPColorInfo TPColorFromCodec(NSString *codec) {
     return c;
 }
 
+// Reads colour info from the downloaded file itself, for when the manifest's codec string is the
+// short form without it (e.g. "vp09.00.40.08"). Looks in the MP4 init segment for, in order:
+//   vpcC (VP9 config: primaries / transfer / matrix / bit depth)
+//   av1C (AV1 config: its sequence header OBU, parsed with dav1d)
+//   colr 'nclx' (generic colour box)
+// Returns NO when none of them carry usable values (2 = "unspecified").
+static BOOL TPColorFromFile(NSURL *file, TPColorInfo *out) {
+    NSFileHandle *fh = [NSFileHandle fileHandleForReadingFromURL:file error:nil];
+    NSData *head = [fh readDataOfLength:256 * 1024];
+    [fh closeFile];
+    const uint8_t *b = head.bytes;
+    NSUInteger n = head.length;
+    if (n < 16) return NO;
+
+    __block int cp = 2, tc = 2, mc = 2, bits = 0;
+    BOOL (^find)(const char *, NSUInteger *, NSUInteger *) = ^BOOL(const char *type, NSUInteger *payload, NSUInteger *len) {
+        for (NSUInteger i = 4; i + 4 <= n; i++) {
+            if (memcmp(b + i, type, 4) != 0) continue;
+            uint32_t size = ((uint32_t)b[i - 4] << 24) | ((uint32_t)b[i - 3] << 16) | ((uint32_t)b[i - 2] << 8) | b[i - 1];
+            if (size < 8 || i - 4 + size > n) continue;
+            *payload = i + 4;
+            *len = size - 8;
+            return YES;
+        }
+        return NO;
+    };
+
+    NSUInteger p = 0, len = 0;
+    if (find("vpcC", &p, &len) && len >= 10) {
+        // version(1) flags(3) profile level bitDepth|chroma|range primaries transfer matrix
+        bits = b[p + 6] >> 4;
+        cp = b[p + 7]; tc = b[p + 8]; mc = b[p + 9];
+    }
+    if ((cp == 2 || tc == 2) && find("av1C", &p, &len) && len > 4) {
+        Dav1dSequenceHeader seq;
+        if (dav1d_parse_sequence_header(&seq, b + p + 4, len - 4) == 0) {
+            cp = seq.pri; tc = seq.trc; mc = seq.mtrx;
+            bits = seq.hbd == 0 ? 8 : (seq.hbd == 1 ? 10 : 12);
+        } else {
+            bits = (b[p + 2] & 0x40) ? ((b[p + 2] & 0x20) ? 12 : 10) : 8;
+        }
+    }
+    if ((cp == 2 || tc == 2) && find("colr", &p, &len) && len >= 10 && memcmp(b + p, "nclx", 4) == 0) {
+        cp = (b[p + 4] << 8) | b[p + 5];
+        tc = (b[p + 6] << 8) | b[p + 7];
+        mc = (b[p + 8] << 8) | b[p + 9];
+    }
+    if (cp == 2 && tc == 2 && mc == 2) return NO;
+    TPColorInfo c = { NO, bits > 8, cp == 2 ? 1 : cp, tc == 2 ? 1 : tc, mc == 2 ? 1 : mc };
+    c.hdr = (c.tc == 16 || c.tc == 18);
+    *out = c;
+    return YES;
+}
+
+// Colour for a downloaded DASH stream: the file's own boxes win when they say something, since
+// they describe the actual bitstream; otherwise the manifest's codec string.
+static TPColorInfo TPColorForDash(NSString *codec, NSURL *file, NSString **source) {
+    TPColorInfo fromFile;
+    if (file && TPColorFromFile(file, &fromFile)) { if (source) *source = @"file"; return fromFile; }
+    if (source) *source = @"codec string";
+    return TPColorFromCodec(codec ?: @"");
+}
+
 static NSString *TPTranscodeTarget(NSString *codec) {
     TPColorInfo c = TPColorFromCodec(codec ?: @"");
     if (c.hdr && [TPPrefs integerForKey:TPKeyVideoFormat] == 1) return @"H.264 SDR (from HDR)";
@@ -1623,7 +1702,14 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
             dispatch_async(dispatch_get_main_queue(), ^{ [weak dashFailed:why]; });
         };
         NSError *err = nil;
-        TPColorInfo color = TPColorFromCodec(codec);
+        NSString *colorSource = nil;
+        TPColorInfo color = TPColorForDash(codec, vFile, &colorSource);
+        TPColorInfo fromCodec = TPColorFromCodec(codec);
+        if (color.hdr != fromCodec.hdr || color.tc != fromCodec.tc) {
+            NSString *msg = [NSString stringWithFormat:@"color from %@: cp %d tc %d mc %d (codec string: tc %d)",
+                             colorSource, color.cp, color.tc, color.mc, fromCodec.tc];
+            dispatch_async(dispatch_get_main_queue(), ^{ typeof(self) s0 = weak; if (s0) [s0->_savedSizes addObject:msg]; });
+        }
         BOOL compat = [TPPrefs integerForKey:TPKeyVideoFormat] == 1;
         BOOL toneMap = softVideo && color.hdr && compat;
         BOOL hevc10 = softVideo && color.hdr && !compat;
