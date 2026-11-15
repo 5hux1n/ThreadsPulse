@@ -8,6 +8,13 @@
 
 + (void)downloadItems:(NSArray<NSDictionary *> *)items;
 + (void)downloadVideoURL:(NSURL *)url;
++ (void)downloadVideoURL:(NSURL *)url dash:(NSDictionary *)dash;
+
+// High-quality DASH streams (separate video + audio). Returns nil when the setting is off, no
+// manifest is found, or the DASH video isn't larger than the progressive MP4.
+// Keys: dashVideo (NSURL), dashAudio (NSURL, optional), dashLabel (NSString, e.g. "1080p").
++ (NSDictionary *)dashInfoFromObject:(id)obj;
++ (NSDictionary *)dashInfoFromVideoView:(UIView *)view player:(id)playerHint;
 
 + (NSURL *)bestVideoURLHarvestedFromObject:(id)obj;
 + (NSURL *)bestImageURLHarvestedFromObject:(id)obj;
