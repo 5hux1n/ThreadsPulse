@@ -17,6 +17,10 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 | Media Download | Download Button | ↓ at the top-right of a post: tap to download all photos and videos; long-press to choose photos or videos only |
 | | Download Original Size | Fetches the highest resolution from the web version; WebP is converted to JPEG for Photos |
 | | Download Original Profile Pictures | Long-press the profile picture on a profile, or view it full screen and tap ↓ at the bottom right |
+| | Parallel Downloads | Downloads up to 4 files at a time when saving an entire post; the progress window shows the speed |
+| | Save to "Threads" Album | Downloaded items are also added to a "Threads" album in Photos (needs Full Access to Photos; off by default) |
+| | Video Quality | Highest / 720p / Ask. Highest gets up to 1080p from Threads' DASH streams; VP9 and AV1 videos are converted on the device. Falls back to 720p if anything fails |
+| | Video Format | Keep HDR (HEVC 10-bit, HLG/PQ kept) or Compatible (H.264 SDR) |
 | Player | Disable Autoplay | Videos in the feed won't play until you tap them |
 | | Default Playback Speed | 1x / 1.25x / 1.5x / 2x; videos return to it after you release a long-press 2x |
 | Home Feed | Keep Feed Position | Coming back from the background won't refresh the home feed, jump to the top or switch tabs. Keep for 10 min / 30 min / No Limit |
@@ -173,13 +177,15 @@ ThreadsPulse/
 ├── Tweak.x                         All hooks (Logos)
 ├── TPPrefs.h/.m                    Settings storage, defaults, export / import
 ├── TPURLCleaner.h/.m               URL tracking removal
-├── TPDownloader.h/.m               URL selection, downloads, WebP → JPEG, diagnostics
+├── TPDownloader.h/.m               URL selection, downloads, WebP → JPEG, DASH 1080p (merge / VP9 & AV1 conversion), diagnostics
 ├── TPHUD.h/.m                      Progress view, toasts, prompt banner
 ├── TPUI.h/.m                       Round frosted buttons, long-press menus, haptics, theme colors
 ├── TPSettingsViewController.h/.m   Settings page
 ├── TPWelcomeViewController.h/.m    Full-screen welcome screen shown on first launch
 ├── TPLocalization.h/.m             TPL() localization
 ├── TPSideloadFix.h/.m              Sideload compatibility fix (keychain, app groups)
+├── vendor/libvpx/                  Prebuilt VP9 decoder (arm64 iOS, static) + headers, LICENSE
+├── vendor/dav1d/                   Prebuilt AV1 decoder (arm64 iOS, static) + headers, COPYING
 ├── TPVersion.h                     Version number (change it only here)
 ├── scripts/inject_ipa.py           Injects the tweak into an IPA
 ├── OpenThreadsSafariExtension/     "Open in Threads" Safari extension (sideload variant only)
@@ -206,6 +212,8 @@ ThreadsPulse/
 
 - **Swift classes**: hooked by mangled name (for example `_TtC6BCNUFI12BCNUFIButton`), with ivars read through the runtime. Pointers and classes are validated before reading Swift enum memory, to avoid crashes.
 - **Batch download**: reads every item from the carousel cell's data model (`BCNFeedMediaViewModel` → `IGPhoto` / `IGVideo`), unaffected by cell reuse.
+- **1080p videos**: the progressive MP4 Threads exposes tops out at 720p. The higher qualities only exist in the DASH manifest (`IGVideo.dashManifestData`), as separate video and audio streams. The best video (by resolution) and audio (AAC preferred over Opus) are downloaded and combined on the device: H.264 / HEVC are copied as-is (`AVAssetExportSession` passthrough, or `AVAssetWriter` when the audio has to be re-encoded); VP9 is decoded with libvpx and AV1 with dav1d, then re-encoded with VideoToolbox — HEVC Main10 when the codec string says HLG/PQ (Keep HDR), otherwise H.264; with Compatible, HDR frames are converted to BT.709 by `VTPixelTransferSession` first. Any failure falls back to the 720p MP4, never to a silent video. "Ask" shows the choice as a menu next to the button that was tapped.
+- **Parallel downloads**: items after the current one are fetched ahead on a second `NSURLSession` (3 connections + the main one); saving to Photos stays in order.
 - **Original-size photos / profile pictures**: fetches `https://www.threads.com/t/<code>` or `/@<username>` and picks the largest candidate from the page JSON by matching file names.
 - **Clipboard**: first checks for a URL with `detectPatternsForPatterns:` (no paste prompt); the content is only read when you tap Open or use Auto-open. The link is handed to Threads through `NSUserActivity` (BrowsingWeb).
 - **Account switching**: hooks `IGAccountSwitcher` and checks the clipboard 1.5 s after the last switch event; 0.8 s after returning from another app.
@@ -233,6 +241,15 @@ ThreadsPulse/
 ## Notes
 
 When Threads updates, some features may stop working for a while (no crash). Turn on Debug Hints to see which one, and feel free to report it.
+
+## Third-party libraries
+
+| Library | Use | License |
+|---|---|---|
+| [libvpx](https://chromium.googlesource.com/webm/libvpx) | VP9 decoding | BSD 3-Clause (`vendor/libvpx/LICENSE`, `PATENTS`) |
+| [dav1d](https://code.videolan.org/videolan/dav1d) | AV1 decoding | BSD 2-Clause (`vendor/dav1d/COPYING`) |
+
+Both are bundled as prebuilt static libraries; the exact commit and build options are in each folder's `VERSION.txt`.
 
 ## Disclaimer
 
