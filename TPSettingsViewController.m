@@ -333,16 +333,30 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"scissors" },
            ]},
         @{ @"header": @"Media Download",
-           @"footer": @"If the original size isn't available, the regular size is downloaded.\nTo save a profile picture, long-press it on a profile, or open it full screen and tap ↓ in the bottom-right corner.",
+           @"groups": @[@"Download Options", @"Video Downloads", @"Photo Downloads"],
            @"rows": @[
-               @{ @"type": @"switch", @"key": TPKeyShowDownloadBtn, @"title": @"Download Button",
-                  @"detail": @"Long-press: choose photos or videos only\nTap: download all photos and videos",
+               @{ @"type": @"switch", @"group": @"Download Options", @"key": TPKeyShowDownloadBtn, @"title": @"Download Button",
+                  @"detail": @"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos.",
                   @"icon": @"arrow.down.circle" },
-               @{ @"type": @"switch", @"key": TPKeyOriginalImage, @"title": @"Download Original Size",
-                  @"detail": @"Fetch the highest resolution from the web version",
+               @{ @"type": @"switch", @"group": @"Download Options", @"key": TPKeyParallelDownload, @"title": @"Parallel Downloads",
+                  @"detail": @"Downloads up to 4 files at a time when saving an entire post, reducing wait time.",
+                  @"icon": @"square.stack.3d.down.right" },
+               @{ @"type": @"switch", @"group": @"Download Options", @"key": TPKeySaveToAlbum, @"title": @"Save to \"Threads\" Album",
+                  @"detail": @"Downloaded items are also added to a \"Threads\" album in Photos. Full Photos access is required the first time.",
+                  @"icon": @"rectangle.stack.badge.plus" },
+               @{ @"type": @"segment", @"group": @"Video Downloads", @"key": TPKeyVideoQuality, @"title": @"Video Quality", @"detail": @"",
+                  @"icon": @"film",
+                  @"segments": @[@"Highest", @"720p", @"Ask"],
+                  @"note": @"Highest downloads videos at up to 1080p; some videos are converted on the device, which takes a few seconds. 720p is the fastest and needs no conversion." },
+               @{ @"type": @"segment", @"group": @"Video Downloads", @"key": TPKeyVideoFormat, @"title": @"Video Format", @"detail": @"",
+                  @"icon": @"sparkles.tv",
+                  @"segments": @[@"Keep HDR", @"Compatible"], @"showIf": @[TPKeyVideoQuality, @1, @"!="],
+                  @"note": @"Keep HDR preserves the original brightness and color. Compatible converts to H.264 (SDR), suited to sharing on LINE, Windows or older devices." },
+               @{ @"type": @"switch", @"group": @"Photo Downloads", @"key": TPKeyOriginalImage, @"title": @"Download Original Size",
+                  @"detail": @"Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded.",
                   @"icon": @"photo" },
-               @{ @"type": @"switch", @"key": TPKeyOriginalAvatar, @"title": @"Download Original Profile Pictures",
-                  @"detail": @"Long-press a profile picture on a profile to save it",
+               @{ @"type": @"switch", @"group": @"Photo Downloads", @"key": TPKeyOriginalAvatar, @"title": @"Download Original Profile Pictures",
+                  @"detail": @"To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner.",
                   @"icon": @"person.crop.circle" },
            ]},
         @{ @"header": @"Player",
@@ -598,12 +612,16 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 }
 
 static NSArray<NSArray *> *TPConditions(NSArray *cond) {
-    if (cond.count == 2 && [cond[0] isKindOfClass:[NSString class]]) return @[cond];
+    if ((cond.count == 2 || cond.count == 3) && [cond[0] isKindOfClass:[NSString class]]) return @[cond];
     return cond ?: @[];
 }
 static BOOL TPConditionMet(NSArray *cond) {
     for (NSArray *c in TPConditions(cond))
-        if ([TPPrefs integerForKey:c[0]] != [c[1] integerValue]) return NO;
+    {
+        BOOL equal = [TPPrefs integerForKey:c[0]] == [c[1] integerValue];
+        BOOL negate = c.count == 3 && [c[2] isEqual:@"!="];
+        if (equal == negate) return NO;
+    }
     return YES;
 }
 static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
