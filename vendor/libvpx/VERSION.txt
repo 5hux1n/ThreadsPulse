@@ -1,0 +1,2 @@
+libvpx commit 6f4dbb1bc6803cbcdb7f54bd1c11a6228b717705 (2026-11-12)
+Built for arm64-apple-ios15.0, VP9 decoder only: --disable-vp8 --disable-vp9-encoder --enable-vp9-highbitdepth --enable-multithread --disable-runtime-cpu-detect

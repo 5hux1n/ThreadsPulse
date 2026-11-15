@@ -233,14 +233,15 @@ static void TPEnsureVideoButton(UIView *host) {
             id player = objc_getAssociatedObject(v, kTPPlayerKey);
             NSURL *url = [TPDownloader bestVideoURLNearView:v];
             if (!url) url = [TPDownloader bestURLFromVideoView:v player:player];
-            if (!url) {
+            NSDictionary *dash = [TPDownloader dashInfoFromVideoView:v player:player];
+            if (!url && !dash) {
                 if ([TPPrefs boolForKey:TPKeyDebugToast])
                     [TPDownloader showReport:[TPDownloader debugReportForVideoView:v player:player]];
                 else
                     [TPHUD toast:TPL(@"No download link found. Play the video for a moment, then try again.")];
                 return;
             }
-            [TPDownloader downloadVideoURL:url];
+            [TPDownloader downloadVideoURL:url dash:dash];
         } menuItems:nil];
         [host addSubview:b];
         objc_setAssociatedObject(host, kTPButtonKey, b, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -324,6 +325,14 @@ static NSURL *TPVideoURLFromMedia(id media) {
     return [TPDownloader bestURLFromObject:media];
 }
 
+static NSDictionary *TPVideoItem(NSURL *url, NSDictionary *dash) {
+    NSMutableDictionary *d = [NSMutableDictionary dictionaryWithDictionary:dash ?: @{}];
+    d[@"video"] = @YES;
+    d[@"urls"] = url ? @[url] : @[];
+    d[@"key"] = url ? TPDedupeKey(url) : [(NSURL *)dash[@"dashVideo"] absoluteString];
+    return d;
+}
+
 static NSURL *TPImageURLFromMedia(id media) {
     if (!media) return nil;
     for (NSString *key in @[@"photo", @"computedPhoto"]) {
@@ -357,17 +366,20 @@ static NSDictionary *TPItemForMediaCell(UIView *cell) {
 
     if (isVideo) {
         NSURL *url = nil;
+        NSDictionary *dash = nil;
         if (vv) {
             id player = objc_getAssociatedObject(vv, kTPPlayerKey);
             url = [TPDownloader bestURLFromVideoView:vv player:player];
+            dash = [TPDownloader dashInfoFromVideoView:vv player:player];
         }
+        if (!dash) dash = [TPDownloader dashInfoFromObject:fragment];
         if (!url) url = TPVideoURLFromMedia(fragment);
         if (!url && fragment) url = [TPDownloader bestVideoURLHarvestedFromObject:fragment];
-        if (!url) {
+        if (!url && !dash) {
             TPDebug([NSString stringWithFormat:@"video fragment: %@", fragment ? NSStringFromClass([fragment class]) : @"nil"]);
             return @{ @"video": @YES, @"failed": @YES };
         }
-        return @{ @"video": @YES, @"urls": @[url], @"key": TPDedupeKey(url) };
+        return TPVideoItem(url, dash);
     }
 
     UIImageView *iv = TPLargestImageView(cell);
@@ -394,8 +406,9 @@ static NSDictionary *TPItemForMedia(id media) {
     if (video) {
         NSURL *u = TPVideoURLFromMedia(media);
         if (!u) u = [TPDownloader bestVideoURLHarvestedFromObject:media];
-        if (!u) return @{ @"video": @YES, @"failed": @YES };
-        return @{ @"video": @YES, @"urls": @[u], @"key": TPDedupeKey(u) };
+        NSDictionary *dash = [TPDownloader dashInfoFromObject:media];
+        if (!u && !dash) return @{ @"video": @YES, @"failed": @YES };
+        return TPVideoItem(u, dash);
     }
     NSURL *u = TPImageURLFromMedia(media);
     if (!u) u = [TPDownloader bestImageURLHarvestedFromObject:media];
@@ -608,7 +621,10 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromViewModels(UIView *cellRoo
         NSDictionary *d = nil;
         if (video) {
             NSURL *u = [TPDownloader bestURLFromObject:video] ?: [TPDownloader bestVideoURLHarvestedFromObject:video];
-            if (!u) {
+            NSDictionary *dash = [TPDownloader dashInfoFromObject:video];
+            if (!u && dash) {
+                d = TPVideoItem(nil, dash);
+            } else if (!u) {
                 for (UIView *c in itemCells) {
                     uint8_t *mi = TPIvarAddress(c, "mediaIndex");
                     if (!mi || mi[8] != 0 || *(NSInteger *)mi != idx) continue;
@@ -618,7 +634,7 @@ static NSArray<NSDictionary *> *TPCollectPostMediaFromViewModels(UIView *cellRoo
                 }
                 if (!d) { d = @{ @"video": @YES, @"failed": @YES }; [diag appendString:TPDiagForVideo(video, idx)]; }
             } else {
-                d = @{ @"video": @YES, @"urls": @[u], @"key": TPDedupeKey(u) };
+                d = TPVideoItem(u, dash);
             }
         } else {
             NSURL *u = TPImageURLFromPhoto(photo);
@@ -887,7 +903,7 @@ static void TPBatchDownload(UIView *cell, NSInteger filter) {
     gTPSizeLog = debug ? [NSMutableString string] : nil;
     gTPSizeIndex = 0;
     NSArray<NSDictionary *> *raw = TPCollectPostMedia(cell);
-    if (gTPSizeLog.length) [TPDownloader setPendingReport:[@"[photo sizes in app]\n" stringByAppendingString:gTPSizeLog]];
+    if (gTPSizeLog.length) [TPDownloader appendPendingReport:[@"[photo sizes in app]\n" stringByAppendingString:gTPSizeLog]];
     gTPSizeLog = nil;
     NSMutableArray<NSDictionary *> *items = [NSMutableArray array];
     NSInteger skipped = 0;

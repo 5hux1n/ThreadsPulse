@@ -38,6 +38,10 @@ UIViewController *TPTopViewController(void) {
 
 NSString *const TPThemeDidChangeNotification = @"TPThemeDidChangeNotification";
 
+static __weak UIView *sTPMenuAnchor;
+void TPSetMenuAnchor(UIView *view) { sTPMenuAnchor = view; }
+UIView *TPMenuAnchor(void) { UIView *v = sTPMenuAnchor; return v.window ? v : nil; }
+
 @implementation TPUI
 
 typedef struct { uint32_t main, iconDark, iconLight; const char *name; } TPTheme;
@@ -146,7 +150,7 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
                             options:0 animations:^{ wb.transform = CGAffineTransformIdentity; } completion:nil];
     }] forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
     if (tap) {
-        [b addAction:[UIAction actionWithHandler:^(UIAction *a) { [TPUI hapticLight]; tap(); }]
+        [b addAction:[UIAction actionWithHandler:^(UIAction *a) { [TPUI hapticLight]; TPSetMenuAnchor(wb); tap(); }]
          forControlEvents:UIControlEventTouchUpInside];
     }
     if (menuItems.count) {
@@ -168,8 +172,9 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
     for (TPMenuItem *item in g.items) {
         void (^h)(void) = item.handler;
+        __weak UIView *wsrc = src;
         UIAlertAction *a = [UIAlertAction actionWithTitle:item.title style:UIAlertActionStyleDefault
-                                                  handler:^(UIAlertAction *x) { if (h) h(); }];
+                                                  handler:^(UIAlertAction *x) { TPSetMenuAnchor(wsrc); if (h) h(); }];
         UIImage *img = item.symbol ? [UIImage systemImageNamed:item.symbol] : nil;
         if (img) { @try { [a setValue:img forKey:@"image"]; } @catch (__unused id e) {} }
         [sheet addAction:a];
