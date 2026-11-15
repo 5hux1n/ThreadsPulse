@@ -1808,15 +1808,66 @@ static void TPCheckClipboardForced(BOOL force) {
 
 static void TPCheckClipboard(void) { TPCheckClipboardForced(NO); }
 
-static void TPScheduleClipboardCheckAfterSwitch(void) {
-    static NSUInteger generation = 0;
-    NSUInteger mine = ++generation;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (mine != generation) return;
-        TPDebug(TPL(@"Account switched"));
-        TPCheckClipboardForced(YES);
+// Instead of a fixed delay, check the clipboard as soon as the home feed is on screen: after a
+// cold launch, and after switching accounts (where it waits for the *new* account's home feed, so
+// the link never opens in the old account or gets covered by the rebuilt UI). If the home feed
+// doesn't show up within the timeout (e.g. the switch lands on another tab), check anyway.
+static NSUInteger gTPReadyGen;
+static BOOL gTPWaitHome, gTPWaitForce;
+static __weak UIViewController *gTPHomeVC;          // last home feed that appeared
+static __weak UIViewController *gTPHomeVCAtRequest; // must not count as "ready" after a switch
+
+static void TPFireReadyCheck(void) {
+    if (!gTPWaitHome) return;
+    gTPWaitHome = NO;
+    BOOL force = gTPWaitForce;
+    gTPWaitForce = NO;
+    gTPHomeVCAtRequest = nil;
+    if (force) TPDebug(TPL(@"Account switched"));
+    TPCheckClipboardForced(force);
+}
+
+static void TPCheckClipboardWhenHomeReady(BOOL force, BOOL needNewHome, double timeout) {
+    if (![TPPrefs boolForKey:TPKeyClipboardLinks]) return;
+    // A switch fires several events; remember the home feed from before the first one only.
+    if (needNewHome && !(gTPWaitHome && gTPWaitForce)) gTPHomeVCAtRequest = gTPHomeVC;
+    gTPWaitHome = YES;
+    gTPWaitForce = gTPWaitForce || force;
+    NSUInteger mine = ++gTPReadyGen;
+    if (!needNewHome && gTPHomeVC.viewIfLoaded.window) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (mine == gTPReadyGen) TPFireReadyCheck();
+        });
+        return;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (mine == gTPReadyGen) TPFireReadyCheck();
     });
 }
+
+static void TPHomeFeedAppeared(UIViewController *vc) {
+    gTPHomeVC = vc;
+    if (!gTPWaitHome) return;
+    if (gTPHomeVCAtRequest && vc == gTPHomeVCAtRequest) return;  // still the old account's feed
+    NSUInteger mine = gTPReadyGen;
+    // A short beat so the first layout pass finishes before Threads is asked to open a link.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (mine == gTPReadyGen) TPFireReadyCheck();
+    });
+}
+
+static void TPScheduleClipboardCheckAfterSwitch(void) {
+    TPCheckClipboardWhenHomeReady(YES, YES, 3.0);
+}
+
+%group ClipboardReady
+%hook _TtC11BCNMainFeed25BCNMainFeedViewController
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    TPHomeFeedAppeared((UIViewController *)self);
+}
+%end
+%end
 
 %group AccountSwitch
 
@@ -3267,6 +3318,7 @@ static void TPUpdateUnsentLabel(UIView *cell) {
         gTPProfileHeaderClass = objc_getClass("_TtC10BCNProfile20BCNProfileHeaderView");
         %init(Avatar);
         %init(AccountSwitch);
+        %init(ClipboardReady);
         %init(KeepFeed);
         gTPMainFeedClass = objc_getClass("_TtC11BCNMainFeed25BCNMainFeedViewController");
         %init(HomeFeedControls);
@@ -3296,7 +3348,15 @@ static void TPUpdateUnsentLabel(UIView *cell) {
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            // Coming back from another app the UI is already there, so check almost at once
+            // (shorter still for Auto-open). On a cold launch, wait for Threads to build its UI first.
+            static BOOL launched;
+            BOOL cold = !launched;
+            launched = YES;
+            if (cold) { TPCheckClipboardWhenHomeReady(NO, NO, 3.0); return; }
+            BOOL autoOpen = [TPPrefs integerForKey:TPKeyClipboardMode] == 1;
+            double delay = autoOpen ? 0.15 : 0.35;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 TPCheckClipboard();
             });
         }];
