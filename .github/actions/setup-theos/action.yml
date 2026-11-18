@@ -14,15 +14,42 @@ outputs:
 runs:
   using: composite
   steps:
+    # Linux runners start almost immediately (macOS runners often queue for minutes) and build
+    # the same binaries with Theos' Linux toolchain.
     - name: Install dependencies
       shell: bash
-      run: brew install ldid make dpkg xz
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq build-essential fakeroot rsync zip unzip xz-utils libtinfo6 libplist-utils > /dev/null
+        sudo ln -sf "$(command -v make)" /usr/local/bin/gmake
 
     - name: Install Theos
       shell: bash
       run: |
         git clone --recursive --depth 1 https://github.com/theos/theos.git "$HOME/theos"
         echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+    - name: Cache iOS toolchain
+      id: tc-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/theos-toolchain
+        key: theos-toolchain-linux-x86_64-v1
+
+    - name: Download iOS toolchain
+      if: steps.tc-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p "$HOME/theos-toolchain"
+        curl -fsSL --retry 3 https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz \
+          | tar -xJ -C "$HOME/theos-toolchain"
+
+    - name: Install iOS toolchain
+      shell: bash
+      run: |
+        mkdir -p "$THEOS/toolchain"
+        cp -R "$HOME/theos-toolchain/." "$THEOS/toolchain/"
+        "$THEOS/toolchain/linux/iphone/bin/clang" --version | head -1
 
     - name: Cache iOS SDK
       id: sdk-cache
