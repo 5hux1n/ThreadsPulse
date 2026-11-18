@@ -99,11 +99,12 @@ static NSInteger TPIntMax(NSString *key) {
 
 + (BOOL)boolForKey:(NSString *)key { return [[self defaults] boolForKey:key]; }
 + (void)setBool:(BOOL)value forKey:(NSString *)key {
+    if (!key.length) return;
     [[self defaults] setBool:value forKey:key];
     [NSNotificationCenter.defaultCenter postNotificationName:TPPrefsDidChangeNotification object:nil userInfo:@{ @"key": key }];
 }
 + (NSInteger)integerForKey:(NSString *)key { return [[self defaults] integerForKey:key]; }
-+ (void)setInteger:(NSInteger)value forKey:(NSString *)key { [[self defaults] setInteger:value forKey:key]; }
++ (void)setInteger:(NSInteger)value forKey:(NSString *)key { if (key.length) [[self defaults] setInteger:value forKey:key]; }
 
 + (void)resetAll {
     for (NSString *k in TPBoolKeys()) [[self defaults] removeObjectForKey:k];
