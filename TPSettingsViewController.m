@@ -8,6 +8,7 @@
 #import "TPWelcomeViewController.h"
 #import "TPAuthorInfo.h"
 #import "TPAuthorStatsViewController.h"
+#import "TPUpdateChecker.h"
 #import <SafariServices/SafariServices.h>
 #import <sys/sysctl.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -581,6 +582,9 @@ static UIImage *TPSquareIconWith(NSString *symbol, UIColor *bg, UIColor *fg) {
                @{ @"type": @"action", @"action": @"whatsNew", @"title": @"What's New",
                   @"detail": @"See what's new in this version",
                   @"icon": @"newspaper" },
+               @{ @"type": @"switch", @"key": TPKeyAutoUpdateCheck, @"title": @"Check for Updates Automatically",
+                  @"detail": @"Checks GitHub once a day and lets you know when a new version is out",
+                  @"icon": @"arrow.triangle.2.circlepath" },
                @{ @"type": @"switch", @"key": TPKeySideloadFix, @"title": @"Sideload Compatibility Fix",
                   @"detail": @"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads",
                   @"icon": @"key" },
@@ -595,6 +599,8 @@ static UIImage *TPSquareIconWith(NSString *symbol, UIColor *bg, UIColor *fg) {
                @{ @"type": @"info", @"group": @"Environment", @"title": @"iOS Version", @"value": TPAboutRows()[3][1], @"icon": @"gear" },
                @{ @"type": @"action", @"group": @"Environment", @"action": @"copyAbout", @"title": @"Copy All Info", @"detail": @"",
                   @"icon": @"doc.on.doc" },
+               @{ @"type": @"action", @"group": @"Links", @"action": @"checkUpdate", @"title": @"Check for Updates", @"detail": @"",
+                  @"icon": @"arrow.down.circle" },
                @{ @"type": @"weblink", @"group": @"Links", @"url": kTPRepoURL, @"title": @"Source Code on GitHub", @"icon": @"chevron.left.forwardslash.chevron.right" },
                @{ @"type": @"weblink", @"group": @"Links", @"action": @"report", @"title": @"Report a Problem", @"icon": @"exclamationmark.bubble" },
                @{ @"type": @"weblink", @"group": @"Links", @"url": @"https://github.com/meettomorrow/lee-su-threads",
@@ -701,6 +707,7 @@ static UIImage *TPSquareIconWith(NSString *symbol, UIColor *bg, UIColor *fg) {
     for (NSDictionary *sec in _allSections)
         for (NSDictionary *row in sec[@"rows"])
             if ([row[@"type"] isEqualToString:@"switch"] && ![row[@"key"] isEqualToString:TPKeyDebugToast]
+                && ![row[@"key"] isEqualToString:TPKeyAutoUpdateCheck]
                 && [TPPrefs boolForKey:row[@"key"]]) n++;
     return n;
 }
@@ -1143,6 +1150,7 @@ static const void *kTPSwitchKey = &kTPSwitchKey;
         else if ([row[@"action"] isEqualToString:@"authorStatus"]) [self showAuthorStatus];
         else if ([row[@"action"] isEqualToString:@"authorStats"]) [self.navigationController pushViewController:[TPAuthorStatsViewController new] animated:YES];
         else if ([row[@"action"] isEqualToString:@"copyAbout"]) [self copyAbout:nil];
+        else if ([row[@"action"] isEqualToString:@"checkUpdate"]) [TPUpdateChecker checkNow];
         else [self importSettings];
     } else if ([type isEqualToString:@"link"]) {
         [self openLink:row[@"url"]];

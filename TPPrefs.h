@@ -36,6 +36,7 @@ extern NSString *const TPKeyHideSearchSuggest;
 extern NSString *const TPKeyHidePostFeedback;
 extern NSString *const TPKeySeenOnReply;
 extern NSString *const TPKeyHomeLongPress;
+extern NSString *const TPKeyAutoUpdateCheck;
 extern NSString *const TPKeyTheme;
 extern NSString *const TPKeyLanguage;   // 0 follow system · 1 English · 2 繁體中文 · 3 简体中文 · 4 日本語 · 5 한국어
 extern NSString *const TPKeySideloadFix;

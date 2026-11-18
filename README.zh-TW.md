@@ -2,7 +2,7 @@
 
 [English](README.md) | **繁體中文**
 
-Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.30.1**
+Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.31.0**
 
 不需要越獄：用 GitHub Actions 就能編譯出注入好的 Threads IPA，再用自己的簽名工具安裝。
 
@@ -62,13 +62,14 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.30.1
 | | 分析回傳紀錄 | 顯示 Threads 收集的使用紀錄與內容：事件排行與每種事件最新一筆的內容，可複製；紀錄不會離開你的手機 |
 | | 歡迎畫面 | 再看一次開啟插件設定的方法 |
 | | 新功能介紹 | 再看一次這個版本的新功能（更新後第一次開啟會自動顯示一次，可直接開啟作者資訊） |
+| | 自動檢查更新 | 每天檢查一次 GitHub，有新版本時跳出視窗，可前往下載、稍後提醒或略過此版本 |
 | | 側載相容修正 | 重新簽名後維持登入與 App 群組資料，僅對重新簽名的 App 生效 |
 
 **主題色**：在設定主頁最上方的插件資訊卡裡，點色點即可切換（珊瑚／海洋／薄荷／薰衣草／櫻花／琥珀），只改變插件按鈕與設定頁的顏色。
 
 **語言**：同一張資訊卡裡可選「跟隨系統」、English、繁體中文、简体中文、日本語或한국어，插件自己的文字立即切換，不影響 Threads 本身。
 
-**關於**（主頁「備份／進階」卡片最下面一行，旁邊直接顯示版本號）：顯示插件版本、Threads 版本、Bundle ID、機型與 iOS 版本（含建置編號），可一鍵複製全部資訊；另有 GitHub 原始碼連結，以及「回報問題」，會開啟 GitHub 新 issue 並自動填入這些資訊。「重設所有設定」在這一頁最下方。
+**關於**（主頁「備份／進階」卡片最下面一行，旁邊直接顯示版本號）：顯示插件版本、Threads 版本、Bundle ID、機型與 iOS 版本（含建置編號），可一鍵複製全部資訊；另有「檢查更新」、GitHub 原始碼連結，以及「回報問題」，會開啟 GitHub 新 issue 並自動填入這些資訊。「重設所有設定」在這一頁最下方。
 
 **設定入口**：Threads「設定」頁右上角「〰 Pulse」、長按底部的首頁標籤，或在任何畫面三指長按 1 秒。第一次開啟 Threads 時會顯示歡迎畫面說明這些方法。
 
@@ -143,8 +144,8 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.30.1
 推送 `v` 開頭的標籤會自動建立 Release 並附上這四個檔案（不含 Threads 本體）：
 
 ```bash
-git tag v1.30.1
-git push origin v1.30.1
+git tag v1.31.0
+git push origin v1.31.0
 ```
 
 ### 本機編譯
@@ -200,6 +201,7 @@ ThreadsPulse/
 ├── TPWelcomeViewController.h/.m    第一次開啟時的全螢幕歡迎畫面
 ├── TPLocalization.h/.m             TPL() 多語系
 ├── TPSideloadFix.h/.m              側載相容修正（鑰匙圈、App 群組）
+├── TPUpdateChecker.h/.m            從 GitHub Releases 檢查新版本
 ├── vendor/libvpx/                  預先編譯的 VP9 解碼器（arm64 iOS 靜態函式庫）、標頭檔、授權
 ├── vendor/dav1d/                   預先編譯的 AV1 解碼器（arm64 iOS 靜態函式庫）、標頭檔、授權
 ├── TPVersion.h                     版本號（只在這裡改）

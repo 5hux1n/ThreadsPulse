@@ -409,3 +409,15 @@
 "Better Video Downloads" = "影片下載升級";
 "AV1 videos are converted automatically and finish even if you switch apps" = "AV1 影片自動轉檔，切換 App 後也能接續完成";
 "Get Started" = "開始使用";
+
+/* Updates */
+"Check for Updates Automatically" = "自動檢查更新";
+"Checks GitHub once a day and lets you know when a new version is out" = "每天檢查一次 GitHub，有新版本時通知你";
+"Check for Updates" = "檢查更新";
+"Checking for updates…" = "正在檢查更新…";
+"Couldn't check for updates. Try again later." = "無法檢查更新，請稍後再試";
+"You're on the latest version" = "已是最新版本";
+"ThreadsPulse %@ Is Available" = "ThreadsPulse %@ 已推出";
+"You're on %@" = "目前版本：%@";
+"Skip This Version" = "略過此版本";
+"Later" = "稍後";

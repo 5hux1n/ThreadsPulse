@@ -409,3 +409,15 @@
 "Better Video Downloads" = "Better Video Downloads";
 "AV1 videos are converted automatically and finish even if you switch apps" = "AV1 videos are converted automatically and finish even if you switch apps";
 "Get Started" = "Get Started";
+
+/* Updates */
+"Check for Updates Automatically" = "Check for Updates Automatically";
+"Checks GitHub once a day and lets you know when a new version is out" = "Checks GitHub once a day and lets you know when a new version is out";
+"Check for Updates" = "Check for Updates";
+"Checking for updates…" = "Checking for updates…";
+"Couldn't check for updates. Try again later." = "Couldn't check for updates. Try again later.";
+"You're on the latest version" = "You're on the latest version";
+"ThreadsPulse %@ Is Available" = "ThreadsPulse %@ Is Available";
+"You're on %@" = "You're on %@";
+"Skip This Version" = "Skip This Version";
+"Later" = "Later";

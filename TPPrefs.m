@@ -42,6 +42,7 @@ NSString *const TPKeyHidePostFeedback = @"tp_hide_post_feedback";
 NSString *const TPKeyHideSearchSuggest = @"tp_hide_search_suggest";
 NSString *const TPKeyHideProfileSearch = @"tp_hide_profile_search";
 NSString *const TPKeyHomeLongPress   = @"tp_home_long_press";
+NSString *const TPKeyAutoUpdateCheck = @"tp_auto_update_check";
 NSString *const TPKeyTheme           = @"tp_theme";
 NSString *const TPKeyLanguage        = @"tp_language";
 NSString *const TPKeyHideFeedSuggest = @"tp_hide_feed_suggest";
@@ -59,7 +60,7 @@ static NSString *const kSuite = @"com.example.threadspulse";
 static NSArray<NSString *> *TPBoolKeys(void) {
     return @[TPKeyBlockAds, TPKeyStripTracking, TPKeyShowDownloadBtn, TPKeyDebugToast,
              TPKeyOriginalImage, TPKeySaveToAlbum, TPKeyParallelDownload, TPKeyHideInCaptures, TPKeySwipeLockSpeed, TPKeyAuthorInfo, TPKeyAuthorLocation, TPKeyAuthorJoined, TPKeyAuthorNewBadge, TPKeyAuthorOwnLine, TPKeyAuthorJoinNumber, TPKeyAuthorDefaultName, TPKeyOriginalAvatar, TPKeyClipboardLinks, TPKeyConfirmLike, TPKeyKeepFeed, TPKeyHideFollowSuggest, TPKeyPinTabBar, TPKeyCopyProfile, TPKeySideloadFix, TPKeyBlockScreenshotDetect, TPKeyBlockAnalytics, TPKeyExternalBrowser, TPKeyHideIGButton, TPKeyHomeLongPress, TPKeyNoSeen, TPKeyKeepUnsent, TPKeyNoTyping, TPKeySeenOnReply, TPKeyHidePostFeedback, TPKeyHideSearchSuggest, TPKeyHideProfileSearch, TPKeyHideFeedSuggest, TPKeyNoAutoplay,
-             TPKeyNoPullRefresh, TPKeyTabNoScrollTop, TPKeyTabNoRefresh];
+             TPKeyNoPullRefresh, TPKeyTabNoScrollTop, TPKeyTabNoRefresh, TPKeyAutoUpdateCheck];
 }
 static NSArray<NSString *> *TPIntKeys(void) {
     return @[TPKeyVideoQuality, TPKeyVideoFormat, TPKeyPlaySpeed, TPKeyExactTime, TPKeyClipboardMode, TPKeyBannerPosition, TPKeyKeepFeedLimit, TPKeyTheme, TPKeyLanguage];
@@ -91,7 +92,7 @@ static NSInteger TPIntMax(NSString *key) {
             TPKeyPlaySpeed: @0,
             TPKeyExactTime: @0,         TPKeyConfirmLike: @NO,      TPKeyOriginalAvatar: @YES,  TPKeyClipboardLinks: @NO,  TPKeyClipboardMode: @0,  TPKeyBannerPosition: @0,
             TPKeyHideFollowSuggest: @YES, TPKeyPinTabBar: @NO, TPKeyCopyProfile: @YES, TPKeySideloadFix: @YES, TPKeyBlockScreenshotDetect: @YES, TPKeyBlockAnalytics: @NO, TPKeyExternalBrowser: @NO, TPKeyHideIGButton: @NO, TPKeyHomeLongPress: @YES, TPKeyNoSeen: @NO, TPKeyKeepUnsent: @NO, TPKeyNoTyping: @NO, TPKeySeenOnReply: @YES, TPKeyHidePostFeedback: @YES, TPKeyHideSearchSuggest: @YES, TPKeyHideProfileSearch: @NO, TPKeyTheme: @0, TPKeyLanguage: @0, TPKeyHideFeedSuggest: @YES, TPKeyNoAutoplay: @NO, TPKeyKeepFeed: @NO,         TPKeyKeepFeedLimit: @0,
-            TPKeyNoPullRefresh: @NO,    TPKeyTabNoScrollTop: @NO,   TPKeyTabNoRefresh: @NO,
+            TPKeyNoPullRefresh: @NO,    TPKeyTabNoScrollTop: @NO,   TPKeyTabNoRefresh: @NO,     TPKeyAutoUpdateCheck: @YES,
         }];
     });
     return d;

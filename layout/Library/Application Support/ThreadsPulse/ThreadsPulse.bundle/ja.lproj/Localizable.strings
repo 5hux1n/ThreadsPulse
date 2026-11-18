@@ -409,3 +409,15 @@
 "Better Video Downloads" = "動画のダウンロードを強化";
 "AV1 videos are converted automatically and finish even if you switch apps" = "AV1 の動画を自動で変換し、ほかのアプリに切り替えても完了まで続けます";
 "Get Started" = "はじめる";
+
+/* Updates */
+"Check for Updates Automatically" = "アップデートを自動確認";
+"Checks GitHub once a day and lets you know when a new version is out" = "1 日 1 回 GitHub を確認し、新しいバージョンがあればお知らせします";
+"Check for Updates" = "アップデートを確認";
+"Checking for updates…" = "アップデートを確認中…";
+"Couldn't check for updates. Try again later." = "アップデートを確認できませんでした。しばらくしてからもう一度お試しください";
+"You're on the latest version" = "最新バージョンです";
+"ThreadsPulse %@ Is Available" = "ThreadsPulse %@ が利用可能です";
+"You're on %@" = "現在のバージョン：%@";
+"Skip This Version" = "このバージョンをスキップ";
+"Later" = "あとで";

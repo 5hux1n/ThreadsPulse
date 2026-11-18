@@ -2,7 +2,7 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
-An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.30.1**
+An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.31.0**
 
 No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using GitHub Actions, then install it with your own signing tool.
 
@@ -62,13 +62,14 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 | | Analytics Log | Shows the usage data Threads collects and what it contains: a ranking of events with plain-language descriptions and the latest payload of each, ready to copy. The log never leaves your device |
 | | Welcome Screen | See how to open ThreadsPulse settings again |
 | | What's New | See this version's new features again (shown once automatically after an update; it can turn on Author Info) |
+| | Check for Updates Automatically | Checks GitHub once a day and shows an alert when a new version is out, with Download, Later and Skip This Version |
 | | Sideload Compatibility Fix | Keeps you signed in and app group data working after re-signing. Only active on re-signed apps |
 
 **Theme**: in the info card at the top of the settings page, tap a color dot to switch (Coral / Ocean / Mint / Lavender / Sakura / Amber). It only changes the color of ThreadsPulse buttons and settings.
 
 **Language**: in the same card, choose Follow System, English, 繁體中文, 简体中文, 日本語 or 한국어. ThreadsPulse's own text switches right away; Threads itself is unaffected.
 
-**About** (last row of the Backup / Advanced card on the main page, with the version beside it): shows the ThreadsPulse version, Threads version, bundle ID, device model and iOS version with its build number, with Copy All Info, a link to the source on GitHub, and Report a Problem, which opens a new GitHub issue with this information filled in. Reset All Settings is at the bottom of this page.
+**About** (last row of the Backup / Advanced card on the main page, with the version beside it): shows the ThreadsPulse version, Threads version, bundle ID, device model and iOS version with its build number, with Copy All Info, Check for Updates, a link to the source on GitHub, and Report a Problem, which opens a new GitHub issue with this information filled in. Reset All Settings is at the bottom of this page.
 
 **Settings**: tap **〰 Pulse** at the top-right of Threads' Settings page, long-press the Home tab at the bottom, or long-press anywhere with three fingers for 1 second. A welcome screen explains these the first time you open Threads.
 
@@ -143,8 +144,8 @@ Pushing to `main` / `master`, opening a pull request, or running **Build** → *
 Pushing a tag that starts with `v` also creates a Release with these four files (Threads itself is not included):
 
 ```bash
-git tag v1.30.1
-git push origin v1.30.1
+git tag v1.31.0
+git push origin v1.31.0
 ```
 
 ### Build locally
@@ -200,6 +201,7 @@ ThreadsPulse/
 ├── TPWelcomeViewController.h/.m    Full-screen welcome screen shown on first launch
 ├── TPLocalization.h/.m             TPL() localization
 ├── TPSideloadFix.h/.m              Sideload compatibility fix (keychain, app groups)
+├── TPUpdateChecker.h/.m            Checks GitHub Releases for a new version
 ├── vendor/libvpx/                  Prebuilt VP9 decoder (arm64 iOS, static) + headers, LICENSE
 ├── vendor/dav1d/                   Prebuilt AV1 decoder (arm64 iOS, static) + headers, COPYING
 ├── TPVersion.h                     Version number (change it only here)

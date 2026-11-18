@@ -20,6 +20,7 @@
 #import "TPVersion.h"
 #import "TPSideloadFix.h"
 #import "TPWelcomeViewController.h"
+#import "TPUpdateChecker.h"
 #import "TPAuthorInfo.h"
 
 // Swift classes have no usable headers, so methods called on them are declared here and
@@ -4243,6 +4244,10 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
             [TPWelcomeViewController presentIfNeeded];
+            // After the welcome / What's New screen has had its turn.
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [TPUpdateChecker checkAutomatically];
+            });
         }];
     }
 }
