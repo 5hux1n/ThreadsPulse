@@ -1,4 +1,5 @@
 #import "TPSettingsViewController.h"
+#import <objc/runtime.h>
 #import "TPPrefs.h"
 #import "TPDownloader.h"
 #import "TPLocalization.h"
@@ -1081,7 +1082,9 @@ static NSArray<NSArray<NSString *> *> *TPAboutRows(void) {
         UISwitch *sw = [UISwitch new];
         sw.onTintColor = TPAccent();
         sw.on = [TPPrefs boolForKey:row[@"key"]];
-        sw.tag = ip.section * 100 + ip.row;
+        // Keyed by the setting itself: rows above can be inserted or removed later, so a stored
+        // index would point at the wrong row.
+        objc_setAssociatedObject(sw, kTPSwitchKey, row[@"key"], OBJC_ASSOCIATION_COPY_NONATOMIC);
         [sw addTarget:self action:@selector(switchChanged:) forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = sw;
     } else if ([type isEqualToString:@"link"]) {
@@ -1101,9 +1104,11 @@ static NSArray<NSArray<NSString *> *> *TPAboutRows(void) {
     return cell;
 }
 
+static const void *kTPSwitchKey = &kTPSwitchKey;
+
 - (void)switchChanged:(UISwitch *)sw {
-    NSInteger s = sw.tag / 100, r = sw.tag % 100;
-    NSString *key = [self visibleRowsInSection:s][r][@"key"];
+    NSString *key = objc_getAssociatedObject(sw, kTPSwitchKey);
+    if (!key) return;
     [TPPrefs setBool:sw.on forKey:key];
     [TPUI hapticLight];
     [_header setEnabledCount:[self enabledFeatureCount]];
