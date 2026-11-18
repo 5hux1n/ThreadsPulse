@@ -4,6 +4,7 @@
 #import "TPHUD.h"
 #import "TPLocalization.h"
 #import "TPVersion.h"
+#import "TPDownloader.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <malloc/malloc.h>
@@ -42,6 +43,7 @@ static id gSyntheticSet;          // object set we built ourselves
 static NSInteger gSyntheticSubtype = -1;
 static BOOL gSyntheticFailed;
 static BOOL gHintShown;
+static NSInteger gSyntheticRetries;  // retries of the built object set this launch (bad network)
 static NSHashTable *gBadObjectSets;
 static NSString *gObjectSetSource;
 static BOOL gInFlight;
@@ -664,13 +666,47 @@ static NSDictionary *TPParams(NSString *pk, NSInteger variant) {
     return inner;
 }
 
+// The built object set failed (no response or an error, often a bad connection). Try again a few
+// times with growing pauses before falling back to asking for "About this profile".
+static void TPSyntheticRetryOrGiveUp(void) {
+    static const NSTimeInterval waits[] = { 30, 60, 120 };
+    if (gSyntheticRetries >= 3) { gSyntheticFailed = YES; return; }
+    NSTimeInterval w = waits[gSyntheticRetries++];
+    gSyntheticFailed = YES;   // hold off until the retry
+    [TPAuthorInfo log:[NSString stringWithFormat:@"built objectSet: retrying in %.0fs", w]];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(w * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (gObjectSet) return;
+        gSyntheticFailed = NO;
+        [TPAuthorInfo pump];
+    });
+}
+
+// Asks the user to open "About this profile" once. An alert rather than a toast, so it can't be
+// missed; at most once a day.
+static void TPShowSeedHint(void) {
+    NSUserDefaults *d = [TPPrefs defaults];
+    NSTimeInterval now = [NSDate date].timeIntervalSince1970;
+    if (now - [d doubleForKey:@"tp_author_hint_at"] < 86400) return;
+    UIViewController *top = [TPDownloader topViewController];
+    if (!top || top.presentedViewController || UIApplication.sharedApplication.applicationState != UIApplicationStateActive) {
+        gHintShown = NO;   // try again on a later pump
+        return;
+    }
+    [d setDouble:now forKey:@"tp_author_hint_at"];
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:TPL(@"Author Info")
+        message:TPL(@"Open anyone's \"About this profile\" once to start showing author info.")
+        preferredStyle:UIAlertControllerStyleAlert];
+    [a addAction:[UIAlertAction actionWithTitle:TPL(@"Close") style:UIAlertActionStyleCancel handler:nil]];
+    [top presentViewController:a animated:YES completion:nil];
+}
+
 static void TPSyntheticTimedOut(void) {
     if (!(gSyntheticSet && !gObjectSet)) return;
     [[TPPrefs defaults] removeObjectForKey:kSynthPending];
     [[TPPrefs defaults] setObject:@"timeout" forKey:@"tp_author_synth_last"];
     gSyntheticSet = nil;
-    gSyntheticFailed = YES;
     [TPAuthorInfo log:@"built objectSet: no response"];
+    TPSyntheticRetryOrGiveUp();
 }
 
 static void TPRequeueVisible(void);
@@ -735,7 +771,7 @@ static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BO
         [TPAuthorInfo log:[@"  built objectSet failed: " stringByAppendingString:joinedAll.length > 200 ? [joinedAll substringToIndex:200] : joinedAll]];
         gSyntheticSet = nil;
         if (gSyntheticSubtype < 2 && [joinedAll.lowercaseString containsString:@"no session context"]) gSyntheticSubtype++;
-        else gSyntheticFailed = YES;
+        else TPSyntheticRetryOrGiveUp();
         [gQueue addObject:pk];
         [gPending addObject:pk];
         gInFlight = NO;
@@ -820,9 +856,10 @@ static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BO
     if (!os) {
         static BOOL logged;
         if (!logged) { logged = YES; [self log:gUserSession ? @"waiting: no objectSet captured yet" : @"waiting: no objectSet, no user session"]; }
-        if (!gHintShown && (gSyntheticFailed || [[TPPrefs defaults] boolForKey:kSynthDisabled])) {
+        BOOL gaveUp = (gSyntheticFailed && gSyntheticRetries >= 3) || [[TPPrefs defaults] boolForKey:kSynthDisabled];
+        if (!gHintShown && gaveUp) {
             gHintShown = YES;
-            [TPHUD toast:TPL(@"Open anyone's \"About this profile\" once to start showing author info.")];
+            TPShowSeedHint();
         }
         return; // noteObjectSet: pumps again
     }
