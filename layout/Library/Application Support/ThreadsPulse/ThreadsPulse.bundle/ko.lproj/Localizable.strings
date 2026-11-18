@@ -27,7 +27,7 @@
 /* 광고 및 개인정보 */
 
 /* - 설정 항목 */
-"Ads & Privacy" = "광고 및 개인정보";
+"Ads & Privacy" = "광고 및 개인정보 보호";
 "Turning ad blocking on or off takes effect after refreshing the feed or restarting the app." = "광고 숨기기를 켜거나 끈 뒤에는 피드를 새로고침하거나 앱을 다시 시작해야 적용됩니다.";
 "Block Ads" = "광고 숨기기";
 "Hide sponsored posts in the feed" = "피드의 광고 게시물을 숨깁니다";
@@ -270,8 +270,8 @@
 "Chats where you tapped the eye to show \"Seen\" go back to hiding it" = "눈 아이콘으로 \"읽음\"을 표시하도록 설정한 채팅을 모두 다시 숨김으로 되돌립니다";
 "Hide Typing Status" = "입력 중 표시 숨기기";
 "The other person won't see \"typing…\" while you write a message" = "메시지를 입력해도 상대방에게 입력 중 표시(…)가 보이지 않습니다";
-"Keep Unsent Messages" = "보내기 취소된 메시지 남기기";
-"When someone unsends a message, it stays in your chat marked \"Unsent\"" = "상대방이 메시지 보내기를 취소해도 \"보내기 취소됨\"으로 표시해 채팅에 남깁니다";
+"Keep Unsent Messages" = "전송 취소된 메시지 남기기";
+"When someone unsends a message, it stays in your chat marked \"Unsent\"" = "상대방이 메시지 전송을 취소해도 \"전송 취소됨\"으로 표시해 채팅에 남깁니다";
 "No chats set to show Seen" = "'읽음'을 표시하는 채팅이 없습니다";
 "%lu chats will hide \"Seen\" again" = "채팅 %lu개에서 \"읽음\"을 다시 숨깁니다";
 "All chats hide Seen" = "이제 모든 채팅에서 '읽음'을 숨깁니다";
@@ -285,8 +285,8 @@
 "Seen for This Chat" = "이 채팅의 '읽음'";
 "Couldn't find this chat" = "이 채팅을 찾을 수 없습니다";
 "Typing status blocked" = "'입력 중'을 차단했습니다";
-"Unsent" = "보내기 취소됨";
-"Unsent message kept" = "보내기 취소된 메시지를 남겼습니다";
+"Unsent" = "전송 취소됨";
+"Unsent message kept" = "전송 취소된 메시지를 남겼습니다";
 
 /* 화면 및 조작 */
 
@@ -373,7 +373,7 @@
 "Environment" = "환경";
 "Copy All Info" = "모든 정보 복사";
 "Source Code on GitHub" = "GitHub 소스 코드";
-"Report a Problem" = "문제 신고";
+"Report a Problem" = "문제 보고";
 "Author Info draws on lee-su-threads (MIT)" = "작성자 정보는 lee-su-threads(MIT)를 참고했습니다";
 "Threads Version" = "Threads 버전";
 "Bundle ID" = "Bundle ID";
