@@ -3429,6 +3429,49 @@ static const void *kTPHomePressKey = &kTPHomePressKey;
 }
 %end
 
+// The older tab bar, which Threads can still use (e.g. on the first launch after installing).
+// Its long-press arrives per button, as the button or its gesture recognizer.
+%hook _TtC21BCNRootViewController25BCNLegacyTabBarController
+- (void)didLongPressTabBarButton:(id)sender {
+    UIGestureRecognizer *g = [sender isKindOfClass:[UIGestureRecognizer class]] ? sender : nil;
+    UIView *btn = g ? g.view : ([sender isKindOfClass:[UIView class]] ? sender : nil);
+    if (![TPPrefs boolForKey:TPKeyHomeLongPress] || !btn || (g && g.state != UIGestureRecognizerStateBegan)) {
+        if (g && g.state != UIGestureRecognizerStateBegan && objc_getAssociatedObject(g, kTPHomePressKey)) {
+            if (g.state == UIGestureRecognizerStateEnded || g.state == UIGestureRecognizerStateCancelled) {
+                objc_setAssociatedObject(g, kTPHomePressKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + 0.6;
+            }
+            return;
+        }
+        %orig; return;
+    }
+    // The bar: the nearest ancestor holding several tab buttons.
+    UIView *bar = btn.superview;
+    NSMutableArray<UIView *> *buttons = [NSMutableArray array];
+    for (int i = 0; bar && i < 6; bar = bar.superview, i++) {
+        [buttons removeAllObjects];
+        TPCollectTabButtons(bar, buttons, 0);
+        if (buttons.count >= 3) break;
+    }
+    BOOL home = NO;
+    if (bar && buttons.count >= 3) {
+        BOOL rtl = bar.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+        UIView *first = nil; CGFloat best = rtl ? -CGFLOAT_MAX : CGFLOAT_MAX;
+        for (UIView *b in buttons) {
+            CGFloat x = CGRectGetMidX([b convertRect:b.bounds toView:bar]);
+            if (rtl ? x > best : x < best) { best = x; first = b; }
+        }
+        home = first && (first == btn || [btn isDescendantOfView:first] || [first isDescendantOfView:btn]);
+    }
+    TPDebug([NSString stringWithFormat:@"%@: %@ (legacy %lu)", TPL(@"Long-press tab"), TPL(home ? @"Home tab" : @"not the Home tab"), (unsigned long)buttons.count]);
+    if (!home) { %orig; return; }
+    if (g) objc_setAssociatedObject(g, kTPHomePressKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + (g ? 10 : 0.6);
+    [TPUI hapticLight];
+    [TPSettingsViewController present];
+}
+%end
+
 %end
 
 // Hide Seen Status.
