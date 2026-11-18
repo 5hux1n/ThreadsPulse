@@ -198,7 +198,7 @@
 
 /* - 操作時の表示 */
 "Not shared" = "非公開";
-"%lu authors · %lu countries or regions" = "投稿者 %lu 人 · %lu の国・地域";
+"%lu authors · %lu countries or regions" = "投稿者 %lu 人 · %lu か国・地域";
 "Counts the authors currently cached (kept for up to 21 days)." = "現在キャッシュされている投稿者が対象です（最大 21 日間保持）。";
 "No author info yet. Browse the feed and it will appear here." = "まだ投稿者情報がありません。フィードを見るとここに表示されます。";
 "Tap an author to open their profile." = "投稿者をタップするとプロフィールを開きます。";
