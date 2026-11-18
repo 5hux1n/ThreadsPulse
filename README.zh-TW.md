@@ -2,7 +2,7 @@
 
 [English](README.md) | **繁體中文**
 
-Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.30.0**
+Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.30.1**
 
 不需要越獄：用 GitHub Actions 就能編譯出注入好的 Threads IPA，再用自己的簽名工具安裝。
 
@@ -143,8 +143,8 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.30.0
 推送 `v` 開頭的標籤會自動建立 Release 並附上這四個檔案（不含 Threads 本體）：
 
 ```bash
-git tag v1.30.0
-git push origin v1.30.0
+git tag v1.30.1
+git push origin v1.30.1
 ```
 
 ### 本機編譯
