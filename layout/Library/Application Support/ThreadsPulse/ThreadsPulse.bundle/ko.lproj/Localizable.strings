@@ -1,0 +1,411 @@
+/* 공통 */
+
+/* - 설정 항목 */
+"Done" = "완료";
+"Ask" = "매번 묻기";
+
+/* - 동작 안내 */
+"Copy" = "복사";
+"Close" = "닫기";
+"Download" = "다운로드";
+"Cancel" = "취소";
+"Open" = "열기";
+
+/* 설정 홈과 테마 */
+
+"Theme" = "테마";
+"Language" = "언어";
+"Follow System" = "시스템 설정 따르기";
+"Running · %ld features on" = "작동 중 · 기능 %ld개 켜짐";
+"Coral" = "코랄";
+"Ocean" = "오션";
+"Mint" = "민트";
+"Lavender" = "라벤더";
+"Sakura" = "벚꽃";
+"Amber" = "앰버";
+
+/* 광고 및 개인정보 */
+
+/* - 설정 항목 */
+"Ads & Privacy" = "광고 및 개인정보";
+"Turning ad blocking on or off takes effect after refreshing the feed or restarting the app." = "광고 숨기기를 켜거나 끈 뒤에는 피드를 새로고침하거나 앱을 다시 시작해야 적용됩니다.";
+"Block Ads" = "광고 숨기기";
+"Hide sponsored posts in the feed" = "피드의 광고 게시물을 숨깁니다";
+"Block Screenshot Detection" = "스크린샷 감지 끄기";
+"Threads won't know when you take a screenshot or record the screen" = "스크린샷이나 화면 녹화를 해도 Threads가 감지하지 못합니다";
+"Block Analytics" = "분석 데이터 전송 차단";
+"Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate" = "조회, 머문 시간, 탭 등 사용 기록을 보내지 않습니다. 추천 콘텐츠가 덜 정확해질 수 있습니다";
+"Remove URL Tracking" = "URL 추적 코드 제거";
+"Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links" = "링크를 복사, 공유하거나 열 때 xmt, igshid, utm_* 등 추적 매개변수를 자동으로 제거합니다";
+"Hide Buttons in Screenshots" = "스크린샷에서 버튼 숨기기";
+"ThreadsPulse buttons don't appear in screenshots or screen recordings" = "스크린샷이나 화면 녹화에 ThreadsPulse 버튼이 나타나지 않습니다";
+
+/* - 동작 안내 */
+"Blocked an ad request" = "광고 요청을 차단했습니다";
+"Dropped sponsored items" = "광고 항목을 제외했습니다";
+"Blocked ad insertion" = "광고 삽입을 차단했습니다";
+"Cleaned tracking from copied link" = "복사한 링크의 추적 코드를 제거했습니다";
+"Screenshot detection blocked" = "스크린샷 감지를 차단했습니다";
+
+/* 미디어 다운로드 */
+
+/* - 설정 항목 */
+"Media Download" = "미디어 다운로드";
+"Download Options" = "다운로드 옵션";
+"Video Downloads" = "동영상";
+"Photo Downloads" = "사진";
+"Download Button" = "다운로드 버튼";
+"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos." = "탭하면 사진과 동영상을 모두, 길게 누르면 사진만 또는 동영상만 다운로드합니다";
+"Parallel Downloads" = "여러 파일 동시 다운로드";
+"Downloads up to 4 files at a time when saving an entire post, reducing wait time." = "게시물 전체를 저장할 때 최대 4개 파일을 동시에 받아 대기 시간을 줄입니다";
+"Save to \"Threads\" Album" = "\"Threads\" 앨범에 저장";
+"Downloaded items are also added to a \"Threads\" album in Photos. Full Photos access is required the first time." = "다운로드한 항목을 \"Threads\" 앨범에도 추가합니다. 처음 사용할 때 사진 \"전체 접근\" 권한이 필요합니다";
+"Video Quality" = "동영상 화질";
+"Highest" = "최고";
+"Highest downloads videos at up to 1080p; some videos are converted on the device, which takes a few seconds. 720p is the fastest and needs no conversion." = "'최고'는 최대 1080p이며, 일부 동영상은 변환에 몇 초 걸립니다\n'720p'는 바로 다운로드되어 가장 빠릅니다";
+"Video Format" = "동영상 형식";
+"Keep HDR" = "HDR 유지";
+"Compatible" = "호환성 우선";
+"Keep HDR preserves the original brightness and color. Compatible converts to H.264 (SDR), suited to sharing on LINE, Windows or older devices." = "'HDR 유지'는 원본의 밝기와 색상을 유지합니다\n'호환성 우선'은 H.264(SDR)로 변환합니다";
+"Download Original Size" = "원본 크기 사진 다운로드";
+"Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded." = "웹 버전에서 가장 높은 해상도를 가져오며, 불가능하면 일반 크기로 받습니다";
+"Download Original Profile Pictures" = "원본 크기 프로필 사진 다운로드";
+"To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner." = "프로필에서 프로필 사진을 길게 누르거나, 전체 화면에서 오른쪽 아래 ↓를 탭해 저장합니다";
+
+/* - 동작 안내 */
+"Photo %ld" = "사진 %ld";
+"Video %ld" = "동영상 %ld";
+"Photos %ld–%ld" = "사진 %ld–%ld";
+"Videos %ld–%ld" = "동영상 %ld–%ld";
+"Saved" = "저장됨";
+"Failed" = "실패";
+"Waiting" = "대기 중";
+"%ld items done" = "%ld개 완료";
+"%ld failed" = "%ld개 실패";
+"%ld more posts waiting" = "게시물 %ld개 더 대기 중";
+"Cancel Download" = "다운로드 취소";
+"Cancel All" = "모두 취소";
+"Added to download queue" = "다운로드 대기열에 추가했습니다";
+"Choose video quality" = "동영상 화질 선택";
+"Highest (%@)" = "최고 화질(%@)";
+"720p (faster)" = "720p(더 빠름)";
+"Waiting for downloads…" = "다운로드 대기 중…";
+"Downloading…" = "다운로드 중…";
+"Downloading %ld of %ld" = "다운로드 중 %ld/%ld";
+"Photos access needed to add to the Threads album" = "Threads 앨범에 추가하려면 사진 전체 접근 권한이 필요합니다";
+"Photos access denied — choose where to save" = "사진 접근 권한이 없습니다. 저장할 위치를 선택하세요";
+"Download failed, please try again later" = "다운로드에 실패했습니다. 잠시 후 다시 시도하세요";
+"Saved %ld, failed %ld" = "%ld개 저장, %ld개 실패";
+"Saved to Photos" = "사진 앱에 저장했습니다";
+"Saved %ld items to Photos" = "%ld개 항목을 사진 앱에 저장했습니다";
+"Video stream" = "영상";
+"Audio stream" = "오디오";
+"Merging video and audio…" = "영상과 오디오를 합치는 중…";
+"Converting video…" = "동영상 변환 중…";
+"Paused — continues when you return to Threads" = "일시정지됨. Threads로 돌아오면 이어서 진행합니다";
+"No download link found. Play the video for a moment, then try again." = "다운로드 링크를 찾을 수 없습니다. 동영상을 잠깐 재생한 뒤 다시 시도하세요.";
+"Download button added" = "다운로드 버튼을 추가했습니다";
+"Found %ld of %ld items" = "%ld/%ld개 항목을 찾았습니다";
+"Getting original photos…" = "원본 사진을 가져오는 중…";
+"No media found" = "사진이나 동영상을 찾을 수 없습니다";
+"%ld items skipped (no download link)" = "%ld개 항목을 건너뛰었습니다(다운로드 링크 없음)";
+"Download All Media" = "사진과 동영상 모두 다운로드";
+"Download Images Only" = "사진만 다운로드";
+"Download Videos Only" = "동영상만 다운로드";
+"No image found" = "사진을 찾을 수 없습니다";
+"Download This Image" = "이 사진 다운로드";
+"Download All Images in Post" = "게시물의 사진 모두 다운로드";
+"Download This Video" = "이 동영상 다운로드";
+"Download All Videos in Post" = "게시물의 동영상 모두 다운로드";
+"No video found" = "동영상을 찾을 수 없습니다";
+"Getting original photo…" = "원본 사진을 가져오는 중…";
+"Save Profile Picture" = "프로필 사진 저장";
+
+/* 플레이어 */
+
+/* - 설정 항목 */
+"Player" = "플레이어";
+"Videos play at the selected speed, and return to it after you release a long-press 2x." = "동영상이 선택한 속도로 재생되며, 길게 눌러 2배속으로 보다가 손을 떼도 이 속도로 돌아옵니다.";
+"Disable Autoplay" = "자동 재생 끄기";
+"Videos in the feed won't play until you tap them" = "피드의 동영상이 자동으로 재생되지 않고, 탭해야 재생됩니다";
+"Default Playback Speed" = "기본 재생 속도";
+"Slide to Lock 2x" = "밀어서 2배속 고정";
+"While holding a video at 2x, a lock button appears at the bottom of the video. Slide your finger onto it to keep 2x after you let go; to unlock, long-press again and slide onto the same button" = "2배속으로 길게 누르는 중 아래 고정 버튼으로 밀면 손을 떼도 2배속을 유지합니다. 같은 동작으로 해제합니다";
+
+/* - 동작 안내 */
+"Slide here to lock 2x" = "여기까지 밀어 2배속 고정";
+"2x locked" = "2배속 고정됨";
+"Slide here to unlock" = "여기까지 밀어 고정 해제";
+"Unlocked" = "고정 해제됨";
+"Playback allowed" = "재생을 허용했습니다";
+"Autoplay blocked" = "자동 재생을 차단했습니다";
+"Tap: no video player found" = "탭: 동영상 플레이어를 찾을 수 없습니다";
+"Tap: replaying video" = "탭: 동영상을 다시 재생합니다";
+"Tap: video is playing" = "탭: 동영상 재생 중";
+"Tap: video still not playing" = "탭: 동영상이 아직 재생되지 않습니다";
+
+/* 홈 피드 */
+
+/* - 설정 항목 */
+"Home Feed" = "홈 피드";
+"With everything here turned on, new posts only load after you fully close and reopen Threads." = "위 항목을 모두 켜면 Threads를 완전히 종료했다가 다시 열어야 새 게시물이 로드됩니다.";
+"Keep Feed Position" = "피드 위치 유지";
+"Coming back from the background won't refresh the home feed, jump to the top or switch tabs" = "백그라운드에서 돌아와도 홈 피드를 새로고침하거나 맨 위로 이동하거나 탭을 바꾸지 않습니다";
+"Keep For" = "유지 시간";
+"10 min" = "10분";
+"30 min" = "30분";
+"No Limit" = "제한 없음";
+"Come back within this time to keep your place; after that, the feed refreshes as usual" = "이 시간 안에 돌아오면 위치가 유지되고, 지나면 평소처럼 새로고침됩니다";
+"Disable Pull to Refresh" = "당겨서 새로고침 끄기";
+"Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing" = "홈 피드 맨 위에서 아래로 당겨도 새로고침되거나 튕기지 않습니다";
+"When Tapping the Home Tab" = "홈 탭을 탭할 때";
+"Don't Scroll to Top" = "맨 위로 이동하지 않기";
+"When you're scrolled down the home feed, tapping the Home tab won't jump back to the top, so you stay where you were" = "홈 탭을 탭해도 맨 위로 이동하지 않고 현재 위치를 유지합니다";
+"Don't Refresh" = "새로고침하지 않기";
+"When you're already at the top of the home feed, tapping the Home tab won't refresh or load new posts" = "홈 피드 맨 위에서 홈 탭을 탭해도 새로고침하거나 새 게시물을 로드하지 않습니다";
+
+/* - 동작 안내 */
+"Feed position kept" = "피드 위치를 유지했습니다";
+"Scroll to top blocked" = "맨 위로 이동을 차단했습니다";
+"Home tab refresh blocked" = "홈 탭 새로고침을 차단했습니다";
+"Pull to refresh blocked" = "당겨서 새로고침을 차단했습니다";
+
+/* 작성자 정보 */
+
+/* - 설정 항목 */
+"Author Info" = "작성자 정보";
+"Show Author Info" = "작성자 정보 표시";
+"Shows details from the author's \"About this profile\" with their name in the feed." = "피드의 작성자 이름 옆에 \"이 프로필 정보\"의 내용을 표시합니다";
+"Location Stats" = "지역 통계";
+"See which countries and regions the authors you've read are from." = "읽어 온 작성자의 국가나 지역을 확인합니다";
+"Read Automatically" = "자동으로 읽을 항목";
+"Location" = "위치";
+"The country or region where the account is based, shown with its flag. Shows \"Not shared\" if the author keeps it private." = "계정이 있는 국가나 지역을 국기와 함께 표시하며, 비공개면 \"공유 안 함\"으로 표시합니다";
+"Join Date" = "가입 시기";
+"The month the account joined Threads." = "계정이 Threads에 가입한 연월입니다";
+"Join Number" = "가입 순번";
+"Shows which user number the account was when it joined, such as #7,551,963 or 100M+." = "Threads에 몇 번째로 가입한 사용자인지 표시합니다(예: #7,551,963, 1억+)";
+"New Account Badge" = "신규 계정 표시";
+"Marks accounts that joined within the last 2 months." = "최근 2개월 안에 가입한 계정을 표시합니다";
+"Default Name Badge" = "기본 사용자 이름 표시";
+"Marks accounts that never changed the username Threads assigned at sign-up, such as camel.253044. This doesn't mean the account is fake." = "가입 시 무작위로 정해진 사용자 이름(예: camel.253044)을 그대로 쓰는 계정을 표시합니다. 가짜 계정이라는 뜻은 아닙니다";
+"Layout" = "레이아웃";
+"Show on Its Own Line" = "별도 줄에 표시";
+"Adds a line under the name so the info always shows in full. When off, it sits next to the name and is shortened or hidden if there isn't enough room." = "켜기: 이름 아래 줄에 전체를 표시합니다\n끄기: 이름 옆에 표시하며, 공간이 부족하면 줄이거나 숨깁니다";
+"Read Status & Cache" = "읽기 상태 및 캐시";
+"See how many authors are cached and whether reading is paused, or clear the cache." = "캐시 수와 읽기 상태를 확인하거나 캐시를 지울 수 있습니다";
+"To avoid limits from Threads, authors are read one at a time and cached for up to 21 days, pausing for 1 hour when needed. Layout changes apply as you scroll." = "Threads의 제한을 피하기 위해 작성자 정보를 한 명씩 읽고 최대 21일 동안 캐시하며, 필요하면 1시간 동안 자동으로 멈춥니다. 레이아웃 변경은 스크롤할 때 적용됩니다.";
+
+/* - 동작 안내 */
+"Not shared" = "공유 안 함";
+"%lu authors · %lu countries or regions" = "작성자 %lu명 · 국가/지역 %lu곳";
+"Counts the authors currently cached (kept for up to 21 days)." = "현재 캐시된 작성자를 기준으로 합니다(최대 21일 보관).";
+"No author info yet. Browse the feed and it will appear here." = "아직 작성자 정보가 없습니다. 피드를 둘러보면 여기에 표시됩니다.";
+"Tap an author to open their profile." = "작성자를 탭하면 프로필을 엽니다.";
+"User ID" = "사용자 ID";
+"Default Name" = "기본 사용자 이름";
+"NEW" = "신규";
+"%lu authors cached · %lu read since launch" = "작성자 %lu명 캐시됨 · 실행 후 %lu회 읽음";
+"Paused by rate limit protection, resumes in %ld min" = "속도 제한 보호로 일시정지됨. %ld분 후 다시 시작합니다";
+"Reading normally" = "정상적으로 읽는 중";
+"Resume Now" = "지금 다시 시작";
+"Clear Cache" = "캐시 지우기";
+"Cache cleared" = "캐시를 지웠습니다";
+"Open anyone's \"About this profile\" once to start showing author info." = "아무나 한 명의 \"이 프로필 정보\"를 한 번 열면 작성자 정보가 표시되기 시작합니다.";
+"Threads asked to slow down. Author info paused for 1 hour." = "Threads가 속도를 줄이라고 요청해 작성자 정보 읽기를 1시간 동안 멈췄습니다.";
+
+/* 숨길 항목 */
+
+/* - 설정 항목 */
+"Hidden Items" = "숨길 항목";
+"Suggested Content" = "추천 콘텐츠";
+"Interface Buttons" = "화면 버튼";
+"Suggested Accounts" = "추천 계정";
+"Hide \"Suggested for you\" in the feed & on profiles" = "피드와 프로필의 \"회원님을 위한 추천\"을 숨깁니다";
+"Search Suggestions" = "팔로우 추천";
+"Hide \"Suggested to follow\" on the search page" = "검색 페이지의 \"팔로우 추천\"을 숨깁니다";
+"Follow Suggestion Pop-ups" = "팔로우 추천 팝업";
+"Stop \"Follow suggestions\" from popping up automatically" = "\"팔로우 추천\"이 자동으로 뜨지 않게 합니다";
+"Post Interest Prompts" = "게시물 관심 여부 질문";
+"Stop asking if you're interested in posts" = "게시물에 관심이 있는지 더 이상 묻지 않습니다";
+"Search Button" = "검색 버튼";
+"Hide the search button on profiles" = "프로필의 검색 버튼을 숨깁니다";
+"Instagram Button" = "Instagram 버튼";
+"Hide the Instagram button on profiles" = "프로필의 Instagram 버튼을 숨깁니다";
+
+/* - 동작 안내 */
+"Follow suggestions hidden" = "팔로우 추천을 숨겼습니다";
+
+/* 링크 */
+
+/* - 설정 항목 */
+"Links" = "링크";
+"Auto-open reads the clipboard directly. If iOS asks to allow pasting every time, go to Settings › Threads › Paste from Other Apps and choose Allow." = "'자동으로 열기'는 클립보드를 바로 읽습니다. iOS가 매번 붙여넣기 허용을 물으면 '설정 › Threads › 다른 앱에서 붙여넣기'에서 '허용'을 선택하세요.";
+"Detect Copied Links" = "복사한 링크 감지";
+"When you come back or switch accounts, detect a copied Threads link and open it" = "Threads로 돌아오거나 계정을 바꿀 때 복사한 Threads 링크를 감지해 엽니다";
+"When a Link Is Found" = "링크를 찾았을 때";
+"Auto-open" = "자동으로 열기";
+"Prompt Position" = "안내 위치";
+"Top" = "위";
+"Middle" = "가운데";
+"Bottom" = "아래";
+"Open Links in External Browser" = "외부 브라우저로 링크 열기";
+"Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app" = "게시물과 소개의 링크를 Safari 또는 기본 브라우저로 엽니다. Threads 링크는 앱 안에서 엽니다";
+
+/* - 동작 안내 */
+"Opened link from clipboard" = "클립보드의 링크를 열었습니다";
+"The copied link isn't a Threads link" = "복사한 링크가 Threads 링크가 아닙니다";
+"Link copied" = "클립보드에 링크가 있습니다";
+"Account switched" = "계정을 바꿨습니다";
+
+/* 메시지 */
+
+/* - 설정 항목 */
+"Messages" = "메시지";
+"Hide Seen Status" = "읽음 표시 숨기기";
+"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat." = "메시지를 봐도 상대방에게 알리지 않습니다. 특정 채팅에서 \"읽음\"을 표시하려면 오른쪽 위의 눈 아이콘을 탭하세요";
+"Show Seen When You Reply" = "답장하면 읽음 표시";
+"Let the other person see \"Seen\" once you reply" = "켜기: 답장한 뒤에 상대방 화면에 \"읽음\"이 표시됩니다\n끄기: 답장해도 상대방 화면에 \"읽음\"이 표시되지 않습니다";
+"Reset Chats" = "채팅 초기화";
+"Chats where you tapped the eye to show \"Seen\" go back to hiding it" = "눈 아이콘으로 \"읽음\"을 표시하도록 설정한 채팅을 모두 다시 숨김으로 되돌립니다";
+"Hide Typing Status" = "입력 중 표시 숨기기";
+"The other person won't see \"typing…\" while you write a message" = "메시지를 입력해도 상대방에게 입력 중 표시(…)가 보이지 않습니다";
+"Keep Unsent Messages" = "보내기 취소된 메시지 남기기";
+"When someone unsends a message, it stays in your chat marked \"Unsent\"" = "상대방이 메시지 보내기를 취소해도 \"보내기 취소됨\"으로 표시해 채팅에 남깁니다";
+"No chats set to show Seen" = "'읽음'을 표시하는 채팅이 없습니다";
+"%lu chats will hide \"Seen\" again" = "채팅 %lu개에서 \"읽음\"을 다시 숨깁니다";
+"All chats hide Seen" = "이제 모든 채팅에서 '읽음'을 숨깁니다";
+
+/* - 동작 안내 */
+"Seen sent" = "'읽음'을 보냈습니다";
+"Seen status blocked" = "'읽음'을 차단했습니다";
+"Seen sent first, message follows" = "'읽음'을 먼저 보내고 메시지를 이어서 보냅니다";
+"This chat shows Seen" = "이 채팅에서는 '읽음'을 표시합니다";
+"This chat hides Seen" = "이 채팅에서는 '읽음'을 숨깁니다";
+"Seen for This Chat" = "이 채팅의 '읽음'";
+"Couldn't find this chat" = "이 채팅을 찾을 수 없습니다";
+"Typing status blocked" = "'입력 중'을 차단했습니다";
+"Unsent" = "보내기 취소됨";
+"Unsent message kept" = "보내기 취소된 메시지를 남겼습니다";
+
+/* 화면 및 조작 */
+
+/* - 설정 항목 */
+"Interface & Interactions" = "화면 및 조작";
+"3h" = "3시간";
+"Example: %@" = "예: %@";
+"Like Confirmation" = "좋아요 확인";
+"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "좋아요를 보내기 전에 확인 창을 띄웁니다. 취소할 때는 묻지 않습니다";
+"Post Time Format" = "게시 시간 형식";
+"Relative" = "상대 시간";
+"Date & Time" = "날짜";
+"With Year" = "연도 포함";
+"With Seconds" = "초 포함";
+"Keep Tab Bar Visible" = "탭 바 항상 표시";
+"Scrolling won't hide the tab bar at the bottom; it always stays on screen" = "스크롤해도 아래쪽 탭 바가 숨겨지지 않습니다";
+"Copy Profile Info" = "프로필 정보 복사";
+"On a profile, long-press the name, username, bio or profile picture to copy the name, username or bio" = "프로필에서 이름, 사용자 이름, 소개, 프로필 사진을 길게 누르면 해당 정보를 복사합니다";
+"Long-Press Home Tab for Settings" = "홈 탭을 길게 눌러 설정 열기";
+"Long-pressing the Home tab at the bottom opens ThreadsPulse settings instead" = "아래쪽 홈 탭을 길게 누르면 ThreadsPulse 설정이 열립니다";
+
+/* - 동작 안내 */
+"Like confirmation shown" = "좋아요 확인 창을 표시했습니다";
+"Like this post?" = "이 게시물에 좋아요를 누를까요?";
+"Like" = "좋아요";
+"Copied" = "복사했습니다";
+"Copy Name" = "이름 복사";
+"Copy Username" = "사용자 이름 복사";
+"Copy Bio" = "소개 복사";
+"Long-press tab" = "탭 길게 누르기";
+"feature is off" = "기능이 꺼져 있음";
+"Home tab" = "홈 탭";
+"not the Home tab" = "홈 탭이 아님";
+
+/* 백업 */
+
+"Backup" = "백업";
+"Export your settings to a file, and import it after reinstalling or on another device." = "설정을 파일로 내보내고, 다시 설치한 뒤나 다른 기기에서 가져올 수 있습니다.";
+"Export Settings" = "설정 내보내기";
+"Import Settings" = "설정 가져오기";
+"Export failed" = "내보내기에 실패했습니다";
+"Invalid settings file" = "설정 파일 형식이 올바르지 않습니다";
+"Imported %ld settings" = "설정 %ld개를 가져왔습니다";
+
+/* 고급 */
+
+/* - 설정 항목 */
+"Advanced" = "고급";
+"Debug Hints" = "디버그 안내";
+"Turn on when a feature stops working. Hints show which features are active, to help report problems." = "기능이 제대로 작동하지 않을 때 켜면 각 기능의 작동 상태가 표시되어 문제를 알리는 데 도움이 됩니다";
+"Analytics Log" = "분석 데이터 기록";
+"Shows the usage data Threads collects and what it contains. The log never leaves your device" = "Threads가 수집하는 사용 기록과 그 내용을 보여 줍니다. 기록은 기기 밖으로 나가지 않습니다";
+"Welcome Screen" = "환영 화면";
+"See how to open ThreadsPulse settings again" = "ThreadsPulse 설정을 여는 방법 다시 보기";
+"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "재서명 후에도 로그인 상태와 데이터를 유지합니다. 재서명한 앱에서만 작동하며, 변경 후 Threads를 다시 열어야 합니다";
+"No analytics recorded yet" = "아직 분석 데이터 기록이 없습니다";
+
+/* - 동작 안내 */
+"Diagnostics" = "진단 정보";
+"Top Events" = "자주 발생한 이벤트";
+"Block Analytics: On" = "분석 데이터 전송 차단: 켬";
+"Block Analytics: Off" = "분석 데이터 전송 차단: 끔";
+"Nothing below was sent" = "아래 내용은 하나도 전송되지 않았습니다";
+"Everything below was sent" = "아래 내용은 모두 전송되었습니다";
+"%lu events while using the app (%lu types)" = "앱 사용 중 %lu건(%lu종류)";
+"…and %lu more types" = "…외 %lu종류";
+"Unknown" = "알 수 없음";
+"%@ times" = "%@회";
+"Recent Events" = "최근 기록";
+"Latest one of each type" = "종류별로 최신 1건만 표시";
+"Contains your user ID and post IDs. Check before sharing." = "사용자 ID와 게시물 ID가 포함되어 있습니다. 공유하기 전에 확인하세요.";
+"Sideload Compatibility Fix" = "사이드로드 호환성 수정";
+"Last session" = "지난번 사용";
+"Analytics blocked last session" = "지난번에 차단한 분석 데이터";
+
+/* 후원 및 정보 */
+
+"Donate" = "후원";
+"Your support keeps ThreadsPulse updated. Thank you!" = "여러분의 후원이 ThreadsPulse를 계속 업데이트하는 힘이 됩니다. 감사합니다!";
+"Buy Me a Coffee" = "커피 한 잔 사 주기";
+"Support ThreadsPulse on Ko-fi" = "Ko-fi에서 ThreadsPulse 후원하기";
+"About" = "정보";
+"Version" = "버전";
+"Environment" = "환경";
+"Copy All Info" = "모든 정보 복사";
+"Source Code on GitHub" = "GitHub 소스 코드";
+"Report a Problem" = "문제 신고";
+"Author Info draws on lee-su-threads (MIT)" = "작성자 정보는 lee-su-threads(MIT)를 참고했습니다";
+"Threads Version" = "Threads 버전";
+"Bundle ID" = "Bundle ID";
+"Device" = "기기 모델";
+"iOS Version" = "iOS 버전";
+"Reset All Settings" = "모든 설정 초기화";
+"Reset All Settings?" = "모든 설정을 초기화할까요?";
+"Reset" = "초기화";
+
+/* 환영 화면 */
+
+"How to Open Settings" = "ThreadsPulse 설정 여는 방법";
+"From Threads Settings" = "Threads 설정에서";
+"Open Threads settings, then tap “Pulse” at the top right" = "Threads 설정을 열고 오른쪽 위의 'Pulse'를 탭합니다";
+"Three-Finger Long Press" = "세 손가락으로 길게 누르기";
+"Press anywhere with three fingers for 1 second" = "아무 화면에서나 세 손가락으로 1초 동안 누릅니다";
+"Long-Press the Home Tab" = "홈 탭 길게 누르기";
+"Long-press the Home tab at the bottom" = "아래쪽 홈 탭을 길게 누릅니다";
+"You can see this screen again under Advanced" = "이 화면은 ThreadsPulse 설정의 '고급'에서 다시 볼 수 있습니다";
+"Open ThreadsPulse Settings" = "ThreadsPulse 설정 열기";
+"Maybe Later" = "나중에";
+"Welcome to ThreadsPulse" = "ThreadsPulse에 오신 것을 환영합니다";
+"ThreadsPulse is installed and running" = "ThreadsPulse가 설치되어 작동 중입니다";
+"What's New" = "새로운 기능";
+"See what's new in this version" = "이 버전의 새로운 기능 보기";
+"What's New in ThreadsPulse %@" = "ThreadsPulse %@ 새로운 기능";
+"Updated to the latest version" = "최신 버전으로 업데이트되었습니다";
+"See an author's country, join date and join number right in the feed" = "피드에서 작성자의 국가, 가입 시기, 가입 순번을 바로 확인할 수 있습니다";
+"Full-Screen Download" = "전체 화면 다운로드";
+"Save every image or video in a post while viewing it full screen" = "전체 화면으로 볼 때 게시물의 사진이나 동영상을 한 번에 저장할 수 있습니다";
+"Five Languages" = "5개 언어";
+"Simplified Chinese, Japanese and Korean added; switch in settings" = "중국어 간체, 일본어, 한국어를 추가했습니다. 설정에서 바꿀 수 있습니다";
+"Better Video Downloads" = "동영상 다운로드 개선";
+"AV1 videos are converted automatically and finish even if you switch apps" = "AV1 동영상을 자동으로 변환하며, 다른 앱으로 전환해도 끝까지 완료합니다";
+"Get Started" = "시작하기";

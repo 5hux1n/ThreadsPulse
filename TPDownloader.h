@@ -21,7 +21,6 @@
 + (NSURL *)bestVideoURLNearView:(UIView *)view;
 
 + (double)imageAreaFromURL:(NSURL *)url;
-+ (void)setPendingReport:(NSString *)report;
 + (void)appendPendingReport:(NSString *)report;
 + (id)safeValue:(id)obj key:(NSString *)key;
 + (id)ivarValue:(id)obj name:(NSString *)name;

@@ -1,4 +1,5 @@
 #import "TPUI.h"
+#import <objc/runtime.h>
 #import "TPPrefs.h"
 #import "TPLocalization.h"
 #import "TPHUD.h"
@@ -28,15 +29,122 @@ UIViewController *TPTopViewController(void) {
     i.title = title; i.symbol = symbol; i.handler = handler;
     return i;
 }
++ (instancetype)itemWithKey:(NSString *)key symbol:(NSString *)symbol handler:(void (^)(void))handler {
+    TPMenuItem *i = [self itemWithTitle:key symbol:symbol handler:handler];
+    i.titleKey = key;
+    return i;
+}
+- (NSString *)title { return _titleKey ? TPL(_titleKey) : _title; }
 @end
 
-@interface TPLongPressMenuGesture : UILongPressGestureRecognizer
+// Long-press state of a circle button. Done with the button's own touch tracking rather than a
+// gesture recognizer: on full-screen video pages Threads' gestures kept the recognizer from ever
+// receiving the touch, while the button itself still got it.
+@interface TPUI (TPHoldMenu)
++ (void)tp_showMenu:(NSArray<TPMenuItem *> *)items from:(UIView *)src;
+@end
+
+@interface TPHoldState : NSObject
 @property (nonatomic, copy) NSArray<TPMenuItem *> *items;
+@property (nonatomic, strong) NSTimer *timer;
+@property (nonatomic) BOOL fired;
+@property (nonatomic) NSTimeInterval shownAt;
+- (BOOL)recentlyShown;
 @end
-@implementation TPLongPressMenuGesture
+// Long-press menu, opened by whichever of two paths sees the hold first:
+// - a long-press gesture on the button: gets the touch the moment the finger lands (in the feed,
+//   Threads' own gestures hold the touch back from the button itself for ~0.8 s);
+// - the button's own touch tracking: the only one that works on full-screen video pages, where
+//   the gesture never receives the touch.
+@implementation TPHoldState
+- (BOOL)recentlyShown { return NSProcessInfo.processInfo.systemUptime - self.shownAt < 1.2; }
+- (void)show:(UIButton *)b via:(NSString *)path {
+    if (!b || !self.items.count || [self recentlyShown]) return;
+    self.fired = YES;
+    self.shownAt = NSProcessInfo.processInfo.systemUptime;
+    [self.timer invalidate];
+    self.timer = nil;
+    [TPUI tp_showMenu:self.items from:b];
+}
+- (void)longPressed:(UILongPressGestureRecognizer *)g {
+    if (g.state == UIGestureRecognizerStateBegan) [self show:(UIButton *)g.view via:@"gesture"];
+}
+- (void)touchDown:(UIButton *)b event:(UIEvent *)event {
+    [self.timer invalidate];
+    self.timer = nil;
+    if ([self recentlyShown]) { self.fired = YES; return; }   // the gesture already opened it
+    self.fired = NO;
+    if (!self.items.count) return;
+    __weak TPHoldState *ws = self;
+    __weak UIButton *wb = b;
+    self.timer = [NSTimer scheduledTimerWithTimeInterval:0.45 repeats:NO block:^(NSTimer *x) {
+        UIButton *bb = wb;
+        if (bb.isTracking) [ws show:bb via:@"touch"];
+    }];
+}
 @end
+static const void *kTPHoldKey = &kTPHoldKey;
 
 NSString *const TPThemeDidChangeNotification = @"TPThemeDidChangeNotification";
+
+// A view whose contents iOS leaves out of screenshots and screen recordings, taken from a
+// secure UITextField (the same mechanism that hides typed passwords). Returns nil if the
+// private canvas view isn't there on this iOS version, in which case buttons draw normally.
+UIView *TPCaptureProtectedView(void) {
+    UITextField *field = [UITextField new];
+    field.secureTextEntry = YES;
+    UIView *canvas = nil;
+    for (UIView *v in field.subviews)
+        if ([NSStringFromClass([v class]) containsString:@"CanvasView"]) { canvas = v; break; }
+    if (!canvas) return nil;
+    for (UIView *v in canvas.subviews) [v removeFromSuperview];
+    [canvas removeFromSuperview];
+    canvas.userInteractionEnabled = NO;
+    canvas.backgroundColor = UIColor.clearColor;
+    return canvas;
+}
+
+static const void *kTPButtonContentKey = &kTPButtonContentKey;
+static const void *kTPButtonSecureKey  = &kTPButtonSecureKey;
+
+// Puts the button's content inside or outside the capture-protected layer, per the setting.
+static void TPApplyCaptureProtection(UIButton *b) {
+    UIView *content = objc_getAssociatedObject(b, kTPButtonContentKey);
+    if (!content) return;
+    UIView *secure = objc_getAssociatedObject(b, kTPButtonSecureKey);
+    if ([TPPrefs boolForKey:TPKeyHideInCaptures]) {
+        if (!secure) {
+            secure = TPCaptureProtectedView();
+            if (!secure) { if (content.superview != b) [b insertSubview:content atIndex:0]; return; }
+            secure.frame = b.bounds;
+            secure.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            secure.clipsToBounds = NO;
+            objc_setAssociatedObject(b, kTPButtonSecureKey, secure, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        content.frame = secure.bounds;
+        [secure addSubview:content];
+        if (secure.superview != b) [b insertSubview:secure atIndex:0];
+    } else {
+        [secure removeFromSuperview];
+        content.frame = b.bounds;
+        if (content.superview != b) [b insertSubview:content atIndex:0];
+    }
+}
+
+// Live buttons, so a change to the setting applies to the ones already on screen.
+static NSHashTable<UIButton *> *sTPButtons;
+static void TPTrackButton(UIButton *b) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        sTPButtons = [NSHashTable weakObjectsHashTable];
+        [NSNotificationCenter.defaultCenter addObserverForName:TPPrefsDidChangeNotification object:nil
+                                                         queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
+            if (![n.userInfo[@"key"] isEqual:TPKeyHideInCaptures]) return;
+            for (UIButton *x in sTPButtons.allObjects) TPApplyCaptureProtection(x);
+        }];
+    });
+    [sTPButtons addObject:b];
+}
 
 static __weak UIView *sTPMenuAnchor;
 void TPSetMenuAnchor(UIView *view) { sTPMenuAnchor = view; }
@@ -65,6 +173,8 @@ static const TPTheme *TPCurrentTheme(void) {
 + (UIColor *)themeColorAtIndex:(NSInteger)i { return TPHex(kTPThemes[MAX(0, MIN(i, [self themeCount] - 1))].main); }
 + (NSString *)themeNameAtIndex:(NSInteger)i { return @(kTPThemes[MAX(0, MIN(i, [self themeCount] - 1))].name); }
 + (UIColor *)accent { return TPHex(TPCurrentTheme()->main); }
++ (UIColor *)accentOnDark { return TPHex(TPCurrentTheme()->iconDark); }
+
 + (UIColor *)accentIcon {
     const TPTheme *t = TPCurrentTheme();
     UIColor *dark = TPHex(t->iconDark), *light = TPHex(t->iconLight);
@@ -139,6 +249,28 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
         [icon addSubview:l];
     }
     [b addSubview:icon];
+
+    // Everything visible (frost, icon, ring, shadow) lives in one content view, so it can be moved
+    // in and out of a capture-protected layer whenever "Hide Buttons in Screenshots" changes.
+    UIView *content = [[UIView alloc] initWithFrame:b.bounds];
+    content.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    content.userInteractionEnabled = NO;
+    content.layer.cornerRadius = d / 2;
+    content.layer.borderWidth = b.layer.borderWidth;
+    content.layer.borderColor = b.layer.borderColor;
+    content.layer.shadowColor = b.layer.shadowColor;
+    content.layer.shadowOpacity = b.layer.shadowOpacity;
+    content.layer.shadowRadius = b.layer.shadowRadius;
+    content.layer.shadowOffset = b.layer.shadowOffset;
+    b.layer.borderWidth = 0;
+    b.layer.shadowOpacity = 0;
+    [blur removeFromSuperview];
+    [icon removeFromSuperview];
+    [content addSubview:blur];
+    [content addSubview:icon];
+    objc_setAssociatedObject(b, kTPButtonContentKey, content, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    TPApplyCaptureProtection(b);
+    TPTrackButton(b);
     b.accessibilityLabel = TPL(@"Download");
 
     __weak UIButton *wb = b;
@@ -149,28 +281,39 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
         [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.55 initialSpringVelocity:6
                             options:0 animations:^{ wb.transform = CGAffineTransformIdentity; } completion:nil];
     }] forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
-    if (tap) {
-        [b addAction:[UIAction actionWithHandler:^(UIAction *a) { [TPUI hapticLight]; TPSetMenuAnchor(wb); tap(); }]
-         forControlEvents:UIControlEventTouchUpInside];
-    }
+    TPHoldState *hold = [TPHoldState new];
+    hold.items = menuItems;
+    objc_setAssociatedObject(b, kTPHoldKey, hold, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    __weak TPHoldState *wh = hold;
+    [b addTarget:hold action:@selector(touchDown:event:) forControlEvents:UIControlEventTouchDown];
     if (menuItems.count) {
-        TPLongPressMenuGesture *g = [[TPLongPressMenuGesture alloc] initWithTarget:self action:@selector(tp_longPressed:)];
-        g.minimumPressDuration = 0.45;
-        g.items = menuItems;
-        [b addGestureRecognizer:g];
+        UILongPressGestureRecognizer *lp = [[UILongPressGestureRecognizer alloc] initWithTarget:hold action:@selector(longPressed:)];
+        lp.minimumPressDuration = 0.45;
+        [b addGestureRecognizer:lp];
+    }
+    [b addAction:[UIAction actionWithHandler:^(UIAction *a) { [wh.timer invalidate]; wh.timer = nil; }]
+     forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel | UIControlEventTouchDragExit];
+    if (tap) {
+        [b addAction:[UIAction actionWithHandler:^(UIAction *a) {
+            if (wh.fired || [wh recentlyShown]) { wh.fired = NO; return; }   // the hold already opened the menu
+            [TPUI hapticLight]; TPSetMenuAnchor(wb); tap();
+        }] forControlEvents:UIControlEventTouchUpInside];
     }
     return b;
 }
 
-+ (void)tp_longPressed:(TPLongPressMenuGesture *)g {
-    if (g.state != UIGestureRecognizerStateBegan) return;
-    UIView *src = g.view;
++ (void)setMenuItems:(NSArray<TPMenuItem *> *)items forButton:(UIButton *)button {
+    TPHoldState *h = objc_getAssociatedObject(button, kTPHoldKey);
+    h.items = items;
+}
+
++ (void)tp_showMenu:(NSArray<TPMenuItem *> *)items from:(UIView *)src {
     src.transform = CGAffineTransformIdentity;
     [TPUI hapticLight];
 
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:nil message:nil
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
-    for (TPMenuItem *item in g.items) {
+    for (TPMenuItem *item in items) {
         void (^h)(void) = item.handler;
         __weak UIView *wsrc = src;
         UIAlertAction *a = [UIAlertAction actionWithTitle:item.title style:UIAlertActionStyleDefault
@@ -182,6 +325,13 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
     [sheet addAction:[UIAlertAction actionWithTitle:TPL(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
     sheet.popoverPresentationController.sourceView = src;
     sheet.popoverPresentationController.sourceRect = src.bounds;
-    [TPTopViewController() presentViewController:sheet animated:YES completion:nil];
+    // Normally the app's top controller; if it can't present right now, the screen the button is on.
+    UIViewController *from = TPTopViewController();
+    if (!from.view.window || from.isBeingDismissed || from.isBeingPresented) {
+        for (UIResponder *r = src; r; r = r.nextResponder)
+            if ([r isKindOfClass:[UIViewController class]]) { from = (UIViewController *)r; break; }
+        while (from.presentedViewController && !from.presentedViewController.isBeingDismissed) from = from.presentedViewController;
+    }
+    [from presentViewController:sheet animated:YES completion:nil];
 }
 @end

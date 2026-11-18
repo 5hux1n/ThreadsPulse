@@ -14,7 +14,9 @@
 /* 設定首頁與主題 */
 
 "Theme" = "主題色";
-"Running · %ld features on" = "運作中・已開啟 %ld 項功能";
+"Language" = "語言";
+"Follow System" = "跟隨系統";
+"Running · %ld features on" = "運作中 · 已開啟 %ld 項功能";
 "Coral" = "珊瑚";
 "Ocean" = "海洋";
 "Mint" = "薄荷";
@@ -35,6 +37,8 @@
 "Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate" = "不回傳瀏覽、停留時間與點擊等使用紀錄，推薦內容可能較不精準";
 "Remove URL Tracking" = "移除網址追蹤碼";
 "Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links" = "複製、分享或開啟連結時，自動移除 xmt、igshid、utm_* 等追蹤參數";
+"Hide Buttons in Screenshots" = "截圖時隱藏插件按鈕";
+"ThreadsPulse buttons don't appear in screenshots or screen recordings" = "截圖或錄影時，畫面上不會出現 ThreadsPulse 的按鈕";
 
 /* - 操作提示 */
 "Blocked an ad request" = "擋下廣告請求";
@@ -51,24 +55,37 @@
 "Video Downloads" = "影片";
 "Photo Downloads" = "圖片";
 "Download Button" = "下載按鈕";
-"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos." = "在串文上顯示下載按鈕。點選可下載全部圖片與影片，長按可選擇僅下載圖片或影片。";
+"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos." = "點選下載全部圖片與影片，長按可選擇僅下載圖片或影片";
 "Parallel Downloads" = "同時下載多個檔案";
-"Downloads up to 4 files at a time when saving an entire post, reducing wait time." = "下載整則串文時，最多同時下載 4 個檔案，以縮短等待時間。";
+"Downloads up to 4 files at a time when saving an entire post, reducing wait time." = "下載整則串文時最多同時下載 4 個檔案，縮短等待時間";
 "Save to \"Threads\" Album" = "儲存至「Threads」相簿";
-"Downloaded items are also added to a \"Threads\" album in Photos. Full Photos access is required the first time." = "下載的項目將同步加入「Threads」相簿，首次使用需授予照片「完整取用權限」。";
+"Downloaded items are also added to a \"Threads\" album in Photos. Full Photos access is required the first time." = "下載項目將同步加入「Threads」相簿，首次使用需授予照片「完整取用權限」";
 "Video Quality" = "影片畫質";
 "Highest" = "最高";
-"Highest downloads videos at up to 1080p; some videos are converted on the device, which takes a few seconds. 720p is the fastest and needs no conversion." = "「最高」畫質最佳，最高 1080p，部分影片需於裝置上轉檔，約需數秒；「720p」可直接下載，速度最快。";
+"Highest downloads videos at up to 1080p; some videos are converted on the device, which takes a few seconds. 720p is the fastest and needs no conversion." = "「最高」畫質可達 1080p，部分影片需轉檔數秒\n「720p」直接下載，速度最快";
 "Video Format" = "影片格式";
 "Keep HDR" = "保留 HDR";
 "Compatible" = "相容性優先";
 "Keep HDR preserves the original brightness and color. Compatible converts to H.264 (SDR), suited to sharing on LINE, Windows or older devices." = "「保留 HDR」維持原始的亮度與色彩\n「相容性優先」將轉換為 H.264（SDR）";
 "Download Original Size" = "下載原始尺寸圖片";
-"Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded." = "由網頁版取得最高解析度；若無法取得，將改為下載一般尺寸。";
+"Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded." = "由網頁版取得最高解析度，無法取得時改為一般尺寸";
 "Download Original Profile Pictures" = "下載原始尺寸大頭貼";
-"To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner." = "於個人檔案長按大頭貼，或以全螢幕檢視後點選右下角的 ↓ 即可儲存。";
+"To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner." = "於個人檔案長按大頭貼，或在全螢幕檢視時點選右下角 ↓ 儲存";
 
 /* - 操作提示 */
+"Photo %ld" = "圖片 %ld";
+"Video %ld" = "影片 %ld";
+"Photos %ld–%ld" = "圖片 %ld–%ld";
+"Videos %ld–%ld" = "影片 %ld–%ld";
+"Saved" = "已儲存";
+"Failed" = "失敗";
+"Waiting" = "等待中";
+"%ld items done" = "已完成 %ld 個項目";
+"%ld failed" = "%ld 個失敗";
+"%ld more posts waiting" = "另有 %ld 則串文等待";
+"Cancel Download" = "取消下載";
+"Cancel All" = "取消全部";
+"Added to download queue" = "已加入下載佇列";
 "Choose video quality" = "選擇影片畫質";
 "Highest (%@)" = "最高畫質（%@）";
 "720p (faster)" = "720p（較快）";
@@ -85,6 +102,7 @@
 "Audio stream" = "音訊";
 "Merging video and audio…" = "正在合併影像與音訊…";
 "Converting video…" = "正在轉檔…";
+"Paused — continues when you return to Threads" = "已暫停，回到 Threads 後會繼續";
 "No download link found. Play the video for a moment, then try again." = "找不到下載連結。請先讓影片播放一下再試一次。";
 "Download button added" = "已加入下載按鈕";
 "Found %ld of %ld items" = "已找到 %ld／%ld 個項目";
@@ -92,11 +110,14 @@
 "No media found" = "找不到圖片或影片";
 "%ld items skipped (no download link)" = "略過 %ld 個項目（找不到下載連結）";
 "Download All Media" = "下載全部圖片和影片";
-"Download Images Only" = "只下載圖片";
-"Download Videos Only" = "只下載影片";
+"Download Images Only" = "僅下載圖片";
+"Download Videos Only" = "僅下載影片";
 "No image found" = "找不到圖片";
 "Download This Image" = "下載這張圖片";
 "Download All Images in Post" = "下載串文中所有圖片";
+"Download This Video" = "下載這部影片";
+"Download All Videos in Post" = "下載串文中所有影片";
+"No video found" = "找不到影片";
 "Getting original photo…" = "正在取得原圖…";
 "Save Profile Picture" = "儲存大頭貼";
 
@@ -106,10 +127,16 @@
 "Player" = "播放器";
 "Videos play at the selected speed, and return to it after you release a long-press 2x." = "影片會以選定的速度播放，長按 2 倍速放開後也會回到此速度。";
 "Disable Autoplay" = "停用自動播放";
-"Videos in the feed won't play until you tap them" = "瀏覽動態時，影片不會自動播放，點選後才會開始播放";
+"Videos in the feed won't play until you tap them" = "動態中的影片不會自動播放，點選後才開始播放";
 "Default Playback Speed" = "預設播放速度";
+"Slide to Lock 2x" = "滑動鎖定 2 倍速";
+"While holding a video at 2x, a lock button appears at the bottom of the video. Slide your finger onto it to keep 2x after you let go; to unlock, long-press again and slide onto the same button" = "長按 2 倍速時滑至下方鎖定按鈕，放開後維持 2 倍速，重複相同操作即可解除";
 
 /* - 操作提示 */
+"Slide here to lock 2x" = "滑到這裡鎖定 2 倍速";
+"2x locked" = "已鎖定 2 倍速";
+"Slide here to unlock" = "滑到這裡解除鎖定";
+"Unlocked" = "已解除鎖定";
 "Playback allowed" = "已允許播放";
 "Autoplay blocked" = "已擋下自動播放";
 "Tap: no video player found" = "點擊：找不到影片播放器";
@@ -143,6 +170,50 @@
 "Home tab refresh blocked" = "已擋下點首頁標籤重新整理";
 "Pull to refresh blocked" = "已擋下下拉重新整理";
 
+/* 作者資訊 */
+
+/* - 設定頁選項 */
+"Author Info" = "作者資訊";
+"Show Author Info" = "顯示作者資訊";
+"Shows details from the author's \"About this profile\" with their name in the feed." = "在動態的作者名稱旁顯示「關於此個人檔案」的資訊";
+"Location Stats" = "地點統計";
+"See which countries and regions the authors you've read are from." = "查看讀取過的作者來自哪些國家或地區";
+"Read Automatically" = "自動讀取項目";
+"Location" = "所在地點";
+"The country or region where the account is based, shown with its flag. Shows \"Not shared\" if the author keeps it private." = "帳號所在的國家或地區與國旗，未公開時顯示「未分享」";
+"Join Date" = "加入時間";
+"The month the account joined Threads." = "帳號加入 Threads 的年月";
+"Join Number" = "加入序號";
+"Shows which user number the account was when it joined, such as #7,551,963 or 100M+." = "第幾位加入 Threads 的使用者，例如 #7,551,963 或 1 億+";
+"New Account Badge" = "新帳號標記";
+"Marks accounts that joined within the last 2 months." = "標記最近 2 個月內加入的帳號";
+"Default Name Badge" = "預設名稱標記";
+"Marks accounts that never changed the username Threads assigned at sign-up, such as camel.253044. This doesn't mean the account is fake." = "標記仍使用系統隨機帳號名稱（如 camel.253044）的帳號，不代表是假帳號";
+"Layout" = "版面";
+"Show on Its Own Line" = "另起一行顯示";
+"Adds a line under the name so the info always shows in full. When off, it sits next to the name and is shortened or hidden if there isn't enough room." = "開啟：放在名稱下方一行，完整顯示\n關閉：放在名稱旁，空間不足時精簡或隱藏";
+"Read Status & Cache" = "讀取狀態與快取";
+"See how many authors are cached and whether reading is paused, or clear the cache." = "查看快取數量與讀取狀態，也可清除快取";
+"To avoid limits from Threads, authors are read one at a time and cached for up to 21 days, pausing for 1 hour when needed. Layout changes apply as you scroll." = "為避免被 Threads 限制，作者資訊會逐一讀取並快取最多 21 天，必要時自動暫停 1 小時。版面設定會在捲動時套用。";
+
+/* - 操作提示 */
+"Not shared" = "未分享";
+"%lu authors · %lu countries or regions" = "%lu 位作者 · %lu 個國家或地區";
+"Counts the authors currently cached (kept for up to 21 days)." = "統計範圍為目前快取中的作者（最多保留 21 天）。";
+"No author info yet. Browse the feed and it will appear here." = "尚無作者資訊，瀏覽動態後就會顯示在這裡。";
+"Tap an author to open their profile." = "點選作者即可開啟其個人檔案。";
+"User ID" = "使用者 ID";
+"Default Name" = "預設名稱";
+"NEW" = "新";
+"%lu authors cached · %lu read since launch" = "已快取 %lu 位作者 · 本次啟動已讀取 %lu 次";
+"Paused by rate limit protection, resumes in %ld min" = "速率限制保護暫停中，%ld 分鐘後恢復";
+"Reading normally" = "正常讀取中";
+"Resume Now" = "立即恢復";
+"Clear Cache" = "清除快取";
+"Cache cleared" = "已清除快取";
+"Open anyone's \"About this profile\" once to start showing author info." = "點開任一人的「關於此個人檔案」一次，即可開始顯示作者資訊。";
+"Threads asked to slow down. Author info paused for 1 hour." = "Threads 要求放慢速度，作者資訊已暫停讀取 1 小時。";
+
 /* 隱藏項目 */
 
 /* - 設定頁選項 */
@@ -150,17 +221,17 @@
 "Suggested Content" = "推薦內容";
 "Interface Buttons" = "介面按鈕";
 "Suggested Accounts" = "推薦帳號";
-"Hide \"Suggested for you\" in the feed & on profiles" = "隱藏動態&個人檔案頁面的「為你推薦」";
+"Hide \"Suggested for you\" in the feed & on profiles" = "隱藏動態與個人檔案的「為你推薦」";
 "Search Suggestions" = "追蹤建議";
-"Hide \"Suggested to follow\" on the search page" = "隱藏搜尋頁面的「追蹤建議」";
+"Hide \"Suggested to follow\" on the search page" = "隱藏搜尋頁的「追蹤建議」";
 "Follow Suggestion Pop-ups" = "追蹤對象建議";
-"Stop \"Follow suggestions\" from popping up automatically" = "避免自動跳出「追蹤對象建議」";
+"Stop \"Follow suggestions\" from popping up automatically" = "不再自動跳出「追蹤對象建議」";
 "Post Interest Prompts" = "串文興趣詢問";
 "Stop asking if you're interested in posts" = "不再詢問你對串文有沒有興趣";
 "Search Button" = "搜尋按鈕";
-"Hide the search button on profiles" = "隱藏個人檔案頁面的搜尋按鈕";
+"Hide the search button on profiles" = "隱藏個人檔案的搜尋按鈕";
 "Instagram Button" = "Instagram 按鈕";
-"Hide the Instagram button on profiles" = "隱藏個人檔案頁面的 Instagram 按鈕";
+"Hide the Instagram button on profiles" = "隱藏個人檔案的 Instagram 按鈕";
 
 /* - 操作提示 */
 "Follow suggestions hidden" = "已隱藏追蹤對象建議";
@@ -192,11 +263,11 @@
 /* - 設定頁選項 */
 "Messages" = "私訊";
 "Hide Seen Status" = "不顯示看過";
-"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat." = "查看訊息時不會通知對方，若要讓特定聊天室正常顯示「看過」，請點選聊天室右上角的眼睛圖示";
+"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat." = "查看訊息不會通知對方，若要讓特定聊天室顯示「看過」，請點選右上角的眼睛圖示";
 "Show Seen When You Reply" = "回覆後顯示看過";
 "Let the other person see \"Seen\" once you reply" = "開啟：回覆訊息後，對方畫面才會顯示「看過」\n關閉：即使回覆，對方畫面也不會顯示「看過」";
 "Reset Chats" = "重設聊天室";
-"Chats where you tapped the eye to show \"Seen\" go back to hiding it" = "將透過眼睛圖示設為顯示「看過」的聊天室，全部恢復為不顯示";
+"Chats where you tapped the eye to show \"Seen\" go back to hiding it" = "用眼睛圖示設為顯示「看過」的聊天室，全部恢復成不顯示";
 "Hide Typing Status" = "不顯示輸入中";
 "The other person won't see \"typing…\" while you write a message" = "輸入訊息時，對方不會看到輸入提示「…」";
 "Keep Unsent Messages" = "防止訊息收回";
@@ -221,13 +292,14 @@
 
 /* - 設定頁選項 */
 "Interface & Interactions" = "介面與互動";
-"3h" = "3小時";
+"3h" = "3 小時";
 "Example: %@" = "範例：%@";
 "Like Confirmation" = "按讚確認";
-"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "點愛心時會先顯示確認提示，收回時不會詢問";
+"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "按讚前先顯示確認，收回讚時不會詢問";
 "Post Time Format" = "串文時間格式";
 "Relative" = "相對時間";
 "Date & Time" = "日期時間";
+"With Year" = "含年份";
 "With Seconds" = "含秒";
 "Keep Tab Bar Visible" = "固定底部標籤列";
 "Scrolling won't hide the tab bar at the bottom; it always stays on screen" = "滑動時底部標籤列不會自動隱藏";
@@ -268,8 +340,8 @@
 "Analytics Log" = "分析回傳紀錄";
 "Shows the usage data Threads collects and what it contains. The log never leaves your device" = "顯示 Threads 收集的使用紀錄與內容，紀錄不會離開你的手機";
 "Welcome Screen" = "歡迎畫面";
-"See how to open ThreadsPulse settings again" = "再看一次打開插件設定的方法";
-"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "重新簽名後維持登入與 App 群組資料，僅對重新簽名的 App 生效，變更後需重新開啟 Threads";
+"See how to open ThreadsPulse settings again" = "再看一次開啟插件設定的方法";
+"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "重新簽名後維持登入狀態與資料，僅對重新簽名的 App 生效，變更後需重新開啟 Threads";
 "No analytics recorded yet" = "目前沒有分析回傳紀錄";
 
 /* - 操作提示 */
@@ -284,7 +356,7 @@
 "Unknown" = "無法辨識";
 "%@ times" = "%@ 次";
 "Recent Events" = "最近紀錄";
-"Latest one of each type" = "每種事件只列最新一筆";
+"Latest one of each type" = "每種事件僅列出最新一筆";
 "Contains your user ID and post IDs. Check before sharing." = "內容包含你的使用者編號與串文編號，分享前請先檢查。";
 "Sideload Compatibility Fix" = "側載相容修正";
 "Last session" = "上次使用";
@@ -298,21 +370,42 @@
 "Support ThreadsPulse on Ko-fi" = "在 Ko-fi 支持 ThreadsPulse";
 "About" = "關於";
 "Version" = "版本";
+"Environment" = "環境";
+"Copy All Info" = "複製全部資訊";
+"Source Code on GitHub" = "GitHub 原始碼";
+"Report a Problem" = "回報問題";
+"Author Info draws on lee-su-threads (MIT)" = "作者資訊參考 lee-su-threads（MIT）";
+"Threads Version" = "Threads 版本";
+"Bundle ID" = "Bundle ID";
+"Device" = "機型";
+"iOS Version" = "iOS 版本";
 "Reset All Settings" = "重設所有設定";
 "Reset All Settings?" = "重設所有設定？";
 "Reset" = "重設";
 
 /* 歡迎畫面 */
 
-"How to Open Settings" = "如何打開插件設定";
+"How to Open Settings" = "如何開啟插件設定";
 "From Threads Settings" = "從 Threads 設定進入";
-"Open Threads settings, then tap “Pulse” at the top right" = "打開 Threads 的設定，點右上角的「Pulse」";
+"Open Threads settings, then tap “Pulse” at the top right" = "開啟 Threads 的設定，點選右上角的「Pulse」";
 "Three-Finger Long Press" = "三指長按";
 "Press anywhere with three fingers for 1 second" = "在任何畫面用三根手指長按 1 秒";
 "Long-Press the Home Tab" = "長按首頁標籤";
 "Long-press the Home tab at the bottom" = "長按底部的首頁標籤";
 "You can see this screen again under Advanced" = "之後可以在插件設定的「進階」再看一次這個畫面";
-"Open ThreadsPulse Settings" = "打開插件設定";
+"Open ThreadsPulse Settings" = "開啟插件設定";
 "Maybe Later" = "稍後再說";
 "Welcome to ThreadsPulse" = "歡迎使用 ThreadsPulse";
 "ThreadsPulse is installed and running" = "插件已安裝並開始運作";
+"What's New" = "新功能介紹";
+"See what's new in this version" = "查看這個版本的新功能";
+"What's New in ThreadsPulse %@" = "ThreadsPulse %@ 新功能";
+"Updated to the latest version" = "已更新到最新版本";
+"See an author's country, join date and join number right in the feed" = "在動態直接看到作者的國家、加入時間與序號";
+"Full-Screen Download" = "全螢幕下載";
+"Save every image or video in a post while viewing it full screen" = "全螢幕檢視時，可一次儲存串文中的所有圖片或影片";
+"Five Languages" = "五種語言";
+"Simplified Chinese, Japanese and Korean added; switch in settings" = "新增簡體中文、日文與韓文，可在設定中切換";
+"Better Video Downloads" = "影片下載升級";
+"AV1 videos are converted automatically and finish even if you switch apps" = "AV1 影片自動轉檔，切換 App 後也能接續完成";
+"Get Started" = "開始使用";

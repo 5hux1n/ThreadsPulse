@@ -2,7 +2,7 @@
 
 [English](README.md) | **繁體中文**
 
-Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0**
+Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.30.0**
 
 不需要越獄：用 GitHub Actions 就能編譯出注入好的 Threads IPA，再用自己的簽名工具安裝。
 
@@ -14,7 +14,9 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 | | 停用截圖偵測 | 截圖或錄影時，Threads 不會偵測到 |
 | | 阻擋分析回傳 | 不回傳瀏覽、停留時間與點擊等使用紀錄，推薦內容可能較不精準（預設關閉） |
 | | 移除網址追蹤碼 | 複製、分享或開啟連結時，自動移除 `xmt`、`igshid`、`utm_*` 等追蹤參數，並解開 `l.threads.com` 跳轉 |
-| 媒體下載 | 下載按鈕 | 串文右上角 ↓：點選下載全部圖片與影片，長按選擇只下載圖片或影片 |
+| | 截圖時隱藏插件按鈕 | 截圖或錄影時，畫面上不會出現 ThreadsPulse 的按鈕 |
+| 媒體下載 | 下載按鈕 | 串文右上角 ↓：點選下載全部圖片與影片，長按可選擇僅下載圖片或影片 |
+| | 全螢幕下載 | 全螢幕檢視時 ↓ 在「⋯」旁邊：點選儲存目前的圖片或影片，長按可下載串文中所有圖片或所有影片 |
 | | 下載原始尺寸圖片 | 從網頁版取得最高解析度；WebP 會轉成 JPEG 存入照片 |
 | | 下載原始尺寸大頭貼 | 在個人檔案長按大頭貼，或全螢幕檢視後點選右下角 ↓ 儲存 |
 | | 同時下載多個檔案 | 下載整則串文時，最多同時下載 4 個檔案；進度視窗會顯示下載速度 |
@@ -27,6 +29,15 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 | | 停用下拉重新整理 | 在首頁頂端下拉時，不會重新整理也不會回彈 |
 | | 點首頁標籤時：不捲回頂端 | 點選首頁標籤時維持目前位置，不跳回頂端 |
 | | 點首頁標籤時：不重新整理 | 位於首頁頂端時點選首頁標籤，不會重新整理或載入新串文 |
+| 作者資訊 | 顯示作者資訊 | 在動態中與作者名稱一併顯示「關於此個人檔案」中的資訊（預設關閉） |
+| | 地點統計 | 依國家統計已讀取的作者人數並排序；點選國家可查看作者清單，點作者即可開啟其個人檔案 |
+| | 讀取狀態與快取 | 查看已快取的作者數量、讀取是否暫停，並可清除快取 |
+| | 所在地點 | 帳號所在的國家或地區，前面顯示該國國旗；作者未公開時顯示「未分享」 |
+| | 加入時間 | 帳號加入 Threads 的年月 |
+| | 加入序號 | 帳號是第幾位加入的使用者，例如 #7,551,963 或 1 億+ |
+| | 新帳號標記 | 最近 2 個月內加入的帳號顯示綠色「新」標籤 |
+| | 預設名稱標記 | 從未修改註冊時系統自動給的帳號名稱（例如 camel.253044）的帳號，顯示灰色「預設名稱」標籤；這不代表是假帳號 |
+| | 另起一行顯示 | 在名稱下方多留一行，資訊一律完整顯示；關閉時改放在名稱旁，空間不足會精簡或隱藏（預設開啟） |
 | 隱藏項目：推薦內容 | 推薦帳號 | 隱藏動態與個人檔案頁面的「為你推薦」 |
 | | 追蹤建議 | 隱藏搜尋頁面的「追蹤建議」 |
 | | 追蹤對象建議 | 避免自動跳出「追蹤對象建議」 |
@@ -42,17 +53,22 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 | | 不顯示輸入中 | 輸入訊息時，對方不會看到輸入提示「…」（預設關閉） |
 | | 防止訊息收回 | 對方收回訊息時，訊息會保留在聊天室並標示「已收回」（預設關閉） |
 | 介面與互動 | 按讚確認 | 點愛心時會先顯示確認提示，收回時不會詢問 |
-| | 串文時間格式 | 相對時間／日期時間／含秒 |
+| | 串文時間格式 | 相對時間／日期時間／含年份／含秒 |
 | | 固定底部標籤列 | 滑動時底部標籤列不會自動隱藏 |
 | | 複製個人檔案資訊 | 在個人檔案長按姓名、用戶名稱、個人簡介或大頭貼，即可複製相關資訊 |
 | | 長按首頁標籤開啟設定 | 長按底部的首頁標籤時，改為開啟 ThreadsPulse 設定（預設開啟） |
 | 備份 | 匯出／匯入設定 | 將設定匯出成 JSON 檔，重新安裝或換手機後再匯入 |
 | 進階 | 除錯提示 | 功能異常時開啟，畫面會顯示各功能的運作狀態，方便回報問題 |
 | | 分析回傳紀錄 | 顯示 Threads 收集的使用紀錄與內容：事件排行與每種事件最新一筆的內容，可複製；紀錄不會離開你的手機 |
-| | 歡迎畫面 | 再看一次打開插件設定的方法 |
+| | 歡迎畫面 | 再看一次開啟插件設定的方法 |
+| | 新功能介紹 | 再看一次這個版本的新功能（更新後第一次開啟會自動顯示一次，可直接開啟作者資訊） |
 | | 側載相容修正 | 重新簽名後維持登入與 App 群組資料，僅對重新簽名的 App 生效 |
 
 **主題色**：在設定主頁最上方的插件資訊卡裡，點色點即可切換（珊瑚／海洋／薄荷／薰衣草／櫻花／琥珀），只改變插件按鈕與設定頁的顏色。
+
+**語言**：同一張資訊卡裡可選「跟隨系統」、English、繁體中文、简体中文、日本語或한국어，插件自己的文字立即切換，不影響 Threads 本身。
+
+**關於**（主頁「備份／進階」卡片最下面一行，旁邊直接顯示版本號）：顯示插件版本、Threads 版本、Bundle ID、機型與 iOS 版本（含建置編號），可一鍵複製全部資訊；另有 GitHub 原始碼連結，以及「回報問題」，會開啟 GitHub 新 issue 並自動填入這些資訊。「重設所有設定」在這一頁最下方。
 
 **設定入口**：Threads「設定」頁右上角「〰 Pulse」、長按底部的首頁標籤，或在任何畫面三指長按 1 秒。第一次開啟 Threads 時會顯示歡迎畫面說明這些方法。
 
@@ -74,7 +90,7 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 | **noplugins** | SideStore、AltStore 等**免費 Apple ID** | 移除所有延伸功能。免費帳號無法簽名延伸功能，App ID 數量也有限制 |
 
 **「Open in Threads」Safari 延伸功能**：側載的 Threads 收不到通用連結，在 Safari 點 threads.com 連結只會停在網頁。這個延伸功能會把 threads.com／threads.net 的網址轉成 Threads App 的連結並自動開啟：串文開到該串文、個人檔案開到該個人檔案。
-安裝後到 **設定 › App › Safari › 延伸功能**（iOS 17 以前是 **設定 › Safari › 延伸功能**）打開「Open in Threads」，並允許它在 threads.com 上執行。
+安裝後到 **設定 › App › Safari › 延伸功能**（iOS 17 以前是 **設定 › Safari › 延伸功能**）開啟「Open in Threads」，並允許它在 threads.com 上執行。
 
 ### 準備你自己的 repo（二選一）
 
@@ -127,8 +143,8 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.27.0
 推送 `v` 開頭的標籤會自動建立 Release 並附上這四個檔案（不含 Threads 本體）：
 
 ```bash
-git tag v1.27.0
-git push origin v1.27.0
+git tag v1.30.0
+git push origin v1.30.0
 ```
 
 ### 本機編譯
@@ -187,6 +203,7 @@ ThreadsPulse/
 ├── vendor/libvpx/                  預先編譯的 VP9 解碼器（arm64 iOS 靜態函式庫）、標頭檔、授權
 ├── vendor/dav1d/                   預先編譯的 AV1 解碼器（arm64 iOS 靜態函式庫）、標頭檔、授權
 ├── TPVersion.h                     版本號（只在這裡改）
+├── ThirdPartyLicenses/             引用素材的授權（lee-su-threads）
 ├── scripts/inject_ipa.py           把插件注入 IPA
 ├── OpenThreadsSafariExtension/     「Open in Threads」Safari 延伸功能（只放進 sideload 版）
 │   ├── OpenInThreadsHandler.m      原生端（只負責讓延伸功能能被載入）
@@ -199,20 +216,24 @@ ThreadsPulse/
 └── layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/
     ├── Info.plist
     ├── en.lproj/Localizable.strings
-    └── zh-Hant.lproj/Localizable.strings
+    ├── zh-Hant.lproj/Localizable.strings
+    ├── zh-Hans.lproj/Localizable.strings
+    ├── ja.lproj/Localizable.strings
+    └── ko.lproj/Localizable.strings
 ```
 
 ## 語系
 
 - 程式裡一律用 `TPL(@"English text")`，**英文原文就是 key**；找不到翻譯時直接顯示英文。
-- 依系統語言切換：繁體中文用 `zh-Hant`，其他語言用 `en`。
-- 新增語言：複製 `en.lproj` 改名（例如 `ja.lproj`）並翻譯，再到 `Info.plist` 的 `CFBundleLocalizations` 加上語言代碼。
+- 內建語言：英文（`en`）、繁體中文（`zh-Hant`）、簡體中文（`zh-Hans`）、日文（`ja`）、韓文（`ko`）。預設跟隨系統語言（其他語言顯示英文），也可在設定頁最上方的「語言」指定。
+- 新增語言：複製 `en.lproj` 改名（例如 `fr.lproj`）並翻譯，到 `Info.plist` 的 `CFBundleLocalizations` 加上語言代碼，再把它加進語言選單（`TPSettingsViewController.m`）與 `TPLocalization.m`。
+- 簡體中文、日文、韓文的翻譯歡迎母語使用者協助修正。
 
 ## 實作重點
 
 - **Swift 類別**：以 mangled name hook（例如 `_TtC6BCNUFI12BCNUFIButton`），透過 runtime 讀取 ivar；讀取 Swift enum 記憶體前會先驗證指標與類別，避免閃退。
 - **批次下載**：從輪播 cell 的資料模型（`BCNFeedMediaViewModel` → `IGPhoto`／`IGVideo`）讀取全部項目，不受 cell 重用影響。
-- **1080p 影片**：Threads 提供的影音合一 MP4 最高只有 720p，更高畫質只在 DASH 清單（`IGVideo.dashManifestData`）裡，而且影像與音訊分開。插件挑解析度最高的影像與最好的音訊（優先 AAC，其次 Opus），下載後在裝置上合併：H.264／HEVC 直接沿用（`AVAssetExportSession` passthrough，音訊需要重新編碼時改用 `AVAssetWriter`）；VP9 用 libvpx、AV1 用 dav1d 解碼，再以 VideoToolbox 重新編碼——格式代碼標示 HLG／PQ 時輸出 HEVC Main10（保留 HDR），其他輸出 H.264；選「相容性優先」時先用 `VTPixelTransferSession` 把 HDR 畫面轉成 BT.709。任何步驟失敗都會改下載 720p MP4，不會存成沒有聲音的影片。「每次詢問」的選單會出現在點選的下載按鈕旁邊。
+- **1080p 影片**：Threads 提供的影音合一 MP4 最高只有 720p，更高畫質只在 DASH 清單（`IGVideo.dashManifestData`）裡，而且影像與音訊分開。插件挑解析度最高的影像與最好的音訊（優先 AAC，其次 Opus），下載後在裝置上合併：H.264／HEVC 直接沿用（`AVAssetExportSession` passthrough，音訊需要重新編碼時改用 `AVAssetWriter`）；VP9 用 libvpx 解碼；AV1 在支援硬體解碼的機型（iPhone 15 Pro 以後，iOS 17+）交給系統的 VideoToolbox 解碼，其他機型用 dav1d，再以 VideoToolbox 重新編碼——格式代碼標示 HLG／PQ 時輸出 HEVC Main10（保留 HDR），其他輸出 H.264；選「相容性優先」時先用 `VTPixelTransferSession` 把 HDR 畫面轉成 BT.709。任何步驟失敗都會改下載 720p MP4，不會存成沒有聲音的影片。一般 MP4 若本身就是 AV1 或 VP9（照片 App 不接受），也會經過同樣的轉檔。下載期間會向系統申請背景執行時間；轉檔若因切到背景而中斷，回到 Threads 後會自動接續。「每次詢問」的選單會出現在點選的下載按鈕旁邊。
 - **同時下載多個檔案**：目前項目之後的檔案，用第二個 `NSURLSession` 提前下載（3 條連線加上主連線）；存入照片仍依原本順序。
 - **原始圖片／大頭貼**：抓 `https://www.threads.com/t/<code>` 或 `/@<username>` 頁面，從 JSON 候選網址中以檔名比對出最大尺寸。
 - **剪貼簿**：先用 `detectPatternsForPatterns:` 判斷有沒有網址（不會跳出貼上詢問），使用者點「開啟」或設為自動開啟時才讀取內容；以 `NSUserActivity`（BrowsingWeb）交給 Threads 自己處理跳轉。
@@ -234,13 +255,14 @@ ThreadsPulse/
 - **不顯示輸入中**：`+[BCNTypingIndicatorPublishEventMutationBuilder builderWithActivityStatus:threadId:]` 的狀態一律改成 0（停止輸入），聊天室編號不變，不影響即時收訊息。
 - **防止訊息收回**：對方收回訊息時，由 Swift 的 `BCNSlideDeleteMessageHandler` 處理，它透過 `MDCoreDeltaApplyingBridge`（建立時帶著處理器的型別名稱）修改本機資料庫。開關開啟時，把這個處理器從 `mutationCommandsForDeltaWithRequestedState:…` 回傳的刪除指令拿掉，訊息就會留在你的手機上，並立即在訊息下方標示「已收回」（之後關閉開關，標示也會保留）。已經被刪掉的訊息，或聊天室從伺服器整個重新載入後消失的，無法救回。
 - **阻擋分析回傳**：使用紀錄在收集階段就丟掉（`-[FBAnalyticsCoreLogger _captureAnalyticsEvent:]`、`_captureAnalyticsEventForBatchUpload:`，`_shouldStreamEvent:` 回傳 NO）；之前已存著的紀錄上傳時，改用 Meta 自己的 `FBAnalyticsNoOpNetworkConfigurator` 取代 `IGAnalyticsNetworkConfigurator`，不會發出網路要求。登入、發文、載入動態等正常 API 不經過這裡。
-- **分析回傳紀錄**：在 `_captureAnalyticsEvent:` 記下 `FBAnalyticsEvent` 的 `eventName` 次數，以及每種事件最新一筆的事件物件；打開紀錄時才讀取 `eventPayload`。只存在記憶體，關閉 App 就清空。
+- **分析回傳紀錄**：在 `_captureAnalyticsEvent:` 記下 `FBAnalyticsEvent` 的 `eventName` 次數，以及每種事件最新一筆的事件物件；開啟紀錄時才讀取 `eventPayload`。只存在記憶體，關閉 App 就清空。
 - **停用自動播放**：動態裡的影片滑進畫面時（`-[IGFNFVideoPlayer playWithReason:callsiteContext:]`，原因代碼 1），照常讓 Threads 走完播放流程，介面（包括聲音圖示）才會正常出現，但把底層的 `FNFPlayer` 按住：第一次 `play` 以音量 0 試播，讓 Threads 走到「開始播放」並顯示聲音圖示，接著在第一格暫停（`videoPlayerDidInitialPlay:`）；之後的 `play` / `playWithContext:` 一律忽略。點一下影片（手指幾乎沒移動，所以滑動不算）才放開並讓 `FNFPlayer` 開始播放。其他原因（例如全螢幕）和不在動態裡的影片照常播放。開始播放後同一個播放器不再按住，直到它被停止。單支影片下載改成先從附近的資料物件找網址，沒播放過的影片也能下載。
+- **作者資訊**：呼叫 Threads 自己的 `BKSharedAsyncActionDataFetcher`，以 `com.bloks.www.text_post_app.about_this_profile_async_action` 取得「關於此個人檔案」，從回傳的 Bloks 版面中解析國家（`about_this_profile_country` 狀態）與「已加入」欄位。請求需要一個帶登入身分的 `BKObjectSet`：啟動時記下 `IGUserSession` 與 `PNPandoGraphQLService`，自行組成（含 `IGSessionContext`），首次嘗試若閃退會自動停用，改為借用 Threads 開啟 Bloks 頁面時建立的物件集。作者 ID 取自 `BCNFeedItemHeaderProfilePicture` 的 Swift `userPk`。速率限制保護：一次一位、間隔 1.5 秒、排隊上限 10、每次啟動最多 400 次；收到 429、`feedback_required`、spam 等回應時暫停 1 小時；有地點的結果快取 21 天，沒有的 1 天。另起一行顯示：在 `BCNFeedSectionController` 建立名稱列 cell 時記下列位置，於 `sizeForItemAtIndex:` 加上一行高度後重新排版。
 - **隱藏追蹤對象建議**：`BCNUserRecommendationsViewController` 以彈出方式出現時攔截 `presentViewController:`；推入的頁面不受影響。
 
 ## 注意事項
 
-Threads 更新後，部分功能可能會暫時失效（不會閃退）。打開「除錯提示」可以看出是哪一項，歡迎回報。
+Threads 更新後，部分功能可能會暫時失效（不會閃退）。開啟「除錯提示」可以看出是哪一項，歡迎回報。
 
 ## 第三方函式庫
 
@@ -250,6 +272,10 @@ Threads 更新後，部分功能可能會暫時失效（不會閃退）。打開
 | [dav1d](https://code.videolan.org/videolan/dav1d) | AV1 解碼 | BSD 2-Clause（`vendor/dav1d/COPYING`） |
 
 兩者都以預先編譯的靜態函式庫內附，確切版本與編譯選項記錄在各資料夾的 `VERSION.txt`。
+
+### 致謝
+
+「作者資訊」（在動態顯示所在地點、加入時間與新帳號標記）參考 meettomorrow 的 [lee-su-threads](https://github.com/meettomorrow/lee-su-threads)（MIT 授權）。程式碼為 ThreadsPulse 自行撰寫，但沿用該專案的做法（標籤解析、快取期限、1 小時速率限制暫停），以及其預設名稱判斷規則與動物字詞表。授權全文附於 `ThirdPartyLicenses/lee-su-threads.txt`。
 
 ## 免責聲明
 

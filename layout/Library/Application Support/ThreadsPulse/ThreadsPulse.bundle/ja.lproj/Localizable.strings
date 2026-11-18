@@ -1,0 +1,411 @@
+/* 共通 */
+
+/* - 設定項目 */
+"Done" = "完了";
+"Ask" = "毎回確認";
+
+/* - 操作時の表示 */
+"Copy" = "コピー";
+"Close" = "閉じる";
+"Download" = "ダウンロード";
+"Cancel" = "キャンセル";
+"Open" = "開く";
+
+/* 設定トップとテーマ */
+
+"Theme" = "テーマ";
+"Language" = "言語";
+"Follow System" = "システムに合わせる";
+"Running · %ld features on" = "動作中・%ld 個の機能がオン";
+"Coral" = "コーラル";
+"Ocean" = "オーシャン";
+"Mint" = "ミント";
+"Lavender" = "ラベンダー";
+"Sakura" = "サクラ";
+"Amber" = "アンバー";
+
+/* 広告とプライバシー */
+
+/* - 設定項目 */
+"Ads & Privacy" = "広告とプライバシー";
+"Turning ad blocking on or off takes effect after refreshing the feed or restarting the app." = "「広告を非表示」の切り替えは、フィードを更新するかアプリを再起動すると反映されます。";
+"Block Ads" = "広告を非表示";
+"Hide sponsored posts in the feed" = "フィードの広告投稿を非表示にします";
+"Block Screenshot Detection" = "スクリーンショット検知を無効化";
+"Threads won't know when you take a screenshot or record the screen" = "スクリーンショットや画面収録を Threads に検知されません";
+"Block Analytics" = "分析データの送信をブロック";
+"Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate" = "閲覧・滞在時間・タップなどの利用データを送信しません。おすすめの精度が下がる場合があります";
+"Remove URL Tracking" = "URL のトラッキングを削除";
+"Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links" = "リンクのコピー・共有・オープン時に xmt、igshid、utm_* などのトラッキングパラメータを自動で削除します";
+"Hide Buttons in Screenshots" = "スクショにボタンを写さない";
+"ThreadsPulse buttons don't appear in screenshots or screen recordings" = "スクリーンショットや画面収録に ThreadsPulse のボタンが写りません";
+
+/* - 操作時の表示 */
+"Blocked an ad request" = "広告リクエストをブロックしました";
+"Dropped sponsored items" = "広告項目を除外しました";
+"Blocked ad insertion" = "広告の挿入をブロックしました";
+"Cleaned tracking from copied link" = "コピーしたリンクのトラッキングを削除しました";
+"Screenshot detection blocked" = "スクリーンショット検知をブロックしました";
+
+/* メディアのダウンロード */
+
+/* - 設定項目 */
+"Media Download" = "メディアのダウンロード";
+"Download Options" = "ダウンロードオプション";
+"Video Downloads" = "動画";
+"Photo Downloads" = "画像";
+"Download Button" = "ダウンロードボタン";
+"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos." = "タップで画像と動画をすべて、長押しで画像のみ・動画のみを選んでダウンロードします";
+"Parallel Downloads" = "複数ファイルを同時にダウンロード";
+"Downloads up to 4 files at a time when saving an entire post, reducing wait time." = "投稿をまとめて保存するとき最大 4 ファイルを同時にダウンロードし、待ち時間を短縮します";
+"Save to \"Threads\" Album" = "「Threads」アルバムに保存";
+"Downloaded items are also added to a \"Threads\" album in Photos. Full Photos access is required the first time." = "ダウンロードした項目を「Threads」アルバムにも追加します。初回は写真への「フルアクセス」が必要です";
+"Video Quality" = "動画の画質";
+"Highest" = "最高";
+"Highest downloads videos at up to 1080p; some videos are converted on the device, which takes a few seconds. 720p is the fastest and needs no conversion." = "「最高」は最大 1080p で、一部の動画は変換に数秒かかります\n「720p」は直接ダウンロードでき、最も速いです";
+"Video Format" = "動画の形式";
+"Keep HDR" = "HDR を維持";
+"Compatible" = "互換性優先";
+"Keep HDR preserves the original brightness and color. Compatible converts to H.264 (SDR), suited to sharing on LINE, Windows or older devices." = "「HDR を維持」は元の明るさと色を保ちます\n「互換性優先」は H.264（SDR）に変換します";
+"Download Original Size" = "オリジナルサイズの画像をダウンロード";
+"Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded." = "Web 版から最高解像度を取得し、取得できない場合は通常サイズになります";
+"Download Original Profile Pictures" = "オリジナルサイズのプロフィール写真をダウンロード";
+"To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner." = "プロフィールで写真を長押しするか、全画面表示で右下の ↓ をタップして保存します";
+
+/* - 操作時の表示 */
+"Photo %ld" = "画像 %ld";
+"Video %ld" = "動画 %ld";
+"Photos %ld–%ld" = "画像 %ld–%ld";
+"Videos %ld–%ld" = "動画 %ld–%ld";
+"Saved" = "保存済み";
+"Failed" = "失敗";
+"Waiting" = "待機中";
+"%ld items done" = "%ld 件完了";
+"%ld failed" = "%ld 件失敗";
+"%ld more posts waiting" = "ほかに %ld 件の投稿が待機中";
+"Cancel Download" = "ダウンロードをキャンセル";
+"Cancel All" = "すべてキャンセル";
+"Added to download queue" = "ダウンロード待ちに追加しました";
+"Choose video quality" = "動画の画質を選択";
+"Highest (%@)" = "最高画質（%@）";
+"720p (faster)" = "720p（高速）";
+"Waiting for downloads…" = "ダウンロード待ち…";
+"Downloading…" = "ダウンロード中…";
+"Downloading %ld of %ld" = "ダウンロード中 %ld／%ld";
+"Photos access needed to add to the Threads album" = "Threads アルバムに追加するには写真へのフルアクセスが必要です";
+"Photos access denied — choose where to save" = "写真へのアクセスが許可されていません。保存先を選んでください";
+"Download failed, please try again later" = "ダウンロードに失敗しました。しばらくしてからもう一度お試しください";
+"Saved %ld, failed %ld" = "%ld 件保存、%ld 件失敗";
+"Saved to Photos" = "写真に保存しました";
+"Saved %ld items to Photos" = "%ld 件を写真に保存しました";
+"Video stream" = "映像";
+"Audio stream" = "音声";
+"Merging video and audio…" = "映像と音声を結合中…";
+"Converting video…" = "動画を変換中…";
+"Paused — continues when you return to Threads" = "一時停止中。Threads に戻ると再開します";
+"No download link found. Play the video for a moment, then try again." = "ダウンロードリンクが見つかりません。動画を少し再生してからもう一度お試しください。";
+"Download button added" = "ダウンロードボタンを追加しました";
+"Found %ld of %ld items" = "%ld／%ld 件を検出";
+"Getting original photos…" = "オリジナル画像を取得中…";
+"No media found" = "画像・動画が見つかりません";
+"%ld items skipped (no download link)" = "%ld 件をスキップしました（ダウンロードリンクなし）";
+"Download All Media" = "画像と動画をすべてダウンロード";
+"Download Images Only" = "画像のみダウンロード";
+"Download Videos Only" = "動画のみダウンロード";
+"No image found" = "画像が見つかりません";
+"Download This Image" = "この画像をダウンロード";
+"Download All Images in Post" = "投稿内の画像をすべてダウンロード";
+"Download This Video" = "この動画をダウンロード";
+"Download All Videos in Post" = "投稿内の動画をすべてダウンロード";
+"No video found" = "動画が見つかりません";
+"Getting original photo…" = "オリジナル画像を取得中…";
+"Save Profile Picture" = "プロフィール写真を保存";
+
+/* プレーヤー */
+
+/* - 設定項目 */
+"Player" = "プレーヤー";
+"Videos play at the selected speed, and return to it after you release a long-press 2x." = "動画は選んだ速度で再生され、長押しの 2 倍速を離したあともこの速度に戻ります。";
+"Disable Autoplay" = "自動再生をオフ";
+"Videos in the feed won't play until you tap them" = "フィードの動画は自動再生されず、タップすると再生が始まります";
+"Default Playback Speed" = "デフォルトの再生速度";
+"Slide to Lock 2x" = "スライドで 2 倍速をロック";
+"While holding a video at 2x, a lock button appears at the bottom of the video. Slide your finger onto it to keep 2x after you let go; to unlock, long-press again and slide onto the same button" = "2 倍速の長押し中に下のロックボタンへスライドすると、離しても 2 倍速を維持します。同じ操作で解除できます";
+
+/* - 操作時の表示 */
+"Slide here to lock 2x" = "ここまでスライドで 2 倍速をロック";
+"2x locked" = "2 倍速をロック中";
+"Slide here to unlock" = "ここまでスライドでロック解除";
+"Unlocked" = "ロックを解除しました";
+"Playback allowed" = "再生を許可しました";
+"Autoplay blocked" = "自動再生をブロックしました";
+"Tap: no video player found" = "タップ：動画プレーヤーが見つかりません";
+"Tap: replaying video" = "タップ：動画を再生し直します";
+"Tap: video is playing" = "タップ：動画を再生中";
+"Tap: video still not playing" = "タップ：動画がまだ再生されていません";
+
+/* ホームフィード */
+
+/* - 設定項目 */
+"Home Feed" = "ホームフィード";
+"With everything here turned on, new posts only load after you fully close and reopen Threads." = "上記をすべてオンにすると、Threads を完全に終了して開き直すまで新しい投稿は読み込まれません。";
+"Keep Feed Position" = "フィードの位置を保持";
+"Coming back from the background won't refresh the home feed, jump to the top or switch tabs" = "バックグラウンドから戻っても、ホームフィードの更新・先頭への移動・タブの切り替えが起こりません";
+"Keep For" = "保持する時間";
+"10 min" = "10 分";
+"30 min" = "30 分";
+"No Limit" = "無制限";
+"Come back within this time to keep your place; after that, the feed refreshes as usual" = "この時間内に戻れば位置を保持し、過ぎると通常どおり更新されます";
+"Disable Pull to Refresh" = "引っ張って更新をオフ";
+"Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing" = "ホームフィードの先頭で下に引っ張っても、更新もバウンドもしません";
+"When Tapping the Home Tab" = "ホームタブをタップしたとき";
+"Don't Scroll to Top" = "先頭に戻らない";
+"When you're scrolled down the home feed, tapping the Home tab won't jump back to the top, so you stay where you were" = "ホームタブをタップしても先頭に戻らず、今の位置のままになります";
+"Don't Refresh" = "更新しない";
+"When you're already at the top of the home feed, tapping the Home tab won't refresh or load new posts" = "ホームフィードの先頭でホームタブをタップしても、更新や新しい投稿の読み込みをしません";
+
+/* - 操作時の表示 */
+"Feed position kept" = "フィードの位置を保持しました";
+"Scroll to top blocked" = "先頭への移動をブロックしました";
+"Home tab refresh blocked" = "ホームタブでの更新をブロックしました";
+"Pull to refresh blocked" = "引っ張って更新をブロックしました";
+
+/* 投稿者情報 */
+
+/* - 設定項目 */
+"Author Info" = "投稿者情報";
+"Show Author Info" = "投稿者情報を表示";
+"Shows details from the author's \"About this profile\" with their name in the feed." = "フィードの投稿者名の横に「このプロフィールについて」の情報を表示します";
+"Location Stats" = "地域の統計";
+"See which countries and regions the authors you've read are from." = "読み込んだ投稿者の国や地域を確認できます";
+"Read Automatically" = "自動で読み込む項目";
+"Location" = "所在地";
+"The country or region where the account is based, shown with its flag. Shows \"Not shared\" if the author keeps it private." = "アカウントの国や地域を国旗つきで表示します。非公開の場合は「非公開」と表示します";
+"Join Date" = "参加時期";
+"The month the account joined Threads." = "アカウントが Threads に参加した年月です";
+"Join Number" = "参加順";
+"Shows which user number the account was when it joined, such as #7,551,963 or 100M+." = "Threads に何番目に参加したユーザーかを表示します（例：#7,551,963、1億+）";
+"New Account Badge" = "新規アカウントのマーク";
+"Marks accounts that joined within the last 2 months." = "直近 2 か月以内に参加したアカウントにマークを付けます";
+"Default Name Badge" = "初期ユーザーネームのマーク";
+"Marks accounts that never changed the username Threads assigned at sign-up, such as camel.253044. This doesn't mean the account is fake." = "登録時のランダムなユーザーネーム（例：camel.253044）のままのアカウントにマークを付けます。偽アカウントという意味ではありません";
+"Layout" = "レイアウト";
+"Show on Its Own Line" = "別の行に表示";
+"Adds a line under the name so the info always shows in full. When off, it sits next to the name and is shortened or hidden if there isn't enough room." = "オン：名前の下の行に全文を表示します\nオフ：名前の横に表示し、スペースが足りないと短縮または非表示になります";
+"Read Status & Cache" = "読み込み状況とキャッシュ";
+"See how many authors are cached and whether reading is paused, or clear the cache." = "キャッシュ数と読み込み状況を確認したり、キャッシュを消去したりできます";
+"To avoid limits from Threads, authors are read one at a time and cached for up to 21 days, pausing for 1 hour when needed. Layout changes apply as you scroll." = "Threads の制限を避けるため、投稿者情報は 1 人ずつ読み込んで最大 21 日間キャッシュし、必要に応じて 1 時間自動停止します。レイアウトの変更はスクロール時に反映されます。";
+
+/* - 操作時の表示 */
+"Not shared" = "非公開";
+"%lu authors · %lu countries or regions" = "投稿者 %lu 人 · %lu の国・地域";
+"Counts the authors currently cached (kept for up to 21 days)." = "現在キャッシュされている投稿者が対象です（最大 21 日間保持）。";
+"No author info yet. Browse the feed and it will appear here." = "まだ投稿者情報がありません。フィードを見るとここに表示されます。";
+"Tap an author to open their profile." = "投稿者をタップするとプロフィールを開きます。";
+"User ID" = "ユーザー ID";
+"Default Name" = "初期ユーザーネーム";
+"NEW" = "新規";
+"%lu authors cached · %lu read since launch" = "投稿者 %lu 人をキャッシュ済み · 起動後 %lu 回読み込み";
+"Paused by rate limit protection, resumes in %ld min" = "レート制限保護のため一時停止中。%ld 分後に再開します";
+"Reading normally" = "通常どおり読み込み中";
+"Resume Now" = "今すぐ再開";
+"Clear Cache" = "キャッシュを消去";
+"Cache cleared" = "キャッシュを消去しました";
+"Open anyone's \"About this profile\" once to start showing author info." = "誰かの「このプロフィールについて」を一度開くと、投稿者情報の表示が始まります。";
+"Threads asked to slow down. Author info paused for 1 hour." = "Threads から速度を落とすよう求められたため、投稿者情報の読み込みを 1 時間停止しました。";
+
+/* 非表示にする項目 */
+
+/* - 設定項目 */
+"Hidden Items" = "非表示にする項目";
+"Suggested Content" = "おすすめコンテンツ";
+"Interface Buttons" = "画面のボタン";
+"Suggested Accounts" = "おすすめアカウント";
+"Hide \"Suggested for you\" in the feed & on profiles" = "フィードとプロフィールの「おすすめ」を非表示にします";
+"Search Suggestions" = "フォローのおすすめ";
+"Hide \"Suggested to follow\" on the search page" = "検索ページの「フォローのおすすめ」を非表示にします";
+"Follow Suggestion Pop-ups" = "フォロー候補のポップアップ";
+"Stop \"Follow suggestions\" from popping up automatically" = "「フォロー候補」が自動で表示されないようにします";
+"Post Interest Prompts" = "投稿への関心の確認";
+"Stop asking if you're interested in posts" = "投稿に興味があるかどうかを尋ねられないようにします";
+"Search Button" = "検索ボタン";
+"Hide the search button on profiles" = "プロフィールの検索ボタンを非表示にします";
+"Instagram Button" = "Instagram ボタン";
+"Hide the Instagram button on profiles" = "プロフィールの Instagram ボタンを非表示にします";
+
+/* - 操作時の表示 */
+"Follow suggestions hidden" = "フォロー候補を非表示にしました";
+
+/* リンク */
+
+/* - 設定項目 */
+"Links" = "リンク";
+"Auto-open reads the clipboard directly. If iOS asks to allow pasting every time, go to Settings › Threads › Paste from Other Apps and choose Allow." = "「自動で開く」はクリップボードを直接読み取ります。毎回ペーストの許可を求められる場合は、「設定 › Threads › ほかの App からペースト」で「許可」を選んでください。";
+"Detect Copied Links" = "コピーしたリンクを検出";
+"When you come back or switch accounts, detect a copied Threads link and open it" = "Threads に戻ったときやアカウントを切り替えたときに、コピーした Threads のリンクを検出して開きます";
+"When a Link Is Found" = "リンクを検出したとき";
+"Auto-open" = "自動で開く";
+"Prompt Position" = "通知の位置";
+"Top" = "上";
+"Middle" = "中央";
+"Bottom" = "下";
+"Open Links in External Browser" = "リンクを外部ブラウザで開く";
+"Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app" = "投稿や自己紹介のリンクを Safari またはデフォルトのブラウザで開きます。Threads のリンクはアプリ内で開きます";
+
+/* - 操作時の表示 */
+"Opened link from clipboard" = "クリップボードのリンクを開きました";
+"The copied link isn't a Threads link" = "コピーしたリンクは Threads のリンクではありません";
+"Link copied" = "クリップボードにリンクがあります";
+"Account switched" = "アカウントを切り替えました";
+
+/* メッセージ */
+
+/* - 設定項目 */
+"Messages" = "メッセージ";
+"Hide Seen Status" = "既読をつけない";
+"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat." = "メッセージを見ても相手に通知されません。特定のチャットで「既読」を表示するには、右上の目のアイコンをタップします";
+"Show Seen When You Reply" = "返信したら既読をつける";
+"Let the other person see \"Seen\" once you reply" = "オン：返信したあとに相手の画面に「既読」が表示されます\nオフ：返信しても相手の画面に「既読」は表示されません";
+"Reset Chats" = "チャットをリセット";
+"Chats where you tapped the eye to show \"Seen\" go back to hiding it" = "目のアイコンで「既読」を表示するよう設定したチャットを、すべて非表示に戻します";
+"Hide Typing Status" = "入力中を表示しない";
+"The other person won't see \"typing…\" while you write a message" = "メッセージを入力していても、相手に入力中の表示（…）が見えません";
+"Keep Unsent Messages" = "取り消されたメッセージを残す";
+"When someone unsends a message, it stays in your chat marked \"Unsent\"" = "相手がメッセージの送信を取り消しても、「取り消し済み」と表示してチャットに残します";
+"No chats set to show Seen" = "「既読」を表示するチャットはありません";
+"%lu chats will hide \"Seen\" again" = "%lu 件のチャットで「既読」を再び非表示にします";
+"All chats hide Seen" = "すべてのチャットで「既読」を非表示にしました";
+
+/* - 操作時の表示 */
+"Seen sent" = "「既読」を送信しました";
+"Seen status blocked" = "「既読」をブロックしました";
+"Seen sent first, message follows" = "先に「既読」を送信し、続けてメッセージを送信します";
+"This chat shows Seen" = "このチャットでは「既読」を表示します";
+"This chat hides Seen" = "このチャットでは「既読」を表示しません";
+"Seen for This Chat" = "このチャットの「既読」";
+"Couldn't find this chat" = "このチャットが見つかりません";
+"Typing status blocked" = "「入力中」をブロックしました";
+"Unsent" = "取り消し済み";
+"Unsent message kept" = "取り消されたメッセージを残しました";
+
+/* 画面と操作 */
+
+/* - 設定項目 */
+"Interface & Interactions" = "画面と操作";
+"3h" = "3時間";
+"Example: %@" = "例：%@";
+"Like Confirmation" = "いいねの確認";
+"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "いいねする前に確認を表示します。取り消し時は確認しません";
+"Post Time Format" = "投稿時刻の形式";
+"Relative" = "相対時間";
+"Date & Time" = "日時";
+"With Year" = "年つき";
+"With Seconds" = "秒つき";
+"Keep Tab Bar Visible" = "タブバーを常に表示";
+"Scrolling won't hide the tab bar at the bottom; it always stays on screen" = "スクロールしても下部のタブバーが隠れません";
+"Copy Profile Info" = "プロフィール情報をコピー";
+"On a profile, long-press the name, username, bio or profile picture to copy the name, username or bio" = "プロフィールで名前・ユーザーネーム・自己紹介・プロフィール写真を長押しすると、その情報をコピーできます";
+"Long-Press Home Tab for Settings" = "ホームタブの長押しで設定を開く";
+"Long-pressing the Home tab at the bottom opens ThreadsPulse settings instead" = "下部のホームタブを長押しすると、ThreadsPulse の設定が開きます";
+
+/* - 操作時の表示 */
+"Like confirmation shown" = "いいねの確認を表示しました";
+"Like this post?" = "この投稿にいいねしますか？";
+"Like" = "いいね";
+"Copied" = "コピーしました";
+"Copy Name" = "名前をコピー";
+"Copy Username" = "ユーザーネームをコピー";
+"Copy Bio" = "自己紹介をコピー";
+"Long-press tab" = "タブを長押し";
+"feature is off" = "機能がオフです";
+"Home tab" = "ホームタブ";
+"not the Home tab" = "ホームタブではありません";
+
+/* バックアップ */
+
+"Backup" = "バックアップ";
+"Export your settings to a file, and import it after reinstalling or on another device." = "設定をファイルに書き出し、再インストール後や別の端末で読み込めます。";
+"Export Settings" = "設定を書き出す";
+"Import Settings" = "設定を読み込む";
+"Export failed" = "書き出しに失敗しました";
+"Invalid settings file" = "設定ファイルの形式が正しくありません";
+"Imported %ld settings" = "%ld 件の設定を読み込みました";
+
+/* 詳細設定 */
+
+/* - 設定項目 */
+"Advanced" = "詳細設定";
+"Debug Hints" = "デバッグ表示";
+"Turn on when a feature stops working. Hints show which features are active, to help report problems." = "機能がうまく動かないときにオンにすると、各機能の動作状況が表示され、問題の報告に役立ちます";
+"Analytics Log" = "分析データの記録";
+"Shows the usage data Threads collects and what it contains. The log never leaves your device" = "Threads が収集する利用データとその内容を表示します。記録が端末の外に送られることはありません";
+"Welcome Screen" = "ようこそ画面";
+"See how to open ThreadsPulse settings again" = "ThreadsPulse の設定を開く方法をもう一度見る";
+"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "再署名後もログイン状態とデータを維持します。再署名したアプリでのみ有効で、変更後は Threads を開き直す必要があります";
+"No analytics recorded yet" = "まだ分析データの記録はありません";
+
+/* - 操作時の表示 */
+"Diagnostics" = "診断情報";
+"Top Events" = "イベントの上位";
+"Block Analytics: On" = "分析データの送信をブロック：オン";
+"Block Analytics: Off" = "分析データの送信をブロック：オフ";
+"Nothing below was sent" = "以下の内容はいずれも送信されていません";
+"Everything below was sent" = "以下の内容はすべて送信されました";
+"%lu events while using the app (%lu types)" = "アプリの使用中に %lu 件（%lu 種類）";
+"…and %lu more types" = "…ほか %lu 種類";
+"Unknown" = "不明";
+"%@ times" = "%@ 回";
+"Recent Events" = "最近の記録";
+"Latest one of each type" = "種類ごとに最新の 1 件のみ表示";
+"Contains your user ID and post IDs. Check before sharing." = "あなたのユーザー ID や投稿 ID が含まれます。共有する前に確認してください。";
+"Sideload Compatibility Fix" = "サイドロード互換性の修正";
+"Last session" = "前回の使用";
+"Analytics blocked last session" = "前回ブロックした分析データ";
+
+/* 寄付と情報 */
+
+"Donate" = "寄付";
+"Your support keeps ThreadsPulse updated. Thank you!" = "みなさんの支援が ThreadsPulse を更新し続ける力になります。ありがとうございます！";
+"Buy Me a Coffee" = "コーヒーをおごる";
+"Support ThreadsPulse on Ko-fi" = "Ko-fi で ThreadsPulse を支援";
+"About" = "このプラグインについて";
+"Version" = "バージョン";
+"Environment" = "環境";
+"Copy All Info" = "すべての情報をコピー";
+"Source Code on GitHub" = "GitHub のソースコード";
+"Report a Problem" = "問題を報告";
+"Author Info draws on lee-su-threads (MIT)" = "投稿者情報は lee-su-threads（MIT）を参考にしています";
+"Threads Version" = "Threads のバージョン";
+"Bundle ID" = "Bundle ID";
+"Device" = "機種";
+"iOS Version" = "iOS のバージョン";
+"Reset All Settings" = "すべての設定をリセット";
+"Reset All Settings?" = "すべての設定をリセットしますか？";
+"Reset" = "リセット";
+
+/* ようこそ画面 */
+
+"How to Open Settings" = "ThreadsPulse の設定を開く方法";
+"From Threads Settings" = "Threads の設定から";
+"Open Threads settings, then tap “Pulse” at the top right" = "Threads の設定を開き、右上の「Pulse」をタップします";
+"Three-Finger Long Press" = "3 本指で長押し";
+"Press anywhere with three fingers for 1 second" = "どの画面でも 3 本指で 1 秒間長押しします";
+"Long-Press the Home Tab" = "ホームタブを長押し";
+"Long-press the Home tab at the bottom" = "下部のホームタブを長押しします";
+"You can see this screen again under Advanced" = "この画面は ThreadsPulse の設定の「詳細設定」からもう一度見られます";
+"Open ThreadsPulse Settings" = "ThreadsPulse の設定を開く";
+"Maybe Later" = "あとで";
+"Welcome to ThreadsPulse" = "ThreadsPulse へようこそ";
+"ThreadsPulse is installed and running" = "ThreadsPulse がインストールされ、動作しています";
+"What's New" = "新機能";
+"See what's new in this version" = "このバージョンの新機能を見る";
+"What's New in ThreadsPulse %@" = "ThreadsPulse %@ の新機能";
+"Updated to the latest version" = "最新バージョンにアップデートしました";
+"See an author's country, join date and join number right in the feed" = "投稿者の国・参加時期・参加順をフィードで直接確認できます";
+"Full-Screen Download" = "全画面でダウンロード";
+"Save every image or video in a post while viewing it full screen" = "全画面表示中に、投稿内の画像や動画をまとめて保存できます";
+"Five Languages" = "5 つの言語";
+"Simplified Chinese, Japanese and Korean added; switch in settings" = "簡体字中国語・日本語・韓国語を追加しました。設定で切り替えられます";
+"Better Video Downloads" = "動画のダウンロードを強化";
+"AV1 videos are converted automatically and finish even if you switch apps" = "AV1 の動画を自動で変換し、ほかのアプリに切り替えても完了まで続けます";
+"Get Started" = "はじめる";

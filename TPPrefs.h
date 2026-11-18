@@ -10,6 +10,15 @@ extern NSString *const TPKeyVideoQuality;   // 0 highest, 1 720p, 2 ask
 extern NSString *const TPKeyVideoFormat;    // 0 keep HDR, 1 compatible (H.264 SDR)
 extern NSString *const TPKeySaveToAlbum;
 extern NSString *const TPKeyParallelDownload;
+extern NSString *const TPKeyHideInCaptures;
+extern NSString *const TPKeySwipeLockSpeed;
+extern NSString *const TPKeyAuthorInfo;
+extern NSString *const TPKeyAuthorLocation;
+extern NSString *const TPKeyAuthorJoined;
+extern NSString *const TPKeyAuthorNewBadge;
+extern NSString *const TPKeyAuthorOwnLine;
+extern NSString *const TPKeyAuthorJoinNumber;
+extern NSString *const TPKeyAuthorDefaultName;
 extern NSString *const TPKeyClipboardLinks;
 extern NSString *const TPKeyConfirmLike;
 extern NSString *const TPKeyHideFollowSuggest;
@@ -28,6 +37,7 @@ extern NSString *const TPKeyHidePostFeedback;
 extern NSString *const TPKeySeenOnReply;
 extern NSString *const TPKeyHomeLongPress;
 extern NSString *const TPKeyTheme;
+extern NSString *const TPKeyLanguage;   // 0 follow system · 1 English · 2 繁體中文 · 3 简体中文 · 4 日本語 · 5 한국어
 extern NSString *const TPKeySideloadFix;
 extern NSString *const TPKeyCopyProfile;
 extern NSString *const TPKeyPinTabBar;
@@ -41,6 +51,9 @@ extern NSString *const TPKeyExactTime;
 extern NSString *const TPKeyClipboardMode;
 extern NSString *const TPKeyBannerPosition;
 extern NSString *const TPKeyKeepFeedLimit;
+
+// Posted after setBool:/setInteger:, with userInfo @{ @"key": key }.
+extern NSString *const TPPrefsDidChangeNotification;
 
 @interface TPPrefs : NSObject
 + (BOOL)boolForKey:(NSString *)key;

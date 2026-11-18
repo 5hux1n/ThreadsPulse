@@ -5,6 +5,12 @@
 #import "TPUI.h"
 
 static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
+static NSString *const kTPWhatsNewKey     = @"tp_whats_new_seen";
+static NSString *const kTPWhatsNewVersion = @"1.30";   // bump with each release that has a What's New
+
+@interface TPWelcomeViewController ()
+@property (nonatomic) BOOL whatsNew;
+@end
 
 @implementation TPWelcomeViewController {
     UIView *_badge;
@@ -13,23 +19,32 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     BOOL _didAnimateIn;
 }
 
-+ (void)present { [self presentMarkingShown:NO attempt:0]; }
++ (void)present { [self presentMarkingShown:NO whatsNew:NO attempt:0]; }
++ (void)presentWhatsNew { [self presentMarkingShown:NO whatsNew:YES attempt:0]; }
 
-// Shown once. Retries a few times if another view controller is being presented at launch.
+// Shown once: the welcome screen on a new install, otherwise What's New once per release.
+// Retries a few times if another view controller is being presented at launch.
 + (void)presentIfNeeded {
-    if ([TPPrefs boolForKey:kTPWelcomeShownKey]) return;
+    NSUserDefaults *d = [TPPrefs defaults];
+    BOOL whatsNew = NO;
+    if ([TPPrefs boolForKey:kTPWelcomeShownKey]) {
+        if ([[d stringForKey:kTPWhatsNewKey] isEqualToString:kTPWhatsNewVersion]) return;
+        whatsNew = YES;
+    } else {
+        [d setObject:kTPWhatsNewVersion forKey:kTPWhatsNewKey];   // a new install doesn't need What's New too
+    }
     static BOOL scheduled;
     if (scheduled) return;
     scheduled = YES;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         scheduled = NO;
-        [self presentMarkingShown:YES attempt:0];
+        [self presentMarkingShown:YES whatsNew:whatsNew attempt:0];
     });
 }
 
-+ (void)presentMarkingShown:(BOOL)mark attempt:(NSInteger)attempt {
++ (void)presentMarkingShown:(BOOL)mark whatsNew:(BOOL)whatsNew attempt:(NSInteger)attempt {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (mark && [TPPrefs boolForKey:kTPWelcomeShownKey]) return;
+        if (mark && !whatsNew && [TPPrefs boolForKey:kTPWelcomeShownKey]) return;
         UIViewController *top = TPTopViewController();
         if ([top isKindOfClass:self]) return;
         BOOL busy = !top || !top.view.window || top.isBeingPresented || top.isBeingDismissed
@@ -37,14 +52,17 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
         if (busy) {
             if (attempt >= 5) return;
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                [self presentMarkingShown:mark attempt:attempt + 1];
+                [self presentMarkingShown:mark whatsNew:whatsNew attempt:attempt + 1];
             });
             return;
         }
         TPWelcomeViewController *vc = [self new];
+        vc.whatsNew = whatsNew;
         vc.modalPresentationStyle = UIModalPresentationFullScreen;
         [top presentViewController:vc animated:YES completion:^{
-            if (mark) [TPPrefs setBool:YES forKey:kTPWelcomeShownKey];
+            if (!mark) return;
+            if (whatsNew) [[TPPrefs defaults] setObject:kTPWhatsNewVersion forKey:kTPWhatsNewKey];
+            else [TPPrefs setBool:YES forKey:kTPWelcomeShownKey];
         }];
     });
 }
@@ -72,6 +90,16 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     [stack addArrangedSubview:hero];
     [stack setCustomSpacing:28 afterView:hero];
 
+    if (self.whatsNew) {
+        [stack addArrangedSubview:[self cardWithSymbol:@"person.text.rectangle" title:TPL(@"Author Info")
+            detail:TPL(@"See an author's country, join date and join number right in the feed") accessory:nil]];
+        [stack addArrangedSubview:[self cardWithSymbol:@"arrow.down.to.line" title:TPL(@"Full-Screen Download")
+            detail:TPL(@"Save every image or video in a post while viewing it full screen") accessory:nil]];
+        [stack addArrangedSubview:[self cardWithSymbol:@"character.bubble" title:TPL(@"Five Languages")
+            detail:TPL(@"Simplified Chinese, Japanese and Korean added; switch in settings") accessory:nil]];
+        [stack addArrangedSubview:[self cardWithSymbol:@"film" title:TPL(@"Better Video Downloads")
+            detail:TPL(@"AV1 videos are converted automatically and finish even if you switch apps") accessory:nil]];
+    } else {
     UILabel *heading = [UILabel new];
     heading.text = TPL(@"How to Open Settings");
     heading.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
@@ -102,9 +130,14 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     [stack setCustomSpacing:16 afterView:stack.arrangedSubviews.lastObject];
     [stack addArrangedSubview:note];
     [_animated addObject:note];
+    }
+
+    // What's New offers to turn on Author Info, the release's headline feature, which is off by default.
+    BOOL offerAuthor = self.whatsNew && ![TPPrefs boolForKey:TPKeyAuthorInfo];
 
     UIButton *primary = [UIButton buttonWithType:UIButtonTypeCustom];
-    [primary setTitle:TPL(@"Open ThreadsPulse Settings") forState:UIControlStateNormal];
+    [primary setTitle:TPL(self.whatsNew ? (offerAuthor ? @"Show Author Info" : @"Get Started") : @"Open ThreadsPulse Settings")
+             forState:UIControlStateNormal];
     [primary setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [primary setTitleColor:[UIColor colorWithWhite:1 alpha:0.6] forState:UIControlStateHighlighted];
     primary.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
@@ -112,8 +145,14 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     primary.layer.cornerRadius = 14;
     primary.layer.cornerCurve = kCACornerCurveContinuous;
     __weak typeof(self) weakSelf = self;
+    BOOL whatsNew = self.whatsNew;
     [primary addAction:[UIAction actionWithHandler:^(UIAction *a) {
         [TPUI hapticLight];
+        if (whatsNew) {
+            if (offerAuthor) [TPPrefs setBool:YES forKey:TPKeyAuthorInfo];
+            [weakSelf dismissViewControllerAnimated:YES completion:nil];
+            return;
+        }
         [weakSelf dismissViewControllerAnimated:YES completion:^{ [TPSettingsViewController present]; }];
     }] forControlEvents:UIControlEventTouchUpInside];
 
@@ -126,6 +165,7 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
         [weakSelf dismissViewControllerAnimated:YES completion:nil];
     }] forControlEvents:UIControlEventTouchUpInside];
 
+    if (self.whatsNew && !offerAuthor) later.hidden = YES;
     for (UIView *v in @[primary, later]) { v.translatesAutoresizingMaskIntoConstraints = NO; [bottom addSubview:v]; }
     [_animated addObject:bottom];
 
@@ -180,7 +220,8 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     glyph.contentMode = UIViewContentModeCenter;
 
     UILabel *title = [UILabel new];
-    title.text = TPL(@"Welcome to ThreadsPulse");
+    title.text = self.whatsNew ? [NSString stringWithFormat:TPL(@"What's New in ThreadsPulse %@"), kTPWhatsNewVersion]
+                               : TPL(@"Welcome to ThreadsPulse");
     title.font = [UIFont systemFontOfSize:28 weight:UIFontWeightBold];
     title.textColor = UIColor.labelColor;
     title.textAlignment = NSTextAlignmentCenter;
@@ -189,7 +230,7 @@ static NSString *const kTPWelcomeShownKey = @"tp_welcome_shown";
     title.minimumScaleFactor = 0.8;
 
     UILabel *subtitle = [UILabel new];
-    subtitle.text = TPL(@"ThreadsPulse is installed and running");
+    subtitle.text = TPL(self.whatsNew ? @"Updated to the latest version" : @"ThreadsPulse is installed and running");
     subtitle.font = [UIFont systemFontOfSize:16];
     subtitle.textColor = UIColor.secondaryLabelColor;
     subtitle.textAlignment = NSTextAlignmentCenter;

@@ -1,5 +1,6 @@
 #import "TPLocalization.h"
 #import <dlfcn.h>
+#import "TPPrefs.h"
 
 static NSBundle *TPBundle(void) {
     static NSBundle *bundle;
@@ -49,8 +50,24 @@ static NSBundle *TPBundle(void) {
     return bundle;
 }
 
+// The language chosen in ThreadsPulse's settings, or the system's when "Follow System".
+static NSDictionary<NSString *, NSString *> *TPChosenTable(NSBundle *b) {
+    static NSString *const codes[] = { nil, @"en", @"zh-Hant", @"zh-Hans", @"ja", @"ko" };
+    static NSDictionary *tables[6];
+    NSInteger lang = [[TPPrefs defaults] integerForKey:TPKeyLanguage];
+    if (lang < 1 || lang > 5) return nil;
+    if (!tables[lang]) {
+        NSString *path = [b pathForResource:@"Localizable" ofType:@"strings" inDirectory:nil
+                            forLocalization:codes[lang]];
+        tables[lang] = (path ? [NSDictionary dictionaryWithContentsOfFile:path] : nil) ?: @{};
+    }
+    return tables[lang];
+}
+
 NSString *TPLocalized(NSString *key) {
     NSBundle *b = TPBundle();
     if (!b) return key;
+    NSDictionary *t = TPChosenTable(b);
+    if (t) return t[key] ?: key;
     return [b localizedStringForKey:key value:key table:nil];
 }

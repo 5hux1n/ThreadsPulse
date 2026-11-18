@@ -11,6 +11,15 @@ NSString *const TPKeyVideoQuality    = @"tp_video_quality";
 NSString *const TPKeyVideoFormat     = @"tp_video_format";
 NSString *const TPKeySaveToAlbum     = @"tp_save_to_album";
 NSString *const TPKeyParallelDownload = @"tp_parallel_download";
+NSString *const TPKeyHideInCaptures  = @"tp_hide_in_captures";
+NSString *const TPKeySwipeLockSpeed  = @"tp_swipe_lock_speed";
+NSString *const TPKeyAuthorInfo      = @"tp_author_info";
+NSString *const TPKeyAuthorLocation  = @"tp_author_location";
+NSString *const TPKeyAuthorJoined    = @"tp_author_joined";
+NSString *const TPKeyAuthorNewBadge  = @"tp_author_new";
+NSString *const TPKeyAuthorOwnLine   = @"tp_author_own_line";
+NSString *const TPKeyAuthorJoinNumber = @"tp_author_join_number";
+NSString *const TPKeyAuthorDefaultName = @"tp_author_default_name";
 NSString *const TPKeyClipboardLinks  = @"tp_clipboard_links";
 NSString *const TPKeyConfirmLike     = @"tp_confirm_like";
 NSString *const TPKeyPlaySpeed       = @"tp_play_speed";
@@ -34,6 +43,7 @@ NSString *const TPKeyHideSearchSuggest = @"tp_hide_search_suggest";
 NSString *const TPKeyHideProfileSearch = @"tp_hide_profile_search";
 NSString *const TPKeyHomeLongPress   = @"tp_home_long_press";
 NSString *const TPKeyTheme           = @"tp_theme";
+NSString *const TPKeyLanguage        = @"tp_language";
 NSString *const TPKeyHideFeedSuggest = @"tp_hide_feed_suggest";
 NSString *const TPKeyNoAutoplay      = @"tp_no_autoplay";
 NSString *const TPKeyHideFollowSuggest = @"tp_hide_follow_suggest";
@@ -42,21 +52,24 @@ NSString *const TPKeyNoPullRefresh   = @"tp_no_pull_refresh";
 NSString *const TPKeyTabNoScrollTop  = @"tp_tab_no_scroll_top";
 NSString *const TPKeyTabNoRefresh    = @"tp_tab_no_refresh";
 
+NSString *const TPPrefsDidChangeNotification = @"TPPrefsDidChangeNotification";
+
 static NSString *const kSuite = @"com.example.threadspulse";
 
 static NSArray<NSString *> *TPBoolKeys(void) {
     return @[TPKeyBlockAds, TPKeyStripTracking, TPKeyShowDownloadBtn, TPKeyDebugToast,
-             TPKeyOriginalImage, TPKeySaveToAlbum, TPKeyParallelDownload, TPKeyOriginalAvatar, TPKeyClipboardLinks, TPKeyConfirmLike, TPKeyKeepFeed, TPKeyHideFollowSuggest, TPKeyPinTabBar, TPKeyCopyProfile, TPKeySideloadFix, TPKeyBlockScreenshotDetect, TPKeyBlockAnalytics, TPKeyExternalBrowser, TPKeyHideIGButton, TPKeyHomeLongPress, TPKeyNoSeen, TPKeyKeepUnsent, TPKeyNoTyping, TPKeySeenOnReply, TPKeyHidePostFeedback, TPKeyHideSearchSuggest, TPKeyHideProfileSearch, TPKeyHideFeedSuggest, TPKeyNoAutoplay,
+             TPKeyOriginalImage, TPKeySaveToAlbum, TPKeyParallelDownload, TPKeyHideInCaptures, TPKeySwipeLockSpeed, TPKeyAuthorInfo, TPKeyAuthorLocation, TPKeyAuthorJoined, TPKeyAuthorNewBadge, TPKeyAuthorOwnLine, TPKeyAuthorJoinNumber, TPKeyAuthorDefaultName, TPKeyOriginalAvatar, TPKeyClipboardLinks, TPKeyConfirmLike, TPKeyKeepFeed, TPKeyHideFollowSuggest, TPKeyPinTabBar, TPKeyCopyProfile, TPKeySideloadFix, TPKeyBlockScreenshotDetect, TPKeyBlockAnalytics, TPKeyExternalBrowser, TPKeyHideIGButton, TPKeyHomeLongPress, TPKeyNoSeen, TPKeyKeepUnsent, TPKeyNoTyping, TPKeySeenOnReply, TPKeyHidePostFeedback, TPKeyHideSearchSuggest, TPKeyHideProfileSearch, TPKeyHideFeedSuggest, TPKeyNoAutoplay,
              TPKeyNoPullRefresh, TPKeyTabNoScrollTop, TPKeyTabNoRefresh];
 }
 static NSArray<NSString *> *TPIntKeys(void) {
-    return @[TPKeyVideoQuality, TPKeyVideoFormat, TPKeyPlaySpeed, TPKeyExactTime, TPKeyClipboardMode, TPKeyBannerPosition, TPKeyKeepFeedLimit, TPKeyTheme];
+    return @[TPKeyVideoQuality, TPKeyVideoFormat, TPKeyPlaySpeed, TPKeyExactTime, TPKeyClipboardMode, TPKeyBannerPosition, TPKeyKeepFeedLimit, TPKeyTheme, TPKeyLanguage];
 }
 static NSInteger TPIntMax(NSString *key) {
     if ([key isEqualToString:TPKeyVideoQuality]) return 2;
     if ([key isEqualToString:TPKeyVideoFormat])  return 1;
     if ([key isEqualToString:TPKeyPlaySpeed])   return 3;
-    if ([key isEqualToString:TPKeyExactTime])   return 2;
+    if ([key isEqualToString:TPKeyExactTime])   return 3;
+    if ([key isEqualToString:TPKeyLanguage])    return 5;
     if ([key isEqualToString:TPKeyClipboardMode])  return 1;
     if ([key isEqualToString:TPKeyBannerPosition]) return 2;
     if ([key isEqualToString:TPKeyKeepFeedLimit])  return 2;
@@ -73,10 +86,11 @@ static NSInteger TPIntMax(NSString *key) {
         d = [[NSUserDefaults alloc] initWithSuiteName:kSuite];
         [d registerDefaults:@{
             TPKeyBlockAds: @YES,        TPKeyStripTracking: @YES,   TPKeyShowDownloadBtn: @YES,
-            TPKeyDebugToast: @NO,       TPKeyOriginalImage: @YES,  TPKeyVideoQuality: @0,  TPKeyVideoFormat: @0,  TPKeySaveToAlbum: @NO,  TPKeyParallelDownload: @YES,
+            TPKeyDebugToast: @NO,       TPKeyOriginalImage: @YES,  TPKeyVideoQuality: @0,  TPKeyVideoFormat: @0,  TPKeySaveToAlbum: @NO,  TPKeyParallelDownload: @YES,  TPKeyHideInCaptures: @YES,  TPKeySwipeLockSpeed: @YES,
+            TPKeyAuthorInfo: @NO, TPKeyAuthorLocation: @YES, TPKeyAuthorJoined: @YES, TPKeyAuthorNewBadge: @YES, TPKeyAuthorOwnLine: @YES, TPKeyAuthorJoinNumber: @YES, TPKeyAuthorDefaultName: @YES,
             TPKeyPlaySpeed: @0,
             TPKeyExactTime: @0,         TPKeyConfirmLike: @NO,      TPKeyOriginalAvatar: @YES,  TPKeyClipboardLinks: @NO,  TPKeyClipboardMode: @0,  TPKeyBannerPosition: @0,
-            TPKeyHideFollowSuggest: @YES, TPKeyPinTabBar: @NO, TPKeyCopyProfile: @YES, TPKeySideloadFix: @YES, TPKeyBlockScreenshotDetect: @YES, TPKeyBlockAnalytics: @NO, TPKeyExternalBrowser: @NO, TPKeyHideIGButton: @NO, TPKeyHomeLongPress: @YES, TPKeyNoSeen: @NO, TPKeyKeepUnsent: @NO, TPKeyNoTyping: @NO, TPKeySeenOnReply: @YES, TPKeyHidePostFeedback: @YES, TPKeyHideSearchSuggest: @YES, TPKeyHideProfileSearch: @NO, TPKeyTheme: @0, TPKeyHideFeedSuggest: @YES, TPKeyNoAutoplay: @NO, TPKeyKeepFeed: @NO,         TPKeyKeepFeedLimit: @0,
+            TPKeyHideFollowSuggest: @YES, TPKeyPinTabBar: @NO, TPKeyCopyProfile: @YES, TPKeySideloadFix: @YES, TPKeyBlockScreenshotDetect: @YES, TPKeyBlockAnalytics: @NO, TPKeyExternalBrowser: @NO, TPKeyHideIGButton: @NO, TPKeyHomeLongPress: @YES, TPKeyNoSeen: @NO, TPKeyKeepUnsent: @NO, TPKeyNoTyping: @NO, TPKeySeenOnReply: @YES, TPKeyHidePostFeedback: @YES, TPKeyHideSearchSuggest: @YES, TPKeyHideProfileSearch: @NO, TPKeyTheme: @0, TPKeyLanguage: @0, TPKeyHideFeedSuggest: @YES, TPKeyNoAutoplay: @NO, TPKeyKeepFeed: @NO,         TPKeyKeepFeedLimit: @0,
             TPKeyNoPullRefresh: @NO,    TPKeyTabNoScrollTop: @NO,   TPKeyTabNoRefresh: @NO,
         }];
     });
@@ -84,7 +98,10 @@ static NSInteger TPIntMax(NSString *key) {
 }
 
 + (BOOL)boolForKey:(NSString *)key { return [[self defaults] boolForKey:key]; }
-+ (void)setBool:(BOOL)value forKey:(NSString *)key { [[self defaults] setBool:value forKey:key]; }
++ (void)setBool:(BOOL)value forKey:(NSString *)key {
+    [[self defaults] setBool:value forKey:key];
+    [NSNotificationCenter.defaultCenter postNotificationName:TPPrefsDidChangeNotification object:nil userInfo:@{ @"key": key }];
+}
 + (NSInteger)integerForKey:(NSString *)key { return [[self defaults] integerForKey:key]; }
 + (void)setInteger:(NSInteger)value forKey:(NSString *)key { [[self defaults] setInteger:value forKey:key]; }
 

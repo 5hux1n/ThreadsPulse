@@ -14,6 +14,8 @@
 /* Settings Home & Theme */
 
 "Theme" = "Theme";
+"Language" = "Language";
+"Follow System" = "Follow System";
 "Running · %ld features on" = "Running · %ld features on";
 "Coral" = "Coral";
 "Ocean" = "Ocean";
@@ -35,6 +37,8 @@
 "Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate" = "Stops sending usage data such as views, time spent and taps; recommendations may be less accurate";
 "Remove URL Tracking" = "Remove URL Tracking";
 "Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links" = "Automatically removes tracking parameters such as xmt, igshid and utm_* when copying, sharing or opening links";
+"Hide Buttons in Screenshots" = "Hide Buttons in Screenshots";
+"ThreadsPulse buttons don't appear in screenshots or screen recordings" = "ThreadsPulse buttons don't appear in screenshots or screen recordings";
 
 /* - Prompts */
 "Blocked an ad request" = "Blocked an ad request";
@@ -51,24 +55,37 @@
 "Video Downloads" = "Video Downloads";
 "Photo Downloads" = "Photo Downloads";
 "Download Button" = "Download Button";
-"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos." = "Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos.";
+"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos." = "Tap to download all photos and videos; long-press to download only photos or only videos";
 "Parallel Downloads" = "Parallel Downloads";
-"Downloads up to 4 files at a time when saving an entire post, reducing wait time." = "Downloads up to 4 files at a time when saving an entire post, reducing wait time.";
+"Downloads up to 4 files at a time when saving an entire post, reducing wait time." = "Downloads up to 4 files at once when saving a whole post, for shorter waits";
 "Save to \"Threads\" Album" = "Save to \"Threads\" Album";
-"Downloaded items are also added to a \"Threads\" album in Photos. Full Photos access is required the first time." = "Downloaded items are also added to the \"Threads\" album. \"Full Access\" to Photos is required the first time.";
+"Downloaded items are also added to a \"Threads\" album in Photos. Full Photos access is required the first time." = "Downloads are also added to the \"Threads\" album. \"Full Access\" to Photos is required the first time";
 "Video Quality" = "Video Quality";
 "Highest" = "Highest";
-"Highest downloads videos at up to 1080p; some videos are converted on the device, which takes a few seconds. 720p is the fastest and needs no conversion." = "Highest gives the best quality, up to 1080p; some videos are converted on the device, which takes a few seconds. 720p downloads directly and is the fastest.";
+"Highest downloads videos at up to 1080p; some videos are converted on the device, which takes a few seconds. 720p is the fastest and needs no conversion." = "Highest: up to 1080p; some videos take a few seconds to convert\n720p: downloads directly, fastest";
 "Video Format" = "Video Format";
 "Keep HDR" = "Keep HDR";
 "Compatible" = "Compatible";
 "Keep HDR preserves the original brightness and color. Compatible converts to H.264 (SDR), suited to sharing on LINE, Windows or older devices." = "Keep HDR preserves the original brightness and color\nCompatible converts to H.264 (SDR)";
 "Download Original Size" = "Download Original-Size Photos";
-"Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded." = "Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded.";
+"Retrieves the highest resolution from the web version. If unavailable, the standard size is downloaded." = "Gets the highest resolution from the web version, or the standard size if unavailable";
 "Download Original Profile Pictures" = "Download Original-Size Profile Pictures";
-"To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner." = "To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner.";
+"To save, long-press a profile picture on a profile, or view it full screen and tap ↓ in the bottom-right corner." = "Long-press a profile picture on a profile, or tap ↓ at the bottom right in full screen, to save";
 
 /* - Prompts */
+"Photo %ld" = "Photo %ld";
+"Video %ld" = "Video %ld";
+"Photos %ld–%ld" = "Photos %ld–%ld";
+"Videos %ld–%ld" = "Videos %ld–%ld";
+"Saved" = "Saved";
+"Failed" = "Failed";
+"Waiting" = "Waiting";
+"%ld items done" = "%ld items done";
+"%ld failed" = "%ld failed";
+"%ld more posts waiting" = "%ld more posts waiting";
+"Cancel Download" = "Cancel Download";
+"Cancel All" = "Cancel All";
+"Added to download queue" = "Added to download queue";
 "Choose video quality" = "Choose video quality";
 "Highest (%@)" = "Highest (%@)";
 "720p (faster)" = "720p (faster)";
@@ -85,6 +102,7 @@
 "Audio stream" = "Audio";
 "Merging video and audio…" = "Merging video and audio…";
 "Converting video…" = "Converting video…";
+"Paused — continues when you return to Threads" = "Paused — continues when you return to Threads";
 "No download link found. Play the video for a moment, then try again." = "No download link found. Play the video for a moment, then try again.";
 "Download button added" = "Download button added";
 "Found %ld of %ld items" = "Found %ld of %ld items";
@@ -97,6 +115,9 @@
 "No image found" = "No image found";
 "Download This Image" = "Download This Image";
 "Download All Images in Post" = "Download All Images in Post";
+"Download This Video" = "Download This Video";
+"Download All Videos in Post" = "Download All Videos in Post";
+"No video found" = "No video found";
 "Getting original photo…" = "Getting original photo…";
 "Save Profile Picture" = "Save Profile Picture";
 
@@ -106,10 +127,16 @@
 "Player" = "Player";
 "Videos play at the selected speed, and return to it after you release a long-press 2x." = "Videos play at the selected speed, and return to it after you release a long-press 2x.";
 "Disable Autoplay" = "Disable Autoplay";
-"Videos in the feed won't play until you tap them" = "Videos won't play automatically while you browse the feed; they start only after you tap them";
+"Videos in the feed won't play until you tap them" = "Videos in the feed won't autoplay; they start when you tap them";
 "Default Playback Speed" = "Default Playback Speed";
+"Slide to Lock 2x" = "Slide to Lock 2x";
+"While holding a video at 2x, a lock button appears at the bottom of the video. Slide your finger onto it to keep 2x after you let go; to unlock, long-press again and slide onto the same button" = "While holding at 2x, slide onto the lock button below to keep 2x after letting go; do the same to unlock";
 
 /* - Prompts */
+"Slide here to lock 2x" = "Slide here to lock 2x";
+"2x locked" = "2x locked";
+"Slide here to unlock" = "Slide here to unlock";
+"Unlocked" = "Unlocked";
 "Playback allowed" = "Playback allowed";
 "Autoplay blocked" = "Autoplay blocked";
 "Tap: no video player found" = "Tap: no video player found";
@@ -143,6 +170,50 @@
 "Home tab refresh blocked" = "Home tab refresh blocked";
 "Pull to refresh blocked" = "Pull to refresh blocked";
 
+/* Author Info */
+
+/* - Settings */
+"Author Info" = "Author Info";
+"Show Author Info" = "Show Author Info";
+"Shows details from the author's \"About this profile\" with their name in the feed." = "Shows \"About this profile\" details next to the author's name in the feed";
+"Location Stats" = "Location Stats";
+"See which countries and regions the authors you've read are from." = "See which countries and regions the authors you've read are from";
+"Read Automatically" = "Read Automatically";
+"Location" = "Location";
+"The country or region where the account is based, shown with its flag. Shows \"Not shared\" if the author keeps it private." = "The account's country or region with its flag; shows \"Not shared\" if private";
+"Join Date" = "Join Date";
+"The month the account joined Threads." = "The month the account joined Threads";
+"Join Number" = "Join Number";
+"Shows which user number the account was when it joined, such as #7,551,963 or 100M+." = "The account's join number on Threads, such as #7,551,963 or 100M+";
+"New Account Badge" = "New Account Badge";
+"Marks accounts that joined within the last 2 months." = "Marks accounts that joined within the last 2 months";
+"Default Name Badge" = "Default Name Badge";
+"Marks accounts that never changed the username Threads assigned at sign-up, such as camel.253044. This doesn't mean the account is fake." = "Marks accounts still using the random username from sign-up (such as camel.253044); this doesn't mean they're fake";
+"Layout" = "Layout";
+"Show on Its Own Line" = "Show on Its Own Line";
+"Adds a line under the name so the info always shows in full. When off, it sits next to the name and is shortened or hidden if there isn't enough room." = "On: on its own line under the name, shown in full\nOff: next to the name, shortened or hidden if space is tight";
+"Read Status & Cache" = "Read Status & Cache";
+"See how many authors are cached and whether reading is paused, or clear the cache." = "See the cache size and reading status, or clear the cache";
+"To avoid limits from Threads, authors are read one at a time and cached for up to 21 days, pausing for 1 hour when needed. Layout changes apply as you scroll." = "To avoid limits from Threads, authors are read one at a time and cached for up to 21 days, pausing for 1 hour when needed. Layout changes apply as you scroll.";
+
+/* - Prompts */
+"Not shared" = "Not shared";
+"%lu authors · %lu countries or regions" = "%lu authors · %lu countries or regions";
+"Counts the authors currently cached (kept for up to 21 days)." = "Counts the authors currently cached (kept for up to 21 days).";
+"No author info yet. Browse the feed and it will appear here." = "No author info yet. Browse the feed and it will appear here.";
+"Tap an author to open their profile." = "Tap an author to open their profile.";
+"User ID" = "User ID";
+"Default Name" = "Default Name";
+"NEW" = "NEW";
+"%lu authors cached · %lu read since launch" = "%lu authors cached · %lu read since launch";
+"Paused by rate limit protection, resumes in %ld min" = "Paused by rate limit protection, resumes in %ld min";
+"Reading normally" = "Reading normally";
+"Resume Now" = "Resume Now";
+"Clear Cache" = "Clear Cache";
+"Cache cleared" = "Cache cleared";
+"Open anyone's \"About this profile\" once to start showing author info." = "Open anyone's \"About this profile\" once to start showing author info.";
+"Threads asked to slow down. Author info paused for 1 hour." = "Threads asked to slow down. Author info paused for 1 hour.";
+
 /* Hidden Items */
 
 /* - Settings */
@@ -150,7 +221,7 @@
 "Suggested Content" = "Suggested Content";
 "Interface Buttons" = "Interface Buttons";
 "Suggested Accounts" = "Suggested Accounts";
-"Hide \"Suggested for you\" in the feed & on profiles" = "Hide \"Suggested for you\" in the feed & on profiles";
+"Hide \"Suggested for you\" in the feed & on profiles" = "Hide \"Suggested for you\" in the feed and on profiles";
 "Search Suggestions" = "Search Suggestions";
 "Hide \"Suggested to follow\" on the search page" = "Hide \"Suggested to follow\" on the search page";
 "Follow Suggestion Pop-ups" = "Follow Suggestion Pop-ups";
@@ -192,7 +263,7 @@
 /* - Settings */
 "Messages" = "Messages";
 "Hide Seen Status" = "Hide Seen Status";
-"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat." = "Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat";
+"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat." = "Viewing messages won't notify the other person. To show \"Seen\" in a specific chat, tap the eye icon at the top right";
 "Show Seen When You Reply" = "Show Seen When You Reply";
 "Let the other person see \"Seen\" once you reply" = "On: \"Seen\" shows to the other person only after you reply\nOff: \"Seen\" won't show to the other person, even after you reply";
 "Reset Chats" = "Reset Chats";
@@ -224,11 +295,12 @@
 "3h" = "3h";
 "Example: %@" = "Example: %@";
 "Like Confirmation" = "Like Confirmation";
-"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "Tapping the heart shows a confirmation first; removing a like won't ask";
+"Ask before a like is sent, to prevent accidental taps. Removing a like won't ask." = "Asks for confirmation before liking; removing a like won't ask";
 "Post Time Format" = "Post Time Format";
 "Relative" = "Relative";
-"Date & Time" = "Date & Time";
-"With Seconds" = "With Seconds";
+"Date & Time" = "Date";
+"With Year" = "+ Year";
+"With Seconds" = "+ Seconds";
 "Keep Tab Bar Visible" = "Keep Tab Bar Visible";
 "Scrolling won't hide the tab bar at the bottom; it always stays on screen" = "The bottom tab bar won't hide while scrolling";
 "Copy Profile Info" = "Copy Profile Info";
@@ -269,7 +341,7 @@
 "Shows the usage data Threads collects and what it contains. The log never leaves your device" = "Shows the usage data Threads collects and what it contains. The log never leaves your device";
 "Welcome Screen" = "Welcome Screen";
 "See how to open ThreadsPulse settings again" = "See how to open ThreadsPulse settings again";
-"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "Keeps you signed in and app group data intact after re-signing; applies only to re-signed apps and needs Threads to be reopened after changes";
+"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads" = "Keeps you signed in and your data intact after re-signing; applies only to re-signed apps and needs Threads to be reopened after changes";
 "No analytics recorded yet" = "No analytics recorded yet";
 
 /* - Prompts */
@@ -298,6 +370,15 @@
 "Support ThreadsPulse on Ko-fi" = "Support ThreadsPulse on Ko-fi";
 "About" = "About";
 "Version" = "Version";
+"Environment" = "Environment";
+"Copy All Info" = "Copy All Info";
+"Source Code on GitHub" = "Source Code on GitHub";
+"Report a Problem" = "Report a Problem";
+"Author Info draws on lee-su-threads (MIT)" = "Author Info draws on lee-su-threads (MIT)";
+"Threads Version" = "Threads Version";
+"Bundle ID" = "Bundle ID";
+"Device" = "Device";
+"iOS Version" = "iOS Version";
 "Reset All Settings" = "Reset All Settings";
 "Reset All Settings?" = "Reset All Settings?";
 "Reset" = "Reset";
@@ -316,3 +397,15 @@
 "Maybe Later" = "Maybe Later";
 "Welcome to ThreadsPulse" = "Welcome to ThreadsPulse";
 "ThreadsPulse is installed and running" = "ThreadsPulse is installed and running";
+"What's New" = "What's New";
+"See what's new in this version" = "See what's new in this version";
+"What's New in ThreadsPulse %@" = "What's New in ThreadsPulse %@";
+"Updated to the latest version" = "Updated to the latest version";
+"See an author's country, join date and join number right in the feed" = "See an author's country, join date and join number right in the feed";
+"Full-Screen Download" = "Full-Screen Download";
+"Save every image or video in a post while viewing it full screen" = "Save every image or video in a post while viewing it full screen";
+"Five Languages" = "Five Languages";
+"Simplified Chinese, Japanese and Korean added; switch in settings" = "Simplified Chinese, Japanese and Korean added; switch in settings";
+"Better Video Downloads" = "Better Video Downloads";
+"AV1 videos are converted automatically and finish even if you switch apps" = "AV1 videos are converted automatically and finish even if you switch apps";
+"Get Started" = "Get Started";

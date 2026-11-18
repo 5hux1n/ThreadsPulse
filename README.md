@@ -2,7 +2,7 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
-An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.27.0**
+An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.30.0**
 
 No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using GitHub Actions, then install it with your own signing tool.
 
@@ -14,7 +14,9 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 | | Block Screenshot Detection | Threads won't know when you take a screenshot or record the screen |
 | | Block Analytics | Stop Threads from sending usage data such as what you view, how long you stay and what you tap. Recommendations may become less accurate (off by default) |
 | | Remove URL Tracking | Strip `xmt`, `igshid`, `utm_*` and more when copying, sharing or opening links, and unwrap `l.threads.com` redirects |
+| | Hide Buttons in Screenshots | ThreadsPulse buttons don't appear in screenshots or screen recordings |
 | Media Download | Download Button | ↓ at the top-right of a post: tap to download all photos and videos; long-press to choose photos or videos only |
+| | Full-Screen Download | In full-screen view, ↓ sits next to "⋯": tap to save the image or video on screen; long-press to save all images or all videos in the post |
 | | Download Original Size | Fetches the highest resolution from the web version; WebP is converted to JPEG for Photos |
 | | Download Original Profile Pictures | Long-press the profile picture on a profile, or view it full screen and tap ↓ at the bottom right |
 | | Parallel Downloads | Downloads up to 4 files at a time when saving an entire post; the progress window shows the speed |
@@ -27,6 +29,15 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 | | Disable Pull to Refresh | Pulling down at the top of the home feed won't refresh it, and the feed stops at the top without bouncing |
 | | When Tapping the Home Tab: Don't Scroll to Top | When you're scrolled down, tapping the Home tab keeps you where you were |
 | | When Tapping the Home Tab: Don't Refresh | When you're at the top, tapping the Home tab won't refresh or load new posts |
+| Author Info | Show Author Info | Shows details from the author's "About this profile" with their name in the feed (off by default) |
+| | Location Stats | Counts the authors you've read by country, most common first; tap a country to list its authors and an author to open their profile |
+| | Read Status & Cache | Shows how many authors are cached and whether reading is paused, or clears the cache |
+| | Location | The country or region the account is based in, with its flag; shows "Not shared" when the author keeps it private |
+| | Join Date | The month the account joined Threads |
+| | Join Number | Which user number the account was when it joined, such as #7,551,963 or 100M+ |
+| | New Account Badge | A green "NEW" tag on accounts that joined within the last 2 months |
+| | Default Name Badge | A gray "Default Name" tag on accounts that never changed the username Threads assigned at sign-up (such as camel.253044); it doesn't mean the account is fake |
+| | Show on Its Own Line | Adds a line under the name so the info always shows in full; when off, it sits next to the name and is shortened or hidden if there isn't enough room (on by default) |
 | Hidden Items: Suggested Content | Suggested Accounts | Hide "Suggested for you" in the feed and on profiles |
 | | Search Suggestions | Hide "Suggested to follow" on the search page |
 | | Follow Suggestion Pop-ups | Stop "Follow suggestions" from popping up automatically |
@@ -42,7 +53,7 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 | | Hide Typing Status | The other person won't see "…" while you write a message (off by default) |
 | | Keep Unsent Messages | When someone unsends a message, it stays in your chat marked "Unsent" (off by default) |
 | Interface & Interactions | Like Confirmation | Ask before a like is sent, to prevent accidental taps. Removing a like won't ask |
-| | Post Time Format | Relative / Date & Time / With Seconds |
+| | Post Time Format | Relative / Date / + Year / + Seconds (the example under the options shows each format) |
 | | Keep Tab Bar Visible | Scrolling won't hide the tab bar at the bottom |
 | | Copy Profile Info | On a profile, long-press the name, username, bio or profile picture to copy the name, username or bio |
 | | Long-Press Home Tab for Settings | Long-pressing the Home tab at the bottom opens ThreadsPulse settings instead (on by default) |
@@ -50,9 +61,14 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 | Advanced | Debug Hints | Turn on when a feature stops working. Hints show which features are active, to help report problems |
 | | Analytics Log | Shows the usage data Threads collects and what it contains: a ranking of events with plain-language descriptions and the latest payload of each, ready to copy. The log never leaves your device |
 | | Welcome Screen | See how to open ThreadsPulse settings again |
+| | What's New | See this version's new features again (shown once automatically after an update; it can turn on Author Info) |
 | | Sideload Compatibility Fix | Keeps you signed in and app group data working after re-signing. Only active on re-signed apps |
 
 **Theme**: in the info card at the top of the settings page, tap a color dot to switch (Coral / Ocean / Mint / Lavender / Sakura / Amber). It only changes the color of ThreadsPulse buttons and settings.
+
+**Language**: in the same card, choose Follow System, English, 繁體中文, 简体中文, 日本語 or 한국어. ThreadsPulse's own text switches right away; Threads itself is unaffected.
+
+**About** (last row of the Backup / Advanced card on the main page, with the version beside it): shows the ThreadsPulse version, Threads version, bundle ID, device model and iOS version with its build number, with Copy All Info, a link to the source on GitHub, and Report a Problem, which opens a new GitHub issue with this information filled in. Reset All Settings is at the bottom of this page.
 
 **Settings**: tap **〰 Pulse** at the top-right of Threads' Settings page, long-press the Home tab at the bottom, or long-press anywhere with three fingers for 1 second. A welcome screen explains these the first time you open Threads.
 
@@ -127,8 +143,8 @@ Pushing to `main` / `master`, opening a pull request, or running **Build** → *
 Pushing a tag that starts with `v` also creates a Release with these four files (Threads itself is not included):
 
 ```bash
-git tag v1.27.0
-git push origin v1.27.0
+git tag v1.30.0
+git push origin v1.30.0
 ```
 
 ### Build locally
@@ -187,6 +203,7 @@ ThreadsPulse/
 ├── vendor/libvpx/                  Prebuilt VP9 decoder (arm64 iOS, static) + headers, LICENSE
 ├── vendor/dav1d/                   Prebuilt AV1 decoder (arm64 iOS, static) + headers, COPYING
 ├── TPVersion.h                     Version number (change it only here)
+├── ThirdPartyLicenses/             Licenses of borrowed material (lee-su-threads)
 ├── scripts/inject_ipa.py           Injects the tweak into an IPA
 ├── OpenThreadsSafariExtension/     "Open in Threads" Safari extension (sideload variant only)
 │   ├── OpenInThreadsHandler.m      Native side (only lets the extension load)
@@ -199,20 +216,24 @@ ThreadsPulse/
 └── layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/
     ├── Info.plist
     ├── en.lproj/Localizable.strings
-    └── zh-Hant.lproj/Localizable.strings
+    ├── zh-Hant.lproj/Localizable.strings
+    ├── zh-Hans.lproj/Localizable.strings
+    ├── ja.lproj/Localizable.strings
+    └── ko.lproj/Localizable.strings
 ```
 
 ## Localization
 
 - The code always uses `TPL(@"English text")`; **the English text is the key**, and it's shown as-is when no translation exists.
-- The language follows the system: Traditional Chinese uses `zh-Hant`, everything else uses `en`.
-- To add a language, copy `en.lproj` (for example to `ja.lproj`), translate it, and add the language code to `CFBundleLocalizations` in `Info.plist`.
+- Included languages: English (`en`), Traditional Chinese (`zh-Hant`), Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`). By default the system language is used (anything else falls back to English); the Language row at the top of the settings can force one.
+- To add a language, copy `en.lproj` (for example to `fr.lproj`), translate it, add the language code to `CFBundleLocalizations` in `Info.plist`, and add it to the Language menu (`TPSettingsViewController.m`) and `TPLocalization.m`.
+- Corrections to the Simplified Chinese, Japanese and Korean translations from native speakers are welcome.
 
 ## Implementation notes
 
 - **Swift classes**: hooked by mangled name (for example `_TtC6BCNUFI12BCNUFIButton`), with ivars read through the runtime. Pointers and classes are validated before reading Swift enum memory, to avoid crashes.
 - **Batch download**: reads every item from the carousel cell's data model (`BCNFeedMediaViewModel` → `IGPhoto` / `IGVideo`), unaffected by cell reuse.
-- **1080p videos**: the progressive MP4 Threads exposes tops out at 720p. The higher qualities only exist in the DASH manifest (`IGVideo.dashManifestData`), as separate video and audio streams. The best video (by resolution) and audio (AAC preferred over Opus) are downloaded and combined on the device: H.264 / HEVC are copied as-is (`AVAssetExportSession` passthrough, or `AVAssetWriter` when the audio has to be re-encoded); VP9 is decoded with libvpx and AV1 with dav1d, then re-encoded with VideoToolbox — HEVC Main10 when the codec string says HLG/PQ (Keep HDR), otherwise H.264; with Compatible, HDR frames are converted to BT.709 by `VTPixelTransferSession` first. Any failure falls back to the 720p MP4, never to a silent video. "Ask" shows the choice as a menu next to the button that was tapped.
+- **1080p videos**: the progressive MP4 Threads exposes tops out at 720p. The higher qualities only exist in the DASH manifest (`IGVideo.dashManifestData`), as separate video and audio streams. The best video (by resolution) and audio (AAC preferred over Opus) are downloaded and combined on the device: H.264 / HEVC are copied as-is (`AVAssetExportSession` passthrough, or `AVAssetWriter` when the audio has to be re-encoded); VP9 is decoded with libvpx, and AV1 by the system (VideoToolbox) on devices with hardware AV1 decoding (iPhone 15 Pro and later, iOS 17+) or with dav1d elsewhere, then re-encoded with VideoToolbox — HEVC Main10 when the codec string says HLG/PQ (Keep HDR), otherwise H.264; with Compatible, HDR frames are converted to BT.709 by `VTPixelTransferSession` first. Any failure falls back to the 720p MP4, never to a silent video. A progressive MP4 that turns out to be AV1 or VP9 (which Photos rejects) goes through the same conversion. Downloads ask iOS for background time, and a conversion cut off because Threads went to the background resumes when you return. "Ask" shows the choice as a menu next to the button that was tapped.
 - **Parallel downloads**: items after the current one are fetched ahead on a second `NSURLSession` (3 connections + the main one); saving to Photos stays in order.
 - **Original-size photos / profile pictures**: fetches `https://www.threads.com/t/<code>` or `/@<username>` and picks the largest candidate from the page JSON by matching file names.
 - **Clipboard**: first checks for a URL with `detectPatternsForPatterns:` (no paste prompt); the content is only read when you tap Open or use Auto-open. The link is handed to Threads through `NSUserActivity` (BrowsingWeb).
@@ -236,6 +257,7 @@ ThreadsPulse/
 - **Block Analytics**: usage events are dropped where they are collected (`-[FBAnalyticsCoreLogger _captureAnalyticsEvent:]`, `_captureAnalyticsEventForBatchUpload:`, and `_shouldStreamEvent:` returns NO), and uploads of anything already stored go through Meta's own `FBAnalyticsNoOpNetworkConfigurator` instead of `IGAnalyticsNetworkConfigurator`, so no request is sent. Normal API calls (login, posting, loading the feed) don't go through this path.
 - **Analytics Log**: `_captureAnalyticsEvent:` counts each `FBAnalyticsEvent` by `eventName` and keeps the latest event object of each kind; `eventPayload` is only read when you open the log. Everything stays in memory and is cleared when the app closes.
 - **Disable Autoplay**: when a feed video scrolls into view (`-[IGFNFVideoPlayer playWithReason:callsiteContext:]`, reason 1), Threads is allowed to start playback as usual so its UI (including the sound icon) appears, but the underlying `FNFPlayer` is held: its first `play` runs with volume 0 so Threads reaches "initial play" and shows the sound icon, then it is paused on the first frame (`videoPlayerDidInitialPlay:`); later `play` / `playWithContext:` calls are ignored. Tapping the video (a touch that barely moved, so scrolling doesn't count) releases the hold and starts `FNFPlayer`. Other play reasons (full screen, etc.) and videos outside the feed play as usual. Once started, the same player isn't held again until it's stopped. The single-video download button now reads the URL from nearby data objects first, so videos that never played can still be downloaded.
+- **Author Info**: calls Threads' own `BKSharedAsyncActionDataFetcher` with `com.bloks.www.text_post_app.about_this_profile_async_action` to get "About this profile", then reads the country (the `about_this_profile_country` state) and the "Joined" row from the returned Bloks layout. The request needs a `BKObjectSet` that carries the signed-in session: the `IGUserSession` and `PNPandoGraphQLService` are noted at launch and assembled into one (with an `IGSessionContext`); if the first try crashes this is disabled for good and the set Threads creates when it opens a Bloks screen is borrowed instead. The author ID is the Swift `userPk` of `BCNFeedItemHeaderProfilePicture`. Rate-limit protection: one author at a time, 1.5 s apart, at most 10 queued and 400 per launch; a 429, `feedback_required` or spam response pauses reading for 1 hour; results with a location are cached for 21 days, without one for 1 day. Own line: when `BCNFeedSectionController` builds the name row's cell its row is remembered, and `sizeForItemAtIndex:` adds one line of height before the section is re-laid out.
 - **Hide Follow Suggestions**: intercepts `presentViewController:` when `BCNUserRecommendationsViewController` is presented as a sheet; pushed pages aren't affected.
 
 ## Notes
@@ -250,6 +272,10 @@ When Threads updates, some features may stop working for a while (no crash). Tur
 | [dav1d](https://code.videolan.org/videolan/dav1d) | AV1 decoding | BSD 2-Clause (`vendor/dav1d/COPYING`) |
 
 Both are bundled as prebuilt static libraries; the exact commit and build options are in each folder's `VERSION.txt`.
+
+### Acknowledgements
+
+Author Info (location, join date and new-account badge in the feed) draws on [lee-su-threads](https://github.com/meettomorrow/lee-su-threads) by meettomorrow (MIT License). ThreadsPulse's code is its own, but it follows that project's approach (label parsing, cache durations, the 1-hour rate-limit pause) and uses its default-username rule and animal word list. Its license is included in `ThirdPartyLicenses/lee-su-threads.txt`.
 
 ## Disclaimer
 

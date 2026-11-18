@@ -5,13 +5,18 @@
 #import "TPHUD.h"
 #import "TPUI.h"
 #import "TPWelcomeViewController.h"
+#import "TPAuthorInfo.h"
+#import "TPAuthorStatsViewController.h"
 #import <SafariServices/SafariServices.h>
+#import <sys/sysctl.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #import "TPVersion.h"
 
 extern NSString *TPAnalyticsLogReport(void);
 static NSString *const kTPDonateURL = @"https://ko-fi.com/mumuisdog";
+static NSString *const kTPRepoURL   = @"https://github.com/mumuisdog/ThreadsPulse";
+static NSArray<NSArray<NSString *> *> *TPAboutRows(void);
 
 static UIColor *TPDyn(UIColor *light, UIColor *dark) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
@@ -60,7 +65,7 @@ static NSString *TPTimePreview(NSInteger mode) {
     } else {
         NSDateFormatter *f = [NSDateFormatter new];
         f.locale = NSLocale.autoupdatingCurrentLocale;
-        [f setLocalizedDateFormatFromTemplate:(mode == 1 ? @"MMMd HHmm" : @"yMMMd HHmmss")];
+        [f setLocalizedDateFormatFromTemplate:(mode == 1 ? @"MMMd HHmm" : mode == 2 ? @"yMMMd HHmm" : @"yMMMd HHmmss")];
         text = [f stringFromDate:sample];
     }
     return [NSString stringWithFormat:TPL(@"Example: %@"), text];
@@ -69,6 +74,7 @@ static NSString *TPTimePreview(NSInteger mode) {
 @interface TPSettingsHeaderView : UIView
 - (void)setEnabledCount:(NSInteger)count;
 @property (nonatomic, copy) void (^onThemeChange)(void);
+@property (nonatomic, copy) void (^onLanguageChange)(void);
 @end
 
 @implementation TPSettingsHeaderView {
@@ -82,6 +88,9 @@ static NSString *TPTimePreview(NSInteger mode) {
     UIView *_sep;
     UILabel *_themeLabel;
     NSArray<UIButton *> *_swatches;
+    UIView *_sep2;
+    UILabel *_langLabel;
+    UIButton *_langButton;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -166,6 +175,45 @@ static NSString *TPTimePreview(NSInteger mode) {
             [sw addObject:b];
         }
         _swatches = sw;
+
+        // Language: follow the system, or force English / Traditional Chinese.
+        _sep2 = [UIView new];
+        _sep2.backgroundColor = [accent colorWithAlphaComponent:0.30];
+        [_card addSubview:_sep2];
+        _langLabel = [UILabel new];
+        _langLabel.text = TPL(@"Language");
+        _langLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
+        _langLabel.textColor = UIColor.secondaryLabelColor;
+        [_card addSubview:_langLabel];
+        // Each language is listed in its own script so anyone can find theirs.
+        NSArray<NSString *> *names = @[TPL(@"Follow System"), @"English", @"繁體中文", @"简体中文", @"日本語", @"한국어"];
+        NSInteger curLang = [TPPrefs integerForKey:TPKeyLanguage];
+        if (curLang < 0 || curLang >= (NSInteger)names.count) curLang = 0;
+        UIButtonConfiguration *c = [UIButtonConfiguration plainButtonConfiguration];
+        c.image = [UIImage systemImageNamed:@"chevron.up.chevron.down"
+                          withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:10 weight:UIImageSymbolWeightSemibold]];
+        c.imagePlacement = NSDirectionalRectEdgeTrailing;
+        c.imagePadding = 5;
+        c.contentInsets = NSDirectionalEdgeInsetsMake(6, 6, 6, 0);
+        c.attributedTitle = [[NSAttributedString alloc] initWithString:names[curLang] attributes:@{
+            NSFontAttributeName: [UIFont systemFontOfSize:14 weight:UIFontWeightMedium] }];
+        _langButton = [UIButton buttonWithConfiguration:c primaryAction:nil];
+        _langButton.tintColor = TPAccentIcon();
+        _langButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentTrailing;
+        NSMutableArray *acts = [NSMutableArray array];
+        for (NSInteger i = 0; i < (NSInteger)names.count; i++) {
+            UIAction *a = [UIAction actionWithTitle:names[i] image:nil identifier:nil handler:^(UIAction *x) {
+                if ([TPPrefs integerForKey:TPKeyLanguage] == i) return;
+                [TPPrefs setInteger:i forKey:TPKeyLanguage];
+                [TPUI hapticLight];
+                if (weakSelf.onLanguageChange) weakSelf.onLanguageChange();
+            }];
+            if (i == curLang) a.state = UIMenuElementStateOn;
+            [acts addObject:a];
+        }
+        _langButton.menu = [UIMenu menuWithChildren:acts];
+        _langButton.showsMenuAsPrimaryAction = YES;
+        [_card addSubview:_langButton];
     }
     return self;
 }
@@ -185,6 +233,9 @@ static NSString *TPTimePreview(NSInteger mode) {
     _themeLabel.frame = CGRectMake(14, h + 1, MAX(0, sx - 22), 43);
     for (NSUInteger i = 0; i < _swatches.count; i++)
         _swatches[i].frame = CGRectMake(sx + i * (sd + gap), h + 1 + (43 - sd) / 2, sd, sd);
+    _sep2.frame = CGRectMake(14, h + 44, cw - 28, 0.5);
+    _langLabel.frame = CGRectMake(14, h + 45, cw / 2 - 14, 43);
+    _langButton.frame = CGRectMake(cw / 2, h + 45, cw / 2 - 14, 43);
     _badge.frame = CGRectMake(14, (h - d) / 2, d, d);
     _glyph.frame = _badge.bounds;
     CGFloat x = CGRectGetMaxX(_badge.frame) + 12, tw = _card.bounds.size.width - x - 14;
@@ -210,24 +261,27 @@ static NSString *TPTimePreview(NSInteger mode) {
 
 static NSArray<NSArray<NSString *> *> *TPRootGroups(void) {
     return @[ @[@"Ads & Privacy", @"Media Download", @"Player", @"Home Feed"],
-              @[@"Hidden Items", @"Links", @"Messages", @"Interface & Interactions"],
-              @[@"Backup", @"Advanced"],
+              @[@"Author Info", @"Hidden Items", @"Links", @"Messages", @"Interface & Interactions"],
+              @[@"Backup", @"Advanced", @"About"],
               @[@"Donate"] ];
 }
 
 static NSString *TPCategoryIcon(NSString *header) {
-    NSDictionary *m = @{ @"Ads & Privacy": @"shield", @"Media Download": @"arrow.down.circle", @"Player": @"play.rectangle",
-                         @"Home Feed": @"house", @"Hidden Items": @"eye.slash", @"Links": @"link",
+    NSDictionary *m = @{ @"Ads & Privacy": @"shield", @"Media Download": @"arrow.down", @"Player": @"play.rectangle",
+                         @"Home Feed": @"house", @"Author Info": @"person.text.rectangle", @"Hidden Items": @"eye.slash", @"Links": @"link",
                          @"Messages": @"bubble.left.and.bubble.right", @"Interface & Interactions": @"slider.horizontal.3",
-                         @"Backup": @"archivebox", @"Advanced": @"wrench.and.screwdriver", @"Donate": @"cup.and.saucer.fill" };
+                         @"Backup": @"archivebox", @"Advanced": @"wrench.and.screwdriver", @"About": @"info.circle", @"Donate": @"cup.and.saucer" };
     return m[header] ?: @"circle";
 }
 
-static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
+static UIImage *TPSquareIconWith(NSString *symbol, UIColor *bg, UIColor *fg);
+static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) { return TPSquareIconWith(symbol, bg, UIColor.whiteColor); }
+
+static UIImage *TPSquareIconWith(NSString *symbol, UIColor *bg, UIColor *fg) {
     CGFloat d = 30;
     UIImage *glyph = [[UIImage systemImageNamed:symbol withConfiguration:
                        [UIImageSymbolConfiguration configurationWithPointSize:15 weight:UIImageSymbolWeightSemibold]]
-                      imageWithTintColor:UIColor.whiteColor renderingMode:UIImageRenderingModeAlwaysOriginal];
+                      imageWithTintColor:fg renderingMode:UIImageRenderingModeAlwaysOriginal];
     UIGraphicsImageRenderer *r = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(d, d)];
     return [r imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
         [bg setFill];
@@ -331,13 +385,16 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                @{ @"type": @"switch", @"key": TPKeyStripTracking, @"title": @"Remove URL Tracking",
                   @"detail": @"Automatically strip xmt, igshid, utm_* and more when copying, sharing or opening links",
                   @"icon": @"scissors" },
+               @{ @"type": @"switch", @"key": TPKeyHideInCaptures, @"title": @"Hide Buttons in Screenshots",
+                  @"detail": @"ThreadsPulse buttons don't appear in screenshots or screen recordings",
+                  @"icon": @"square.dashed" },
            ]},
         @{ @"header": @"Media Download",
            @"groups": @[@"Download Options", @"Video Downloads", @"Photo Downloads"],
            @"rows": @[
                @{ @"type": @"switch", @"group": @"Download Options", @"key": TPKeyShowDownloadBtn, @"title": @"Download Button",
                   @"detail": @"Shows a download button on posts. Tap to download all photos and videos; long-press to download only photos or only videos.",
-                  @"icon": @"arrow.down.circle" },
+                  @"icon": @"arrow.down" },
                @{ @"type": @"switch", @"group": @"Download Options", @"key": TPKeyParallelDownload, @"title": @"Parallel Downloads",
                   @"detail": @"Downloads up to 4 files at a time when saving an entire post, reducing wait time.",
                   @"icon": @"square.stack.3d.down.right" },
@@ -365,6 +422,9 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                @{ @"type": @"switch", @"key": TPKeyNoAutoplay, @"title": @"Disable Autoplay",
                   @"detail": @"Videos in the feed won't play until you tap them",
                   @"icon": @"play.slash" },
+               @{ @"type": @"switch", @"key": TPKeySwipeLockSpeed, @"title": @"Slide to Lock 2x",
+                  @"detail": @"While holding a video at 2x, a lock button appears at the bottom of the video. Slide your finger onto it to keep 2x after you let go; to unlock, long-press again and slide onto the same button",
+                  @"icon": @"lock" },
                @{ @"type": @"segment", @"key": TPKeyPlaySpeed, @"title": @"Default Playback Speed", @"detail": @"",
                   @"icon": @"speedometer",
                   @"segments": @[@"1x", @"1.25x", @"1.5x", @"2x"] },
@@ -390,6 +450,39 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"detail": @"When you're already at the top of the home feed, tapping the Home tab won't refresh or load new posts",
                   @"icon": @"arrow.clockwise" },
            ]},
+        @{ @"header": @"Author Info",
+           @"footer": @"To avoid limits from Threads, authors are read one at a time and cached for up to 21 days, pausing for 1 hour when needed. Layout changes apply as you scroll.",
+           @"rows": @[
+               @{ @"type": @"switch", @"key": TPKeyAuthorInfo, @"title": @"Show Author Info",
+                  @"detail": @"Shows details from the author's \"About this profile\" with their name in the feed.",
+                  @"icon": @"person.text.rectangle" },
+               @{ @"type": @"action", @"action": @"authorStats", @"title": @"Location Stats",
+                  @"detail": @"See which countries and regions the authors you've read are from.",
+                  @"icon": @"chart.bar.xaxis", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"action", @"action": @"authorStatus", @"title": @"Read Status & Cache",
+                  @"detail": @"See how many authors are cached and whether reading is paused, or clear the cache.",
+                  @"icon": @"gauge.with.dots.needle.33percent", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"caption", @"title": @"Read Automatically", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"switch", @"key": TPKeyAuthorLocation, @"title": @"Location",
+                  @"detail": @"The country or region where the account is based, shown with its flag. Shows \"Not shared\" if the author keeps it private.",
+                  @"icon": @"mappin.and.ellipse", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"switch", @"key": TPKeyAuthorJoined, @"title": @"Join Date",
+                  @"detail": @"The month the account joined Threads.",
+                  @"icon": @"calendar", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"switch", @"key": TPKeyAuthorJoinNumber, @"title": @"Join Number",
+                  @"detail": @"Shows which user number the account was when it joined, such as #7,551,963 or 100M+.",
+                  @"icon": @"number", @"showIf": @[@[TPKeyAuthorInfo, @1], @[TPKeyAuthorJoined, @1]] },
+               @{ @"type": @"switch", @"key": TPKeyAuthorNewBadge, @"title": @"New Account Badge",
+                  @"detail": @"Marks accounts that joined within the last 2 months.",
+                  @"icon": @"sparkles", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"switch", @"key": TPKeyAuthorDefaultName, @"title": @"Default Name Badge",
+                  @"detail": @"Marks accounts that never changed the username Threads assigned at sign-up, such as camel.253044. This doesn't mean the account is fake.",
+                  @"icon": @"person.crop.circle.badge.questionmark", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"caption", @"title": @"Layout", @"showIf": @[TPKeyAuthorInfo, @1] },
+               @{ @"type": @"switch", @"key": TPKeyAuthorOwnLine, @"title": @"Show on Its Own Line",
+                  @"detail": @"Adds a line under the name so the info always shows in full. When off, it sits next to the name and is shortened or hidden if there isn't enough room.",
+                  @"icon": @"text.line.last.and.arrowtriangle.forward", @"showIf": @[TPKeyAuthorInfo, @1] },
+           ]},
         @{ @"header": @"Hidden Items",
            @"groups": @[@"Suggested Content", @"Interface Buttons"],
            @"rows": @[
@@ -398,7 +491,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"person.badge.minus" },
                @{ @"type": @"switch", @"group": @"Suggested Content", @"key": TPKeyHideSearchSuggest, @"title": @"Search Suggestions",
                   @"detail": @"Hide \"Suggested to follow\" on the search page",
-                  @"icon": @"magnifyingglass" },
+                  @"icon": @"person.badge.plus" },
                @{ @"type": @"switch", @"group": @"Suggested Content", @"key": TPKeyHideFollowSuggest, @"title": @"Follow Suggestion Pop-ups",
                   @"detail": @"Stop \"Follow suggestions\" from popping up automatically",
                   @"icon": @"person.crop.circle.badge.xmark" },
@@ -407,7 +500,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"hand.thumbsup" },
                @{ @"type": @"switch", @"group": @"Interface Buttons", @"key": TPKeyHideProfileSearch, @"title": @"Search Button",
                   @"detail": @"Hide the search button on profiles",
-                  @"icon": @"magnifyingglass.circle" },
+                  @"icon": @"magnifyingglass" },
                @{ @"type": @"switch", @"group": @"Interface Buttons", @"key": TPKeyHideIGButton, @"title": @"Instagram Button",
                   @"detail": @"Hide the Instagram button on profiles",
                   @"icon": @"minus.square" },
@@ -423,7 +516,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"hand.tap",
                   @"segments": @[@"Ask", @"Auto-open"], @"showIf": @[TPKeyClipboardLinks, @1] },
                @{ @"type": @"segment", @"key": TPKeyBannerPosition, @"title": @"Prompt Position", @"detail": @"",
-                  @"icon": @"rectangle.topthird.inset.filled",
+                  @"icon": @"arrow.up.arrow.down",
                   @"segments": @[@"Top", @"Middle", @"Bottom"], @"showIf": @[@[TPKeyClipboardLinks, @1], @[TPKeyClipboardMode, @0]] },
                @{ @"type": @"switch", @"key": TPKeyExternalBrowser, @"title": @"Open Links in External Browser",
                   @"detail": @"Links in posts and bios open in Safari (or your default browser) instead of the in-app browser. Threads links still open in the app",
@@ -433,7 +526,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
            @"rows": @[
                @{ @"type": @"switch", @"key": TPKeyNoSeen, @"title": @"Hide Seen Status",
                   @"detail": @"Viewing messages won't notify the other person. To show \"Seen\" normally in a specific chat, tap the eye icon at the top right of that chat.",
-                  @"icon": @"eye.slash.circle" },
+                  @"icon": @"eye.slash" },
                @{ @"type": @"switch", @"key": TPKeySeenOnReply, @"title": @"Show Seen When You Reply",
                   @"detail": @"Let the other person see \"Seen\" once you reply",
                   @"icon": @"arrowshape.turn.up.left", @"showIf": @[TPKeyNoSeen, @1] },
@@ -445,7 +538,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"ellipsis.bubble" },
                @{ @"type": @"switch", @"key": TPKeyKeepUnsent, @"title": @"Keep Unsent Messages",
                   @"detail": @"When someone unsends a message, it stays in your chat marked \"Unsent\"",
-                  @"icon": @"arrow.uturn.backward.circle" },
+                  @"icon": @"arrow.uturn.backward" },
            ]},
         @{ @"header": @"Interface & Interactions",
            @"rows": @[
@@ -454,7 +547,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                   @"icon": @"heart" },
                @{ @"type": @"segment", @"key": TPKeyExactTime, @"title": @"Post Time Format", @"detail": @"",
                   @"icon": @"clock",
-                  @"segments": @[@"Relative", @"Date & Time", @"With Seconds"], @"preview": @"time" },
+                  @"segments": @[@"Relative", @"Date & Time", @"With Year", @"With Seconds"], @"preview": @"time" },
                @{ @"type": @"switch", @"key": TPKeyPinTabBar, @"title": @"Keep Tab Bar Visible",
                   @"detail": @"Scrolling won't hide the tab bar at the bottom; it always stays on screen",
                   @"icon": @"dock.rectangle" },
@@ -484,16 +577,34 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
                @{ @"type": @"action", @"action": @"welcome", @"title": @"Welcome Screen",
                   @"detail": @"See how to open ThreadsPulse settings again",
                   @"icon": @"hand.wave" },
+               @{ @"type": @"action", @"action": @"whatsNew", @"title": @"What's New",
+                  @"detail": @"See what's new in this version",
+                  @"icon": @"newspaper" },
                @{ @"type": @"switch", @"key": TPKeySideloadFix, @"title": @"Sideload Compatibility Fix",
                   @"detail": @"Keeps you signed in and app group data working after re-signing. Only active on re-signed apps; takes effect after reopening Threads",
                   @"icon": @"key" },
+           ]},
+        // Opened from the main page. The plugin version is in the page header.
+        @{ @"header": @"About",
+           @"groups": @[@"Environment", @"Links"],
+           @"rows": @[
+               @{ @"type": @"info", @"group": @"Environment", @"title": @"Threads Version", @"value": TPAboutRows()[1][1], @"icon": @"at" },
+               @{ @"type": @"info", @"group": @"Environment", @"title": @"Bundle ID", @"value": TPAboutRows()[2][1], @"icon": @"shippingbox" },
+               @{ @"type": @"info", @"group": @"Environment", @"title": @"Device", @"value": TPAboutRows()[4][1], @"icon": @"iphone" },
+               @{ @"type": @"info", @"group": @"Environment", @"title": @"iOS Version", @"value": TPAboutRows()[3][1], @"icon": @"gear" },
+               @{ @"type": @"action", @"group": @"Environment", @"action": @"copyAbout", @"title": @"Copy All Info", @"detail": @"",
+                  @"icon": @"doc.on.doc" },
+               @{ @"type": @"weblink", @"group": @"Links", @"url": kTPRepoURL, @"title": @"Source Code on GitHub", @"icon": @"chevron.left.forwardslash.chevron.right" },
+               @{ @"type": @"weblink", @"group": @"Links", @"action": @"report", @"title": @"Report a Problem", @"icon": @"exclamationmark.bubble" },
+               @{ @"type": @"weblink", @"group": @"Links", @"url": @"https://github.com/meettomorrow/lee-su-threads",
+                  @"title": @"Author Info draws on lee-su-threads (MIT)", @"icon": @"person.2" },
            ]},
         @{ @"header": @"Donate",
            @"footer": @"Your support keeps ThreadsPulse updated. Thank you!",
            @"rows": @[
                @{ @"type": @"link", @"url": kTPDonateURL, @"title": @"Buy Me a Coffee",
                   @"detail": @"Support ThreadsPulse on Ko-fi",
-                  @"icon": @"cup.and.saucer.fill" },
+                  @"icon": @"cup.and.saucer" },
            ]},
     ];
     _allSections = _sections;
@@ -515,7 +626,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
             }
             if (parts.count) _sections = parts;
         }
-        _showAbout = [sec[@"header"] isEqualToString:@"Advanced"];
+        _showAbout = [sec[@"header"] isEqualToString:@"About"];   // adds Reset All Settings at the bottom
         self.navigationItem.title = TPL(sec[@"header"]);
         self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
     }
@@ -529,6 +640,34 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     CGFloat w = self.tableView.bounds.size.width;
+    if (!self.isRoot && w > 0 && w != _headerWidth && [_allSections[_category][@"header"] isEqualToString:@"About"]) {
+        _headerWidth = w;
+        UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 150)];
+        CGFloat d = 64;
+        UIView *tile = [[UIView alloc] initWithFrame:CGRectMake((w - d) / 2, 12, d, d)];
+        tile.backgroundColor = TPAccent();
+        tile.layer.cornerRadius = 16;
+        tile.layer.cornerCurve = kCACornerCurveContinuous;
+        UIImageView *g = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"waveform.path.ecg"
+            withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:30 weight:UIImageSymbolWeightSemibold]]];
+        g.tintColor = UIColor.whiteColor;
+        g.contentMode = UIViewContentModeCenter;
+        g.frame = tile.bounds;
+        [tile addSubview:g];
+        [box addSubview:tile];
+        UILabel *name = [[UILabel alloc] initWithFrame:CGRectMake(20, 86, w - 40, 26)];
+        name.text = @"ThreadsPulse";
+        name.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
+        name.textAlignment = NSTextAlignmentCenter;
+        [box addSubview:name];
+        UILabel *ver = [[UILabel alloc] initWithFrame:CGRectMake(20, 112, w - 40, 20)];
+        ver.text = [NSString stringWithFormat:@"%@ %@", TPL(@"Version"), TP_VERSION];
+        ver.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+        ver.textColor = UIColor.secondaryLabelColor;
+        ver.textAlignment = NSTextAlignmentCenter;
+        [box addSubview:ver];
+        self.tableView.tableHeaderView = box;
+    }
     if (!self.isRoot && w > 0 && w != _headerWidth) {
         _headerWidth = w;
         UIView *box = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 56)];
@@ -541,10 +680,15 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
     }
     if (self.isRoot && w > 0 && w != _headerWidth) {
         _headerWidth = w;
-        _header = [[TPSettingsHeaderView alloc] initWithFrame:CGRectMake(0, 0, w, 136)];
+        _header = [[TPSettingsHeaderView alloc] initWithFrame:CGRectMake(0, 0, w, 180)];
         [_header setEnabledCount:[self enabledFeatureCount]];
         __weak typeof(self) weakSelf = self;
         _header.onThemeChange = ^{ [weakSelf applyTheme]; };
+        // Every label in the settings is built once, so reopen them in the new language.
+        _header.onLanguageChange = ^{
+            UIViewController *nav = weakSelf.navigationController ?: weakSelf;
+            [nav.presentingViewController dismissViewControllerAnimated:YES completion:^{ [TPSettingsViewController present]; }];
+        };
         self.tableView.tableHeaderView = _header;
     }
 }
@@ -577,7 +721,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 
 - (NSInteger)tableView:(UITableView *)tv numberOfRowsInSection:(NSInteger)s {
     if (self.isRoot) return TPRootGroups()[s].count;
-    if (s >= (NSInteger)_sections.count) return 2;
+    if (s >= (NSInteger)_sections.count) return 1;   // Reset All Settings (the version moved to the main page)
     NSArray *rows = [self visibleRowsInSection:s];
     if (!_shownRows) _shownRows = [NSMutableDictionary dictionary];
     _shownRows[@(s)] = rows;
@@ -586,7 +730,7 @@ static UIImage *TPSquareIcon(NSString *symbol, UIColor *bg) {
 
 - (NSString *)tableView:(UITableView *)tv titleForHeaderInSection:(NSInteger)s {
     if (self.isRoot) return nil;
-    if (s >= (NSInteger)_sections.count) return TPL(@"About");
+    if (s >= (NSInteger)_sections.count) return nil;
     NSString *g = _sections[s][@"groupTitle"];
     return g.length ? TPL(g) : nil;
 }
@@ -787,6 +931,66 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     return cell;
 }
 
+// "26.1 (23B85)": the build number tells betas and point releases apart.
+static NSString *TPOSVersionWithBuild(void) {
+    NSString *v = UIDevice.currentDevice.systemVersion ?: @"?";
+    char buf[32] = {0};
+    size_t len = sizeof(buf);
+    if (sysctlbyname("kern.osversion", buf, &len, NULL, 0) == 0 && buf[0]) v = [NSString stringWithFormat:@"%@ (%s)", v, buf];
+    return v;
+}
+
+// "iPhone 15 Pro (iPhone16,1)". Unknown or newer models show the identifier alone.
+static NSString *TPDeviceModel(void) {
+    char buf[64] = {0};
+    size_t len = sizeof(buf);
+    if (sysctlbyname("hw.machine", buf, &len, NULL, 0) != 0 || !buf[0]) return UIDevice.currentDevice.model ?: @"?";
+    NSString *idf = [NSString stringWithUTF8String:buf];
+    static NSDictionary<NSString *, NSString *> *names;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        names = @{
+            @"iPhone11,2": @"iPhone XS", @"iPhone11,4": @"iPhone XS Max", @"iPhone11,6": @"iPhone XS Max", @"iPhone11,8": @"iPhone XR",
+            @"iPhone12,1": @"iPhone 11", @"iPhone12,3": @"iPhone 11 Pro", @"iPhone12,5": @"iPhone 11 Pro Max", @"iPhone12,8": @"iPhone SE (2nd generation)",
+            @"iPhone13,1": @"iPhone 12 mini", @"iPhone13,2": @"iPhone 12", @"iPhone13,3": @"iPhone 12 Pro", @"iPhone13,4": @"iPhone 12 Pro Max",
+            @"iPhone14,4": @"iPhone 13 mini", @"iPhone14,5": @"iPhone 13", @"iPhone14,2": @"iPhone 13 Pro", @"iPhone14,3": @"iPhone 13 Pro Max",
+            @"iPhone14,6": @"iPhone SE (3rd generation)", @"iPhone14,7": @"iPhone 14", @"iPhone14,8": @"iPhone 14 Plus",
+            @"iPhone15,2": @"iPhone 14 Pro", @"iPhone15,3": @"iPhone 14 Pro Max", @"iPhone15,4": @"iPhone 15", @"iPhone15,5": @"iPhone 15 Plus",
+            @"iPhone16,1": @"iPhone 15 Pro", @"iPhone16,2": @"iPhone 15 Pro Max",
+            @"iPhone17,3": @"iPhone 16", @"iPhone17,4": @"iPhone 16 Plus", @"iPhone17,1": @"iPhone 16 Pro", @"iPhone17,2": @"iPhone 16 Pro Max",
+            @"iPhone17,5": @"iPhone 16e",
+            @"iPhone18,3": @"iPhone 17", @"iPhone18,4": @"iPhone Air", @"iPhone18,1": @"iPhone 17 Pro", @"iPhone18,2": @"iPhone 17 Pro Max",
+            @"iPhone18,5": @"iPhone 17e",
+            // 2026. iPhone19,1/19,5/19,6 aren't confirmed yet, so they show as the identifier alone.
+            @"iPhone19,2": @"iPhone 18 Pro", @"iPhone19,3": @"iPhone 18 Pro Max", @"iPhone19,7": @"iPhone 18 Pro Max",
+            @"iPhone19,4": @"iPhone Duo",
+        };
+    });
+    NSString *name = names[idf];
+    return name ? [NSString stringWithFormat:@"%@ (%@)", name, idf] : idf;
+}
+
+// Facts that help when reporting a problem (About page, Copy All Info, issue template).
+static NSArray<NSArray<NSString *> *> *TPAboutRows(void) {
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary;
+    NSString *ver = info[@"CFBundleShortVersionString"] ?: @"?", *build = info[@"CFBundleVersion"];
+    NSString *threads = build.length && ![build isEqualToString:ver] ? [NSString stringWithFormat:@"%@ (%@)", ver, build] : ver;
+    return @[ @[@"Plugin Version", TP_VERSION, @"waveform.path.ecg"],
+              @[@"Threads Version", threads, @"at"],
+              @[@"Bundle ID", NSBundle.mainBundle.bundleIdentifier ?: @"?", @"shippingbox"],
+              @[@"iOS Version", TPOSVersionWithBuild(), @"gear"],
+              @[@"Device", TPDeviceModel(), @"iphone"] ];
+}
+
+- (void)copyAbout:(id)sender {
+    if ([sender isKindOfClass:[UIGestureRecognizer class]] && [(UIGestureRecognizer *)sender state] != UIGestureRecognizerStateBegan) return;
+    NSMutableArray *lines = [NSMutableArray array];
+    for (NSArray *r in TPAboutRows()) [lines addObject:[NSString stringWithFormat:@"%@: %@", r[0], r[1]]];
+    UIPasteboard.generalPasteboard.string = [lines componentsJoinedByString:@"\n"];
+    [TPUI hapticLight];
+    [TPHUD toast:TPL(@"Copied")];
+}
+
 - (UITableViewCell *)rootCellAt:(NSIndexPath *)ip {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     NSString *h = TPRootGroups()[ip.section][ip.row];
@@ -795,7 +999,7 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     NSDictionary *link = donate ? [sec[@"rows"] firstObject] : nil;
     UIListContentConfiguration *c = [UIListContentConfiguration valueCellConfiguration];
     c.text = TPL(donate ? link[@"title"] : h);
-    c.secondaryText = donate ? nil : [self summaryForSection:sec];
+    c.secondaryText = donate ? nil : [h isEqualToString:@"About"] ? TP_VERSION : [self summaryForSection:sec];
     c.secondaryTextProperties.color = UIColor.secondaryLabelColor;
     c.image = TPSquareIcon(TPCategoryIcon(h), donate ? TPKofiColor() : TPAccent());
     c.imageToTextPadding = 14;
@@ -817,28 +1021,46 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
 
     if (ip.section >= (NSInteger)_sections.count) {
-        if (ip.row == 0) {
-            UIListContentConfiguration *c = [UIListContentConfiguration valueCellConfiguration];
-            c.text = TPL(@"Version");
-            c.secondaryText = TP_VERSION;
-            TPApplyIcon(c, @"info.circle", nil);
-            cell.contentConfiguration = c;
-            TPApplyCardBackground(cell);
-            cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        } else {
-            UIListContentConfiguration *c = [UIListContentConfiguration cellConfiguration];
-            c.text = TPL(@"Reset All Settings");
-            c.textProperties.color = UIColor.systemRedColor;
-            TPApplyIcon(c, @"arrow.counterclockwise", UIColor.systemRedColor);
-            cell.contentConfiguration = c;
-            TPApplyCardBackground(cell);
-        }
+        UIListContentConfiguration *c = [UIListContentConfiguration cellConfiguration];
+        c.text = TPL(@"Reset All Settings");
+        c.textProperties.color = UIColor.systemRedColor;
+        TPApplyIcon(c, @"arrow.counterclockwise", UIColor.systemRedColor);
+        cell.contentConfiguration = c;
+        TPApplyCardBackground(cell);
         return cell;
     }
 
     NSDictionary *row = [self rowAt:ip];
     NSString *type = row[@"type"];
     if ([type isEqualToString:@"segment"]) return [self segmentCellForRow:row];
+    if ([type isEqualToString:@"info"]) {
+        UIListContentConfiguration *c = [UIListContentConfiguration valueCellConfiguration];
+        c.text = TPL(row[@"title"]);
+        c.secondaryText = row[@"value"];
+        c.secondaryTextProperties.color = UIColor.secondaryLabelColor;
+        c.secondaryTextProperties.font = [UIFont monospacedSystemFontOfSize:13 weight:UIFontWeightRegular];
+        c.secondaryTextProperties.numberOfLines = 1;
+        c.secondaryTextProperties.lineBreakMode = NSLineBreakByTruncatingMiddle;
+        TPApplyIcon(c, row[@"icon"], nil);
+        cell.contentConfiguration = c;
+        TPApplyCardBackground(cell);
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        [cell addGestureRecognizer:[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(copyAbout:)]];
+        return cell;
+    }
+    if ([type isEqualToString:@"weblink"]) {
+        UIListContentConfiguration *c = [UIListContentConfiguration cellConfiguration];
+        c.text = TPL(row[@"title"]);
+        TPApplyIcon(c, row[@"icon"], nil);
+        cell.contentConfiguration = c;
+        TPApplyCardBackground(cell);
+        UIImageView *ext = [[UIImageView alloc] initWithImage:
+            [UIImage systemImageNamed:@"arrow.up.right"
+                    withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightBold]]];
+        ext.tintColor = UIColor.tertiaryLabelColor;
+        cell.accessoryView = ext;
+        return cell;
+    }
     if ([type isEqualToString:@"caption"]) return [self captionCellForRow:row];
     NSString *detail = row[@"detail"];
 
@@ -902,7 +1124,7 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     UITableViewCell *cell = [tv cellForRowAtIndexPath:ip];
 
     if (ip.section >= (NSInteger)_sections.count) {
-        if (ip.row == 1) [self confirmReset];
+        [self confirmReset];
         return;
     }
     NSDictionary *row = [self rowAt:ip];
@@ -912,9 +1134,24 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
         else if ([row[@"action"] isEqualToString:@"resetSeenChats"]) [self confirmResetSeenChats];
         else if ([row[@"action"] isEqualToString:@"analyticsLog"]) [self showAnalyticsLog];
         else if ([row[@"action"] isEqualToString:@"welcome"]) [TPWelcomeViewController present];
+        else if ([row[@"action"] isEqualToString:@"whatsNew"]) [TPWelcomeViewController presentWhatsNew];
+        else if ([row[@"action"] isEqualToString:@"authorStatus"]) [self showAuthorStatus];
+        else if ([row[@"action"] isEqualToString:@"authorStats"]) [self.navigationController pushViewController:[TPAuthorStatsViewController new] animated:YES];
+        else if ([row[@"action"] isEqualToString:@"copyAbout"]) [self copyAbout:nil];
         else [self importSettings];
     } else if ([type isEqualToString:@"link"]) {
         [self openLink:row[@"url"]];
+    } else if ([type isEqualToString:@"weblink"]) {
+        if ([row[@"action"] isEqualToString:@"report"]) {
+            // A new GitHub issue with the environment filled in.
+            NSMutableString *body = [NSMutableString stringWithString:@"**What happened**\n\n\n**Steps to reproduce**\n\n\n**Environment**\n"];
+            for (NSArray *r in TPAboutRows()) [body appendFormat:@"- %@: %@\n", r[0], r[1]];
+            NSURLComponents *u = [NSURLComponents componentsWithString:[kTPRepoURL stringByAppendingString:@"/issues/new"]];
+            u.queryItems = @[[NSURLQueryItem queryItemWithName:@"body" value:body]];
+            [self openLink:u.URL.absoluteString];
+        } else {
+            [self openLink:row[@"url"]];
+        }
     }
 }
 
@@ -943,6 +1180,33 @@ static BOOL TPConditionUsesKey(NSArray *cond, NSString *key) {
     NSString *r = TPAnalyticsLogReport();
     if (!r) { [TPHUD toast:TPL(@"No analytics recorded yet")]; return; }
     [TPDownloader showReport:r];
+}
+
+- (void)showAuthorStatus {
+    NSTimeInterval left = [TPAuthorInfo pausedRemaining];
+    NSMutableString *msg = [NSMutableString stringWithFormat:TPL(@"%lu authors cached · %lu read since launch"),
+                            (unsigned long)[TPAuthorInfo cachedCount], (unsigned long)[TPAuthorInfo sessionRequestCount]];
+    [msg appendString:@"\n"];
+    if (left > 0) [msg appendFormat:TPL(@"Paused by rate limit protection, resumes in %ld min"), (long)ceil(left / 60.0)];
+    else [msg appendString:TPL(@"Reading normally")];
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:TPL(@"Read Status & Cache") message:msg
+                                                        preferredStyle:UIAlertControllerStyleAlert];
+    if (left > 0) {
+        [a addAction:[UIAlertAction actionWithTitle:TPL(@"Resume Now") style:UIAlertActionStyleDefault handler:^(UIAlertAction *x) {
+            [TPAuthorInfo resume];
+        }]];
+    }
+    [a addAction:[UIAlertAction actionWithTitle:TPL(@"Clear Cache") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *x) {
+        [TPAuthorInfo clearCache];
+        [TPHUD toast:TPL(@"Cache cleared")];
+    }]];
+    if ([TPPrefs boolForKey:TPKeyDebugToast]) {
+        [a addAction:[UIAlertAction actionWithTitle:TPL(@"Diagnostics") style:UIAlertActionStyleDefault handler:^(UIAlertAction *x) {
+            [TPDownloader showReport:[TPAuthorInfo diagnostics]];
+        }]];
+    }
+    [a addAction:[UIAlertAction actionWithTitle:TPL(@"Close") style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:a animated:YES completion:nil];
 }
 
 - (void)confirmResetSeenChats {

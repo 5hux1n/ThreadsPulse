@@ -11,6 +11,7 @@
 #import <objc/runtime.h>
 #import "TPUI.h"
 #import "TPHUD.h"
+#import "TPCapsule.h"
 
 @interface TPDownloadJob : NSObject <NSURLSessionDownloadDelegate>
 - (instancetype)initWithItems:(NSArray<NSDictionary *> *)items;
@@ -24,6 +25,11 @@
 @end
 
 static NSString *sPendingReport;
+static NSMutableSet *sJobs;
+// Downloads run one job at a time; jobs started meanwhile wait here (the progress capsule
+// doesn't block the app, so several posts can be queued).
+static NSMutableArray<NSArray<NSDictionary *> *> *sQueue;
+static void TPStartNextJob(void);
 
 // Collects every <Representation> in an MPD with the attributes it inherits from its
 // <AdaptationSet>. Threads/Instagram manifests use one <BaseURL> per Representation that points
@@ -70,6 +76,21 @@ static NSString *sPendingReport;
 static NSDictionary *TPDashInfoFromManifest(NSData *mpd, NSInteger progressivePixels);
 static NSString *TPTranscodeTarget(NSString *codec);
 static NSInteger TPProgressivePixels(id obj);
+
+// Four-character code of the first video track ("avc1", "hvc1", "av01", "vp09"…), or nil.
+static NSString *TPVideoFourCC(NSURL *file) {
+    AVURLAsset *a = [AVURLAsset URLAssetWithURL:file options:nil];
+    AVAssetTrack *t = [a tracksWithMediaType:AVMediaTypeVideo].firstObject;
+    CMFormatDescriptionRef fd = (__bridge CMFormatDescriptionRef)t.formatDescriptions.firstObject;
+    if (!fd) return nil;
+    FourCharCode c = CMFormatDescriptionGetMediaSubType(fd);
+    char s[5] = { (char)(c >> 24), (char)(c >> 16), (char)(c >> 8), (char)c, 0 };
+    return [NSString stringWithUTF8String:s];
+}
+
+static BOOL TPFileHasAudio(NSURL *file) {
+    return [[AVURLAsset URLAssetWithURL:file options:nil] tracksWithMediaType:AVMediaTypeAudio].count > 0;
+}
 
 @implementation TPDownloader
 
@@ -418,6 +439,16 @@ static BOOL TPCodecOK(NSString *codecs) {
     return NO;
 }
 
+// HLG (18) or PQ (16) in the codec string's transfer field:
+// vp09.PP.LL.DD.CC.cp.tc.mc.FF   av01.P.LLT.DD.M.CCC.cp.tc.mc.F
+static BOOL TPCodecIsHDR(NSString *codec) {
+    NSArray<NSString *> *f = [codec.lowercaseString componentsSeparatedByString:@"."];
+    NSInteger tc = 0;
+    if ([codec.lowercaseString hasPrefix:@"vp09"] && f.count >= 7) tc = f[6].integerValue;
+    else if ([codec.lowercaseString hasPrefix:@"av01"] && f.count >= 8) tc = f[7].integerValue;
+    return tc == 16 || tc == 18;
+}
+
 static NSDictionary *TPDashInfoFromManifest(NSData *mpd, NSInteger progressivePixels) {
     if (!mpd.length) return nil;
     NSXMLParser *xp = [[NSXMLParser alloc] initWithData:mpd];
@@ -450,7 +481,12 @@ static NSDictionary *TPDashInfoFromManifest(NSData *mpd, NSInteger progressivePi
                    || (px == bestPx && pass == bestPass && bw > bestVBw);
         if (better) { bestV = r; bestPx = px; bestVBw = bw; bestPass = pass; }
     }
-    if (!bestV || bestPx <= progressivePixels) return nil;
+    if (!bestV) return nil;
+    // Use DASH when it's sharper than the progressive MP4 — or, with "Keep HDR", when it's the same
+    // size but HDR: the progressive MP4 is SDR, so it would lose the HDR look.
+    BOOL hdr = TPCodecIsHDR(bestV[@"codecs"] ?: @"");
+    BOOL keepHDR = hdr && [TPPrefs integerForKey:TPKeyVideoFormat] == 0;
+    if (bestPx < progressivePixels || (bestPx == progressivePixels && !keepHDR)) return nil;
 
     NSURL *vu = [NSURL URLWithString:bestV[@"BaseURL"]];
     if (!vu) return nil;
@@ -462,6 +498,7 @@ static NSDictionary *TPDashInfoFromManifest(NSData *mpd, NSInteger progressivePi
     NSInteger w = [bestV[@"width"] integerValue], h = [bestV[@"height"] integerValue];
     NSString *label = bestV[@"FBQualityLabel"];
     if (!label.length && w && h) label = [NSString stringWithFormat:@"%ldp", (long)MIN(w, h)];
+    if (keepHDR && label.length && ![label.uppercaseString containsString:@"HDR"]) label = [label stringByAppendingString:@" HDR"];
     if (label.length) out[@"dashLabel"] = label;
     out[@"dashSize"] = [NSString stringWithFormat:@"%ldx%ld %@", (long)w, (long)h, bestV[@"codecs"] ?: @""];
     if (!bestPass) out[@"dashTranscode"] = @YES;
@@ -523,7 +560,7 @@ static NSString *TPDashDiag(NSString *label, NSArray *objs, NSInteger prog) {
         [r appendFormat:@"  head: %@\n", x.length > 600 ? [x substringToIndex:600] : x];
     }
     NSDictionary *best = TPDashInfoFromManifest(mpd, prog);
-    [r appendFormat:@"  chosen: %@%@\n", best ? best[@"dashSize"] : @"none (not larger / codec)",
+    [r appendFormat:@"  chosen: %@%@\n", best ? best[@"dashSize"] : @"none (not larger, not HDR / codec)",
          [best[@"dashTranscode"] boolValue] ? [@" → " stringByAppendingString:TPTranscodeTarget(best[@"dashCodec"])] : @""];
     [r appendFormat:@"  HW decode vp09 %@ · av01 %@\n",
          VTIsHardwareDecodeSupported('vp09') ? @"yes" : @"no", VTIsHardwareDecodeSupported('av01') ? @"yes" : @"no"];
@@ -557,7 +594,6 @@ static NSString *TPDashDiag(NSString *label, NSArray *objs, NSInteger prog) {
 
 + (double)imageAreaFromURL:(NSURL *)url { return (double)TPImageScore(url); }
 
-+ (void)setPendingReport:(NSString *)report { sPendingReport = [report copy]; }
 
 + (void)appendPendingReport:(NSString *)report {
     if (![TPPrefs boolForKey:TPKeyDebugToast] || !report.length) return;
@@ -588,8 +624,14 @@ static NSArray<NSDictionary *> *TPStripDash(NSArray<NSDictionary *> *items) {
     if (!items.count) return;
     dispatch_async(dispatch_get_main_queue(), ^{
         void (^run)(NSArray *) = ^(NSArray *list) {
-            TPDownloadJob *job = [[TPDownloadJob alloc] initWithItems:list];
-            [job start];
+            if (!sQueue) sQueue = [NSMutableArray array];
+            [sQueue addObject:list];
+            if (sJobs.count) {
+                [TPHUD toast:TPL(@"Added to download queue")];
+                [NSNotificationCenter.defaultCenter postNotificationName:@"TPQueueChanged" object:nil];
+                return;
+            }
+            TPStartNextJob();
         };
         NSDictionary *dashItem = nil;
         for (NSDictionary *d in items) if (d[@"dashVideo"]) { dashItem = d; break; }
@@ -629,7 +671,7 @@ static NSArray<NSDictionary *> *TPStripDash(NSArray<NSDictionary *> *items) {
 
 @end
 
-static NSMutableSet *sJobs;
+
 
 // Adds saved assets to a "Threads" album, creating it once. Needs read/write Photos access;
 // failures are ignored because the files are already in the library.
@@ -718,12 +760,24 @@ static NSData *TPJPEGData(UIImage *img) {
     return UIImageJPEGRepresentation(flat, 0.95);
 }
 
+static void TPStartNextJob(void) {
+    if (sJobs.count || !sQueue.count) return;
+    NSArray *list = sQueue.firstObject;
+    [sQueue removeObjectAtIndex:0];
+    TPDownloadJob *job = [[TPDownloadJob alloc] initWithItems:list];
+    [job start];
+}
+
 @implementation TPDownloadJob {
+    UIBackgroundTaskIdentifier _bgTask;
+    BOOL _wentBackground;
+    NSInteger _resumeTries;
+    id _bgObserver;
     NSArray<NSDictionary *> *_items;
     NSInteger _index, _urlIndex, _saved, _failed;
     NSURLSession *_session;
     NSURLSessionDownloadTask *_task;
-    TPHUD *_hud;
+    TPCapsule *_hud;
     BOOL _cancelled, _allowPhotos;
     NSURL *_pendingFile;
     NSMutableArray<NSURL *> *_leftovers;
@@ -748,6 +802,10 @@ static NSData *TPJPEGData(UIImage *img) {
     NSString *_speedText;
     // "Threads" album
     BOOL _useAlbum, _albumDenied;
+    // Per-item results for the capsule's file list: 2 saved, 3 failed.
+    NSMutableDictionary<NSNumber *, NSNumber *> *_states;
+    NSInteger _savedAtItemStart, _failedAtItemStart;
+    CGFloat _itemFrac;
     NSMutableArray<NSString *> *_savedIDs;
 }
 
@@ -758,6 +816,7 @@ static NSData *TPJPEGData(UIImage *img) {
         _log = [NSMutableArray array];
         _savedSizes = [NSMutableArray array];
         _prefetch = [NSMutableDictionary dictionary];
+        _states = [NSMutableDictionary dictionary];
         _allTasks = [NSMutableArray array];
         _savedIDs = [NSMutableArray array];
         _useAlbum = [TPPrefs boolForKey:TPKeySaveToAlbum];
@@ -818,10 +877,26 @@ static NSData *TPJPEGData(UIImage *img) {
 
 - (void)begin {
     __weak typeof(self) weak = self;
-    _hud = [TPHUD showWithTitle:[self titleForCurrent] cancel:^{ [weak cancel]; }];
+    // Keep running for a while if the user leaves Threads mid-download or mid-conversion.
+    _bgTask = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"ThreadsPulse download" expirationHandler:^{
+        typeof(self) s = weak;
+        if (!s || s->_bgTask == UIBackgroundTaskInvalid) return;
+        [UIApplication.sharedApplication endBackgroundTask:s->_bgTask];
+        s->_bgTask = UIBackgroundTaskInvalid;
+    }];
+    _bgObserver = [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil
+                                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
+        typeof(self) s = weak;
+        if (s) s->_wentBackground = YES;
+    }];
+    _hud = [TPCapsule showWithTitle:[self titleForCurrent] cancel:^{ [weak cancel]; }];
+    _hud.queueCount = ^NSInteger { return (NSInteger)sQueue.count; };
+    _hud.cancelAll = ^{ [sQueue removeAllObjects]; [weak cancel]; };
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(queueChanged) name:@"TPQueueChanged" object:nil];
     NSURLSessionConfiguration *cfg = NSURLSessionConfiguration.ephemeralSessionConfiguration;
     _session = [NSURLSession sessionWithConfiguration:cfg delegate:self delegateQueue:NSOperationQueue.mainQueue];
     [self startPrefetch];
+    [_hud setRows:[self rows]];
     _lastTick = CFAbsoluteTimeGetCurrent();
     _speedTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(tick) userInfo:nil repeats:YES];
     [self tryCurrent];
@@ -876,11 +951,10 @@ static NSData *TPJPEGData(UIImage *img) {
     _lastTick = now;
     _speedText = _speed >= 1048576 * 0.1 ? [NSString stringWithFormat:@"%.1f MB/s", _speed / 1048576.0]
                : (_speed > 0 ? [NSString stringWithFormat:@"%.0f KB/s", _speed / 1024.0] : nil);
+    [_hud setSpeed:_speedText];
     if (_waitingPrefetch) {
         CGFloat overall = (CGFloat)_index / (CGFloat)MAX((NSInteger)1, (NSInteger)_items.count);
-        NSString *sub = _speedText ? [NSString stringWithFormat:@"%@\n%@", TPL(@"Waiting for downloads…"), _speedText]
-                                   : TPL(@"Waiting for downloads…");
-        [_hud setProgress:overall subtitle:sub];
+        [_hud setProgress:overall subtitle:TPL(@"Waiting for downloads…")];
     }
 }
 
@@ -892,8 +966,21 @@ static NSData *TPJPEGData(UIImage *img) {
     [_prefetch removeAllObjects];
 }
 
+- (void)queueChanged { [_hud setRows:[self rows]]; }
+
+- (void)jobEnded {
+    [NSNotificationCenter.defaultCenter removeObserver:self name:@"TPQueueChanged" object:nil];
+    if (_bgObserver) { [NSNotificationCenter.defaultCenter removeObserver:_bgObserver]; _bgObserver = nil; }
+    if (_bgTask != UIBackgroundTaskInvalid) { [UIApplication.sharedApplication endBackgroundTask:_bgTask]; _bgTask = UIBackgroundTaskInvalid; }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        TPStartNextJob();
+    });
+}
+
 - (void)cancel {
+    if (_cancelled) return;
     _cancelled = YES;
+    [self jobEnded];
     [self stopTimersAndPrefetch];
     [_export cancelExport];
     [self cleanupDash];
@@ -903,17 +990,77 @@ static NSData *TPJPEGData(UIImage *img) {
 }
 
 - (NSString *)titleForCurrent {
-    if (_items.count <= 1) return TPL(@"Downloading…");
-    return [NSString stringWithFormat:TPL(@"Downloading %ld of %ld"), (long)MIN(_index + 1, (NSInteger)_items.count), (long)_items.count];
+    NSString *t = _items.count <= 1 ? TPL(@"Downloading…")
+        : [NSString stringWithFormat:TPL(@"Downloading %ld of %ld"), (long)MIN(_index + 1, (NSInteger)_items.count), (long)_items.count];
+    return t;
+}
+
+// The capsule's file list: one row per item, consecutive waiting items of the same kind grouped
+// ("Photos 3–5"), at most 6 rows.
+- (NSArray<NSDictionary *> *)rows {
+    NSMutableArray *rows = [NSMutableArray array];
+    NSInteger n = (NSInteger)_items.count, i = 0;
+    while (i < n) {
+        BOOL video = [_items[i][@"video"] boolValue];
+        NSInteger state = i < _index ? [_states[@(i)] integerValue] ?: 2 : (i == _index ? 1 : 0);
+        if (state == 0) {
+            NSInteger j = i;
+            while (j + 1 < n && [_items[j + 1][@"video"] boolValue] == video) j++;
+            NSString *title = j > i
+                ? [NSString stringWithFormat:TPL(video ? @"Videos %ld–%ld" : @"Photos %ld–%ld"), (long)i + 1, (long)j + 1]
+                : [NSString stringWithFormat:TPL(video ? @"Video %ld" : @"Photo %ld"), (long)i + 1];
+            [rows addObject:@{ @"title": title, @"status": TPL(@"Waiting"), @"state": @0 }];
+            i = j + 1;
+            continue;
+        }
+        NSString *title = [NSString stringWithFormat:TPL(video ? @"Video %ld" : @"Photo %ld"), (long)i + 1];
+        NSString *label = state == 1 && _dashStage ? _items[i][@"dashLabel"] : nil;
+        if (label.length) title = [title stringByAppendingFormat:@" · %@", label];
+        NSString *status = state == 2 ? TPL(@"Saved") : state == 3 ? TPL(@"Failed")
+                         : [NSString stringWithFormat:@"%.0f%%", floor(MAX(0, MIN(1, _itemFrac)) * 100)];
+        [rows addObject:@{ @"title": title, @"status": status, @"state": @(state) }];
+        i++;
+    }
+    // Keep the card short: completed rows beyond the last few collapse into the first row.
+    if (rows.count > 6) {
+        NSInteger drop = (NSInteger)rows.count - 6;
+        NSInteger done = 0;
+        for (NSDictionary *r in rows) if ([r[@"state"] integerValue] >= 2) done++;
+        if (done > drop) {
+            NSMutableArray *kept = [NSMutableArray array];
+            NSInteger dropped = 0, failed = 0;
+            for (NSDictionary *r in rows) {
+                if (dropped < drop + 1 && [r[@"state"] integerValue] >= 2) {
+                    dropped++;
+                    if ([r[@"state"] integerValue] == 3) failed++;
+                    continue;
+                }
+                [kept addObject:r];
+            }
+            NSString *t = [NSString stringWithFormat:TPL(@"%ld items done"), (long)dropped];
+            [kept insertObject:@{ @"title": t, @"status": failed ? [NSString stringWithFormat:TPL(@"%ld failed"), (long)failed] : TPL(@"Saved"),
+                                  @"state": @(failed ? 3 : 2) } atIndex:0];
+            rows = kept;
+        }
+    }
+    return rows;
 }
 
 - (void)nextItem {
+    if (_index < (NSInteger)_items.count) {
+        BOOL failedMore = _failed > _failedAtItemStart;
+        _states[@(_index)] = @(failedMore ? 3 : 2);
+    }
+    _savedAtItemStart = _saved;
+    _failedAtItemStart = _failed;
+    _itemFrac = 0;
     [self cleanupDash];
     _dashTried = NO;
     _index++;
     _urlIndex = 0;
     if (_index >= (NSInteger)_items.count) { [self finish]; return; }
     [_hud setTitle:[self titleForCurrent]];
+    [_hud setRows:[self rows]];
     [self tryCurrent];
 }
 
@@ -954,6 +1101,7 @@ static NSData *TPJPEGData(UIImage *img) {
     [_session finishTasksAndInvalidate];
     [self stopTimersAndPrefetch];
     [sJobs removeObject:self];
+    [self jobEnded];
     if (_useAlbum && _savedIDs.count) TPAddToThreadsAlbum(_savedIDs);
     if (_albumDenied && _saved > 0) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -1015,8 +1163,9 @@ static NSData *TPJPEGData(UIImage *img) {
     else if (_dashStage == 2) size = [NSString stringWithFormat:@"%@ %@", TPL(@"Audio stream"), size];
     [parts addObject:size];
     NSString *sub = [parts componentsJoinedByString:@" · "];
-    if (_speedText) sub = [NSString stringWithFormat:@"%@\n%@", sub, _speedText];
+    _itemFrac = itemFrac;
     [_hud setProgress:overall subtitle:sub];
+    [_hud setRows:[self rows]];
 }
 
 - (void)URLSession:(NSURLSession *)s downloadTask:(NSURLSessionDownloadTask *)t didFinishDownloadingToURL:(NSURL *)loc {
@@ -1067,6 +1216,25 @@ static NSData *TPJPEGData(UIImage *img) {
     if (isVideo) {
         NSURL *mp4 = [NSURL fileURLWithPath:[file.path stringByAppendingPathExtension:@"mp4"]];
         [NSFileManager.defaultManager moveItemAtURL:file toURL:mp4 error:nil];
+        // Threads now also serves the plain (progressive) MP4 as AV1 or VP9, which Photos refuses
+        // (error 3302). Convert those with the same decoder path the DASH streams use.
+        NSString *fourcc = TPVideoFourCC(mp4);
+        if (([fourcc isEqualToString:@"av01"] || [fourcc isEqualToString:@"vp09"]) && ![_items[_index][@"progressiveConvert"] boolValue]) {
+            NSMutableArray *items = [_items mutableCopy];
+            NSMutableDictionary *it = [items[_index] mutableCopy];
+            it[@"progressiveConvert"] = @YES;
+            it[@"dashTranscode"] = @YES;
+            it[@"dashCodec"] = [fourcc isEqualToString:@"av01"] ? @"av01" : @"vp09";
+            [it removeObjectForKey:@"dashAudioCodec"];
+            items[_index] = it;
+            _items = items;
+            [self note:[NSString stringWithFormat:@"progressive %@ → converting", fourcc]];
+            _dashVideoFile = mp4;
+            _dashAudioFile = TPFileHasAudio(mp4) ? mp4 : nil;
+            _dashStage = 3;
+            [self transcodeDash];
+            return;
+        }
         [self saveVideoFile:mp4 completion:^(BOOL ok) { [self itemDone:ok]; }];
         return;
     }
@@ -1097,7 +1265,32 @@ static NSData *TPJPEGData(UIImage *img) {
 #pragma mark DASH download + merge
 
 - (void)saveVideoFile:(NSURL *)file completion:(void (^)(BOOL ok))completion {
+    [self saveVideoFile:file attempt:0 completion:completion];
+}
+
+// Photos refuses or interrupts a save while the app is in the background (error 3301). The
+// converted file is kept and saved again once Threads is back in front.
+- (void)saveVideoFile:(NSURL *)file attempt:(NSInteger)attempt completion:(void (^)(BOOL ok))completion {
     [self performSave:^PHAssetChangeRequest *{ return [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:file]; } completion:^(BOOL ok, NSError *e) {
+        BOOL interrupted = !ok && attempt < 2 &&
+            (([e.domain isEqualToString:@"PHPhotosErrorDomain"] && (e.code == 3301 || e.code == 3300)) ||
+             UIApplication.sharedApplication.applicationState != UIApplicationStateActive);
+        if (interrupted && !self->_cancelled) {
+            [self note:[NSString stringWithFormat:@"save video interrupted (%ld), retry when active", (long)e.code]];
+            void (^retry)(void) = ^{ [self saveVideoFile:file attempt:attempt + 1 completion:completion]; };
+            if (UIApplication.sharedApplication.applicationState == UIApplicationStateActive) {
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), retry);
+            } else {
+                [self->_hud setProgress:-1 subtitle:TPL(@"Paused — continues when you return to Threads")];
+                __block id obs = [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil
+                                                                                  queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
+                    [NSNotificationCenter.defaultCenter removeObserver:obs];
+                    obs = nil;
+                    retry();
+                }];
+            }
+            return;
+        }
         [NSFileManager.defaultManager removeItemAtURL:file error:nil];
         if (!ok) [self note:[NSString stringWithFormat:@"save video: %@", e.localizedDescription ?: @"?"]];
         completion(ok);
@@ -1123,6 +1316,13 @@ static NSData *TPJPEGData(UIImage *img) {
 // Any DASH failure drops back to the progressive (720p) URLs of the same item.
 - (void)dashFailed:(NSString *)why {
     if (_cancelled) return;
+    if ([_items[_index][@"progressiveConvert"] boolValue]) {
+        // The progressive file itself needed converting; downloading it again won't help.
+        [self note:[@"convert: " stringByAppendingString:why]];
+        [self cleanupDash];
+        [self itemDone:NO];
+        return;
+    }
     [self note:[@"DASH → 720p: " stringByAppendingString:why]];
     [self cleanupDash];
     _urlIndex = 0;
@@ -1168,7 +1368,9 @@ static NSData *TPJPEGData(UIImage *img) {
     BOOL audioNeedsEncode = _dashAudioFile && audioCodec.length && ![audioCodec hasPrefix:@"mp4a"];
     if ([_items[_index][@"dashTranscode"] boolValue] || audioNeedsEncode) { [self transcodeDash]; return; }
     CGFloat overall = ((CGFloat)_index + 0.98) / (CGFloat)_items.count;
+    _itemFrac = 0.98;
     [_hud setProgress:overall subtitle:TPL(@"Merging video and audio…")];
+    [_hud setRows:[self rows]];
 
     NSURL *vFile = _dashVideoFile, *aFile = _dashAudioFile;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
@@ -1337,6 +1539,69 @@ static TPColorInfo TPColorFromCodec(NSString *codec) {
     return c;
 }
 
+// Reads colour info from the downloaded file itself, for when the manifest's codec string is the
+// short form without it (e.g. "vp09.00.40.08"). Looks in the MP4 init segment for, in order:
+//   vpcC (VP9 config: primaries / transfer / matrix / bit depth)
+//   av1C (AV1 config: its sequence header OBU, parsed with dav1d)
+//   colr 'nclx' (generic colour box)
+// Returns NO when none of them carry usable values (2 = "unspecified").
+static BOOL TPColorFromFile(NSURL *file, TPColorInfo *out) {
+    NSFileHandle *fh = [NSFileHandle fileHandleForReadingFromURL:file error:nil];
+    NSData *head = [fh readDataOfLength:256 * 1024];
+    [fh closeFile];
+    const uint8_t *b = head.bytes;
+    NSUInteger n = head.length;
+    if (n < 16) return NO;
+
+    __block int cp = 2, tc = 2, mc = 2, bits = 0;
+    BOOL (^find)(const char *, NSUInteger *, NSUInteger *) = ^BOOL(const char *type, NSUInteger *payload, NSUInteger *len) {
+        for (NSUInteger i = 4; i + 4 <= n; i++) {
+            if (memcmp(b + i, type, 4) != 0) continue;
+            uint32_t size = ((uint32_t)b[i - 4] << 24) | ((uint32_t)b[i - 3] << 16) | ((uint32_t)b[i - 2] << 8) | b[i - 1];
+            if (size < 8 || i - 4 + size > n) continue;
+            *payload = i + 4;
+            *len = size - 8;
+            return YES;
+        }
+        return NO;
+    };
+
+    NSUInteger p = 0, len = 0;
+    if (find("vpcC", &p, &len) && len >= 10) {
+        // version(1) flags(3) profile level bitDepth|chroma|range primaries transfer matrix
+        bits = b[p + 6] >> 4;
+        cp = b[p + 7]; tc = b[p + 8]; mc = b[p + 9];
+    }
+    if ((cp == 2 || tc == 2) && find("av1C", &p, &len) && len > 4) {
+        Dav1dSequenceHeader seq;
+        if (dav1d_parse_sequence_header(&seq, b + p + 4, len - 4) == 0) {
+            cp = seq.pri; tc = seq.trc; mc = seq.mtrx;
+            bits = seq.hbd == 0 ? 8 : (seq.hbd == 1 ? 10 : 12);
+        } else {
+            bits = (b[p + 2] & 0x40) ? ((b[p + 2] & 0x20) ? 12 : 10) : 8;
+        }
+    }
+    if ((cp == 2 || tc == 2) && find("colr", &p, &len) && len >= 10 && memcmp(b + p, "nclx", 4) == 0) {
+        cp = (b[p + 4] << 8) | b[p + 5];
+        tc = (b[p + 6] << 8) | b[p + 7];
+        mc = (b[p + 8] << 8) | b[p + 9];
+    }
+    if (cp == 2 && tc == 2 && mc == 2) return NO;
+    TPColorInfo c = { NO, bits > 8, cp == 2 ? 1 : cp, tc == 2 ? 1 : tc, mc == 2 ? 1 : mc };
+    c.hdr = (c.tc == 16 || c.tc == 18);
+    *out = c;
+    return YES;
+}
+
+// Colour for a downloaded DASH stream: the file's own boxes win when they say something, since
+// they describe the actual bitstream; otherwise the manifest's codec string.
+static TPColorInfo TPColorForDash(NSString *codec, NSURL *file, NSString **source) {
+    TPColorInfo fromFile;
+    if (file && TPColorFromFile(file, &fromFile)) { if (source) *source = @"file"; return fromFile; }
+    if (source) *source = @"codec string";
+    return TPColorFromCodec(codec ?: @"");
+}
+
 static NSString *TPTranscodeTarget(NSString *codec) {
     TPColorInfo c = TPColorFromCodec(codec ?: @"");
     if (c.hdr && [TPPrefs integerForKey:TPKeyVideoFormat] == 1) return @"H.264 SDR (from HDR)";
@@ -1437,12 +1702,15 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
 @property (nonatomic, weak) AVAssetWriter *writer;
 @property (nonatomic, copy) BOOL (^shouldStop)(void);
 - (instancetype)initWithCodec:(NSString *)codec;
+// Hardware mode: the asset reader already decodes (VideoToolbox), samples carry pixel buffers.
+- (instancetype)initHardware;
+@property (nonatomic, readonly) BOOL hardware;
 - (BOOL)decodeSample:(CMSampleBufferRef)sb;   // NO on error
 - (BOOL)flush;
 @end
 
 @implementation TPSoftDecoder {
-    BOOL _isAV1, _open;
+    BOOL _isAV1, _open, _hw;
     vpx_codec_ctx_t _vpx;
     Dav1dContext *_dav1d;
     int64_t _lastPTS;
@@ -1467,6 +1735,58 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
     }
     _open = YES;
     return self;
+}
+
+- (instancetype)initHardware {
+    if (!(self = [super init])) return nil;
+    _hw = YES;
+    _lastPTS = INT64_MIN;
+    return self;
+}
+- (BOOL)hardware { return _hw; }
+
+// Appends a frame the system decoder produced: colour-tagged as is when the format already fits
+// the encoder, otherwise converted (bit depth, or HDR → SDR for the compatible format).
+- (BOOL)emitPixelBuffer:(CVPixelBufferRef)src pts:(int64_t)pts {
+    if (pts <= _lastPTS) pts = _lastPTS + 1;
+    _lastPTS = pts;
+    AVAssetWriterInput *input = _adaptor.assetWriterInput;
+    for (int waited = 0; !input.isReadyForMoreMediaData; waited++) {
+        if (_writer && _writer.status != AVAssetWriterStatusWriting) {
+            _error = [NSString stringWithFormat:@"encode: writer status %ld %@", (long)_writer.status, _writer.error.localizedDescription ?: @""];
+            return NO;
+        }
+        if (_shouldStop && _shouldStop()) { _error = @"cancelled"; return NO; }
+        if (waited > 7500) { _error = @"encode: writer not ready (timeout)"; return NO; }
+        usleep(2000);
+    }
+    TPAttachColor(src, _color);
+    OSType want = _dst10 ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+    CVPixelBufferRef out = NULL;
+    if (!_toneMap && CVPixelBufferGetPixelFormatType(src) == want) {
+        out = CVPixelBufferRetain(src);
+    } else {
+        if (!_adaptor.pixelBufferPool || CVPixelBufferPoolCreatePixelBuffer(NULL, _adaptor.pixelBufferPool, &out) != kCVReturnSuccess) {
+            _error = @"pixel buffer"; return NO;
+        }
+        if (!_xfer) {
+            if (VTPixelTransferSessionCreate(NULL, &_xfer) != noErr) { CVPixelBufferRelease(out); _error = @"convert: session"; return NO; }
+            if (_toneMap) {
+                VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
+                VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationTransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
+                VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+            }
+        }
+        OSStatus st = VTPixelTransferSessionTransferImage(_xfer, src, out);
+        if (st != noErr) { CVPixelBufferRelease(out); _error = [NSString stringWithFormat:@"convert: %d", (int)st]; return NO; }
+        if (_toneMap) { TPColorInfo sdr = { NO, NO, 1, 1, 1 }; TPAttachColor(out, sdr); }
+        else TPAttachColor(out, _color);
+    }
+    NSString *why = nil;
+    BOOL ok = TPAppendPB(_adaptor, out, CMTimeMake(pts, _timescale), &why);
+    CVPixelBufferRelease(out);
+    if (!ok) _error = why;
+    return ok;
 }
 
 - (void)dealloc {
@@ -1551,6 +1871,12 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
 }
 
 - (BOOL)decodeSample:(CMSampleBufferRef)sb {
+    if (_hw) {
+        CVImageBufferRef pb = CMSampleBufferGetImageBuffer(sb);
+        if (!pb) return YES;
+        CMTime pts = CMTimeConvertScale(CMSampleBufferGetPresentationTimeStamp(sb), _timescale, kCMTimeRoundingMethod_Default);
+        return [self emitPixelBuffer:pb pts:pts.value];
+    }
     CMBlockBufferRef bb = CMSampleBufferGetDataBuffer(sb);
     size_t len = bb ? CMBlockBufferGetDataLength(bb) : 0;
     if (!len) return YES;
@@ -1591,7 +1917,7 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
 }
 
 - (BOOL)flush {
-    if (!_isAV1) return YES;
+    if (_hw || !_isAV1) return YES;
     // dav1d may still hold frames; keep pulling until it has nothing left.
     for (int i = 0; i < 64; i++) {
         Dav1dPicture p = {0};
@@ -1607,6 +1933,32 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
 }
 @end
 
+static NSDictionary *TPHardwareOutputSettings(BOOL tenBit) {
+    return @{ (id)kCVPixelBufferPixelFormatTypeKey: @(tenBit ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+                                                            : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange),
+              (id)kCVPixelBufferIOSurfacePropertiesKey: @{} };
+}
+
+// Whether the system decodes this track: hardware support reported, and a trial read yields a frame.
+static BOOL TPCanHardwareDecode(AVAsset *asset, AVAssetTrack *track, BOOL tenBit) {
+    if (![NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){ 17, 0, 0 }]) return NO;
+    if (!VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1)) return NO;
+    AVAssetReader *r = [AVAssetReader assetReaderWithAsset:asset error:nil];
+    AVAssetReaderTrackOutput *o = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:track outputSettings:TPHardwareOutputSettings(tenBit)];
+    if (!r || ![r canAddOutput:o]) return NO;
+    [r addOutput:o];
+    if (![r startReading]) return NO;
+    BOOL ok = NO;
+    for (int i = 0; i < 4 && !ok; i++) {
+        CMSampleBufferRef sb = [o copyNextSampleBuffer];
+        if (!sb) break;
+        ok = CMSampleBufferGetImageBuffer(sb) != NULL;
+        CFRelease(sb);
+    }
+    [r cancelReading];
+    return ok;
+}
+
 @implementation TPDownloadJob (Transcode)
 
 - (void)transcodeDash {
@@ -1618,12 +1970,40 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
     BOOL softVideo = [_items[_index][@"dashTranscode"] boolValue];
     NSString *stepLabel = softVideo ? TPL(@"Converting video…") : TPL(@"Merging video and audio…");
     __weak typeof(self) weak = self;
+    _wentBackground = UIApplication.sharedApplication.applicationState == UIApplicationStateBackground;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         void (^fail)(NSString *) = ^(NSString *why) {
-            dispatch_async(dispatch_get_main_queue(), ^{ [weak dashFailed:why]; });
+            dispatch_async(dispatch_get_main_queue(), ^{
+                typeof(self) s = weak;
+                if (!s) return;
+                // iOS stops hardware video encoding once Threads is in the background. If that's
+                // what broke the conversion, pick it up again when the user returns.
+                if (s->_wentBackground && s->_resumeTries < 2 && !s->_cancelled) {
+                    s->_resumeTries++;
+                    [s note:[@"paused in background: " stringByAppendingString:why]];
+                    [s->_hud setProgress:-1 subtitle:TPL(@"Paused — continues when you return to Threads")];
+                    __block id obs = nil;
+                    obs = [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil
+                                                                           queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
+                        [NSNotificationCenter.defaultCenter removeObserver:obs];
+                        obs = nil;
+                        typeof(self) s2 = weak;
+                        if (s2 && !s2->_cancelled) [s2 transcodeDash];
+                    }];
+                    return;
+                }
+                [s dashFailed:why];
+            });
         };
         NSError *err = nil;
-        TPColorInfo color = TPColorFromCodec(codec);
+        NSString *colorSource = nil;
+        TPColorInfo color = TPColorForDash(codec, vFile, &colorSource);
+        TPColorInfo fromCodec = TPColorFromCodec(codec);
+        if (color.hdr != fromCodec.hdr || color.tc != fromCodec.tc) {
+            NSString *msg = [NSString stringWithFormat:@"color from %@: cp %d tc %d mc %d (codec string: tc %d)",
+                             colorSource, color.cp, color.tc, color.mc, fromCodec.tc];
+            dispatch_async(dispatch_get_main_queue(), ^{ typeof(self) s0 = weak; if (s0) [s0->_savedSizes addObject:msg]; });
+        }
         BOOL compat = [TPPrefs integerForKey:TPKeyVideoFormat] == 1;
         BOOL toneMap = softVideo && color.hdr && compat;
         BOOL hevc10 = softVideo && color.hdr && !compat;
@@ -1635,10 +2015,16 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
         if (!vt) { fail(@"transcode: no video track"); return; }
 
         TPSoftDecoder *dec = nil;
-        if (softVideo) {
+        NSDictionary *hwOutput = nil;
+        if (softVideo && [codec hasPrefix:@"av01"] && TPCanHardwareDecode(va, vt, hevc10 || toneMap)) {
+            // iPhone 15 Pro and later decode AV1 in hardware: much faster than dav1d, and cooler.
+            dec = [[TPSoftDecoder alloc] initHardware];
+            hwOutput = TPHardwareOutputSettings(hevc10 || toneMap);
+        } else if (softVideo) {
             dec = [[TPSoftDecoder alloc] initWithCodec:codec];
             if (!dec) { fail([codec hasPrefix:@"av01"] ? @"dav1d: open" : @"libvpx: init"); return; }
         }
+        if (dec.hardware) dispatch_async(dispatch_get_main_queue(), ^{ typeof(self) s0 = weak; if (s0) [s0->_savedSizes addObject:@"AV1: hardware decode"]; });
         dec.color = color;
         dec.dst10 = hevc10;
         dec.toneMap = toneMap;
@@ -1646,7 +2032,7 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
 
         AVAssetReader *vr = [AVAssetReader assetReaderWithAsset:va error:&err];
         if (!vr) { fail([@"reader: " stringByAppendingString:err.localizedDescription ?: @"?"]); return; }
-        AVAssetReaderTrackOutput *vo = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:vt outputSettings:nil];
+        AVAssetReaderTrackOutput *vo = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:vt outputSettings:hwOutput];
         vo.alwaysCopiesSampleData = NO;
         if (![vr canAddOutput:vo]) { fail(@"reader: can't add video output"); return; }
         [vr addOutput:vo];
@@ -1779,7 +2165,9 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
                         typeof(self) s2 = weak;
                         if (!s2 || s2->_cancelled) return;
                         CGFloat overall = ((CGFloat)index + 0.97 + 0.03 * f) / (CGFloat)s2->_items.count;
+                        s2->_itemFrac = 0.97 + 0.03 * f;
                         [s2->_hud setProgress:overall subtitle:[NSString stringWithFormat:@"%@ %.0f%%", stepLabel, f * 100]];
+                        [s2->_hud setRows:[s2 rows]];
                     });
                 }
             }

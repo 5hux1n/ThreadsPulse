@@ -9,15 +9,18 @@
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
 	<key>CFBundleVersion</key>
-	<string>1.27.0</string>
+	<string>1.30.0</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.27.0</string>
+	<string>1.30.0</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>
 		<string>zh-Hant</string>
+		<string>zh-Hans</string>
+		<string>ja</string>
+		<string>ko</string>
 	</array>
 </dict>
 </plist>
