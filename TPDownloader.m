@@ -1715,7 +1715,7 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
     Dav1dContext *_dav1d;
     int64_t _lastPTS;
     CVPixelBufferPoolRef _hdrPool;
-    VTPixelTransferSessionRef _xfer;
+    void *_xfer;
 }
 
 - (instancetype)initWithCodec:(NSString *)codec {
@@ -1770,15 +1770,26 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
             _error = @"pixel buffer"; return NO;
         }
         if (!_xfer) {
-            if (VTPixelTransferSessionCreate(NULL, &_xfer) != noErr) { CVPixelBufferRelease(out); _error = @"convert: session"; return NO; }
-            if (_toneMap) {
-                VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
-                VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationTransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
-                VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+            if (@available(iOS 16.0, *)) {
+                VTPixelTransferSessionRef transfer = NULL;
+                if (VTPixelTransferSessionCreate(NULL, &transfer) != noErr) { CVPixelBufferRelease(out); _error = @"convert: session"; return NO; }
+                _xfer = (void *)transfer;
+                if (_toneMap) {
+                    VTSessionSetProperty(transfer, kVTPixelTransferPropertyKey_DestinationColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
+                    VTSessionSetProperty(transfer, kVTPixelTransferPropertyKey_DestinationTransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
+                    VTSessionSetProperty(transfer, kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+                }
+            } else {
+                CVPixelBufferRelease(out); _error = @"convert: requires iOS 16"; return NO;
             }
         }
-        OSStatus st = VTPixelTransferSessionTransferImage(_xfer, src, out);
-        if (st != noErr) { CVPixelBufferRelease(out); _error = [NSString stringWithFormat:@"convert: %d", (int)st]; return NO; }
+        if (@available(iOS 16.0, *)) {
+            VTPixelTransferSessionRef transfer = (VTPixelTransferSessionRef)_xfer;
+            OSStatus st = VTPixelTransferSessionTransferImage(transfer, src, out);
+            if (st != noErr) { CVPixelBufferRelease(out); _error = [NSString stringWithFormat:@"convert: %d", (int)st]; return NO; }
+        } else {
+            CVPixelBufferRelease(out); _error = @"convert: requires iOS 16"; return NO;
+        }
         if (_toneMap) { TPColorInfo sdr = { NO, NO, 1, 1, 1 }; TPAttachColor(out, sdr); }
         else TPAttachColor(out, _color);
     }
@@ -1790,7 +1801,15 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
 }
 
 - (void)dealloc {
-    if (_xfer) { VTPixelTransferSessionInvalidate(_xfer); CFRelease(_xfer); }
+    if (_xfer) {
+        if (@available(iOS 16.0, *)) {
+            VTPixelTransferSessionRef transfer = (VTPixelTransferSessionRef)_xfer;
+            VTPixelTransferSessionInvalidate(transfer);
+            CFRelease(transfer);
+        } else {
+            CFRelease(_xfer);
+        }
+    }
     if (_hdrPool) CVPixelBufferPoolRelease(_hdrPool);
     if (!_open) return;
     if (_isAV1) dav1d_close(&_dav1d); else vpx_codec_destroy(&_vpx);
@@ -1832,10 +1851,16 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
             CVPixelBufferPoolCreate(NULL, NULL, (__bridge CFDictionaryRef)attrs, &_hdrPool);
         }
         if (!_xfer) {
-            if (VTPixelTransferSessionCreate(NULL, &_xfer) != noErr) { CVPixelBufferRelease(out); _error = @"tone map: session"; return NO; }
-            VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
-            VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationTransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
-            VTSessionSetProperty(_xfer, kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+            if (@available(iOS 16.0, *)) {
+                VTPixelTransferSessionRef transfer = NULL;
+                if (VTPixelTransferSessionCreate(NULL, &transfer) != noErr) { CVPixelBufferRelease(out); _error = @"tone map: session"; return NO; }
+                _xfer = (void *)transfer;
+                VTSessionSetProperty(transfer, kVTPixelTransferPropertyKey_DestinationColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
+                VTSessionSetProperty(transfer, kVTPixelTransferPropertyKey_DestinationTransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
+                VTSessionSetProperty(transfer, kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+            } else {
+                CVPixelBufferRelease(out); _error = @"tone map: requires iOS 16"; return NO;
+            }
         }
         CVPixelBufferRef hdr = NULL;
         if (!_hdrPool || CVPixelBufferPoolCreatePixelBuffer(NULL, _hdrPool, &hdr) != kCVReturnSuccess) {
@@ -1843,9 +1868,14 @@ static BOOL TPAppendPB(AVAssetWriterInputPixelBufferAdaptor *adaptor, CVPixelBuf
         }
         TPFillPlanar(hdr, YES, y, u, v, sy, suv, w, h, bits);
         TPAttachColor(hdr, _color);
-        OSStatus st = VTPixelTransferSessionTransferImage(_xfer, hdr, out);
+        if (@available(iOS 16.0, *)) {
+            VTPixelTransferSessionRef transfer = (VTPixelTransferSessionRef)_xfer;
+            OSStatus st = VTPixelTransferSessionTransferImage(transfer, hdr, out);
+            if (st != noErr) { CVPixelBufferRelease(hdr); CVPixelBufferRelease(out); _error = [NSString stringWithFormat:@"tone map: %d", (int)st]; return NO; }
+        } else {
+            CVPixelBufferRelease(hdr); CVPixelBufferRelease(out); _error = @"tone map: requires iOS 16"; return NO;
+        }
         CVPixelBufferRelease(hdr);
-        if (st != noErr) { CVPixelBufferRelease(out); _error = [NSString stringWithFormat:@"tone map: %d", (int)st]; return NO; }
         TPColorInfo sdr = { NO, NO, 1, 1, 1 };
         TPAttachColor(out, sdr);
     }

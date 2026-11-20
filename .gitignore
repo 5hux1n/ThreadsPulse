@@ -1,4 +1,5 @@
 .theos/
+.generated/
 packages/
 build/
 dist/

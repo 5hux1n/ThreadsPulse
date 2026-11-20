@@ -8,17 +8,20 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <malloc/malloc.h>
+#import <dlfcn.h>
 
 NSString *const TPAuthorInfoDidUpdateNotification = @"TPAuthorInfoDidUpdateNotification";
 void (^TPAuthorOpenProfile)(NSString *username);
 
 static NSString *TPFlagForCountry(NSString *name);
 static NSString *const kAppID        = @"com.bloks.www.text_post_app.about_this_profile_async_action";
+static NSString *const kLegacyAppID  = @"com.bloks.www.text_post_app.about_this_profile_bottom_sheet";
 static NSString *const kCacheKey     = @"tp_author_cache";
 static NSString *const kPausedKey    = @"tp_author_paused_until";
 static NSString *const kVariantKey   = @"tp_author_param_format";
 
 static const NSTimeInterval kDelay          = 1.5;            // seconds between requests
+static const NSTimeInterval kLegacyDelay    = 0.75;
 static const NSTimeInterval kCooldown       = 60 * 60;        // rate-limit pause
 static const NSTimeInterval kTTLLocation    = 21 * 86400;     // entries with a location
 static const NSTimeInterval kTTLNoLocation  = 1 * 86400;      // entries without one
@@ -64,6 +67,8 @@ static NSMutableString *gDiag;
 @property (nonatomic, strong) CALayer *capsule;   // outline around everything after the NEW tag
 @end
 
+static void TPInvalidateAuthorHeader(UIView *host);
+
 @implementation TPAuthorBadgeLabel
 - (instancetype)initWithFrame:(CGRect)frame {
     if ((self = [super initWithFrame:frame])) {
@@ -77,11 +82,17 @@ static NSMutableString *gDiag;
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)infoChanged:(NSNotification *)n {
     NSString *pk = n.userInfo[@"pk"];
-    if (!pk || [pk isEqualToString:self.pk]) [self.host setNeedsLayout];
+    if (!pk || [pk isEqualToString:self.pk]) {
+        TPInvalidateAuthorHeader(self.host);
+        [self.host setNeedsLayout];
+    }
 }
 - (void)prefsChanged:(NSNotification *)n {
     NSString *k = n.userInfo[@"key"];
-    if ([k hasPrefix:@"tp_author"] || [k isEqualToString:TPKeyTheme]) [self.host setNeedsLayout];
+    if ([k hasPrefix:@"tp_author"] || [k isEqualToString:TPKeyTheme]) {
+        TPInvalidateAuthorHeader(self.host);
+        [self.host setNeedsLayout];
+    }
 }
 @end
 
@@ -90,6 +101,19 @@ static NSMutableString *gDiag;
 @end
 
 static BOOL TPPkOnScreen(NSString *pk);
+static BOOL TPHeaderVisible(UIView *host);
+static void TPRequeueVisible(void);
+static NSDictionary *TPHeaderJoinInfo(NSString *pk);
+
+static BOOL TPIsThreads410(void) {
+    static BOOL legacy;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSString *version = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+        legacy = [[version componentsSeparatedByString:@"."].firstObject isEqualToString:@"410"];
+    });
+    return legacy;
+}
 
 @implementation TPAuthorInfo
 
@@ -122,6 +146,16 @@ static BOOL TPPkOnScreen(NSString *pk);
 
 #pragma mark - Cache
 
+static BOOL TPHasAuthorDetails(NSDictionary *info) {
+    return [info[@"location"] length] || [info[@"joined"] length] ||
+           [info[@"number"] length] || [info[@"hidden"] boolValue];
+}
+
+static BOOL TPNeedsLegacyCacheRefresh(NSDictionary *entry, BOOL legacy) {
+    return legacy && [entry[@"v"] integerValue] < 5 && TPHasAuthorDetails(entry) &&
+           (![entry[@"joined"] length] || ![entry[@"number"] length]);
+}
+
 static void TPLoadCache(void) {
     if (gCache) return;
     // One-time reset: earlier test builds could disable the built object set too eagerly.
@@ -150,6 +184,8 @@ static void TPLoadCache(void) {
         if ([e[@"joined"] hasPrefix:@"#"]) return;   // bad parse from an earlier build
         if ([e[@"v"] integerValue] < 2 && e[@"joined"]) return;   // saved before the join number was kept
         if ([e[@"v"] integerValue] < 3 && e[@"joined"] && !e[@"location"]) return;   // may be a hidden location
+        if ([e[@"v"] integerValue] < 4 && !TPHasAuthorDetails(e)) return; // discard old empty successes, not real profiles
+        if (TPNeedsLegacyCacheRefresh(e, TPIsThreads410())) return;
         if ([e[@"x"] doubleValue] > now) gCache[pk] = e;
     }];
 }
@@ -185,7 +221,8 @@ static void TPStore(NSString *pk, NSString *location, NSString *joined, NSString
     if (hidden && !location.length) e[@"hidden"] = @YES;
     if ([extra[@"u"] length]) e[@"u"] = extra[@"u"];
     if ([extra[@"n"] length]) e[@"n"] = extra[@"n"];
-    e[@"v"] = @3;
+    e[@"v"] = @5;
+    failed = failed || !TPHasAuthorDetails(e);
     NSTimeInterval ttl = failed ? kTTLFailure : (location.length ? kTTLLocation : kTTLNoLocation);
     e[@"x"] = @(now + ttl);
     gCache[pk] = e;
@@ -220,6 +257,7 @@ static void TPStore(NSString *pk, NSString *location, NSString *joined, NSString
     gParserGaveUp = NO;
     gEmptyStreak = 0;
     [self log:@"resumed by user"];
+    TPRequeueVisible();
     [self pump];
 }
 
@@ -250,13 +288,16 @@ static void TPStore(NSString *pk, NSString *location, NSString *joined, NSString
 + (NSUInteger)sessionRequestCount { return gSessionCount; }
 
 + (void)noteUserSession:(id)session {
-    if (session) gUserSession = session;
+    if (!session) return;
+    gUserSession = session;
+    dispatch_async(dispatch_get_main_queue(), ^{ [self pump]; });
 }
 + (void)noteService:(id)obj kind:(NSString *)kind {
     if (!obj) return;
     if ([kind isEqualToString:@"pando"]) gPandoService = obj;
     else if ([kind isEqualToString:@"consistency"]) gPandoConsistency = obj;
     else if ([kind isEqualToString:@"analytics"]) gAnalytics = obj;
+    dispatch_async(dispatch_get_main_queue(), ^{ [self pump]; });
 }
 
 
@@ -325,7 +366,7 @@ static id TPBuildObjectSet(NSInteger subtype) {
     return m && [animals containsObject:[u substringWithRange:[m rangeAtIndex:1]]];
 }
 
-+ (BOOL)isNewAccount:(NSString *)joined {
+static BOOL TPIsNewAccountAtDate(NSString *joined, NSDate *date) {
     if (!joined.length) return NO;
     NSRegularExpression *yr = [NSRegularExpression regularExpressionWithPattern:@"(\\d{4})" options:0 error:nil];
     NSTextCheckingResult *ym = [yr firstMatchInString:joined options:0 range:NSMakeRange(0, joined.length)];
@@ -335,18 +376,30 @@ static id TPBuildObjectSet(NSInteger subtype) {
     NSRegularExpression *cjk = [NSRegularExpression regularExpressionWithPattern:@"(\\d{1,2})\\s*[月월]" options:0 error:nil];
     NSTextCheckingResult *cm = [cjk firstMatchInString:joined options:0 range:NSMakeRange(0, joined.length)];
     if (cm) month = [[joined substringWithRange:[cm rangeAtIndex:1]] integerValue];
+    if (month < 1 && [joined rangeOfString:@"^(19|20)[0-9]{2}-(0[1-9]|1[0-2])$" options:NSRegularExpressionSearch].location != NSNotFound)
+        month = [joined substringFromIndex:5].integerValue;
     if (month < 1) {
         NSArray *names = @[@"jan", @"feb", @"mar", @"apr", @"may", @"jun", @"jul", @"aug", @"sep", @"oct", @"nov", @"dec"];
         NSString *low = joined.lowercaseString;
         for (NSUInteger i = 0; i < names.count; i++) if ([low containsString:names[i]]) { month = i + 1; break; }
     }
-    if (month < 1 || month > 12) return NO;
     NSCalendar *greg = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian]; // ROC calendar users would get year 115
-    NSDateComponents *now = [greg components:NSCalendarUnitYear | NSCalendarUnitMonth fromDate:[NSDate date]];
+    if (month < 1) {
+        NSDateFormatter *f = [NSDateFormatter new];
+        f.locale = NSLocale.currentLocale;
+        f.calendar = greg;
+        [f setLocalizedDateFormatFromTemplate:@"yMMMM"];
+        NSDate *parsed = [f dateFromString:joined];
+        if (parsed) month = [greg component:NSCalendarUnitMonth fromDate:parsed];
+    }
+    if (month < 1 || month > 12) return NO;
+    NSDateComponents *now = [greg components:NSCalendarUnitYear | NSCalendarUnitMonth fromDate:date];
     NSInteger joinedIdx = year * 12 + (month - 1);
     NSInteger nowIdx = now.year * 12 + (now.month - 1);
     return nowIdx - joinedIdx <= 2 && nowIdx - joinedIdx >= 0;
 }
+
++ (BOOL)isNewAccount:(NSString *)joined { return TPIsNewAccountAtDate(joined, [NSDate date]); }
 
 #pragma mark - Pointer safety
 
@@ -354,11 +407,17 @@ static CFMutableSetRef gClassSet;
 
 static void TPBuildClassSet(void) {
     if (gClassSet) return;
-    unsigned int n = 0;
-    Class *list = objc_copyClassList(&n);
-    CFMutableSetRef set = CFSetCreateMutable(NULL, n, NULL);
-    for (unsigned int i = 0; i < n; i++) CFSetAddValue(set, (__bridge const void *)list[i]);
-    free(list);
+    CFMutableSetRef set = CFSetCreateMutable(NULL, 0, NULL);
+    typedef Class __unsafe_unretained *(*TPCopyClasses)(unsigned int *);
+    static TPCopyClasses copyClasses;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ copyClasses = (TPCopyClasses)dlsym(RTLD_DEFAULT, "objc_copyRealizedClassList"); });
+    if (copyClasses) {
+        unsigned int n = 0;
+        Class __unsafe_unretained *list = copyClasses(&n);
+        for (unsigned int i = 0; i < n; i++) CFSetAddValue(set, (__bridge const void *)list[i]);
+        free(list);
+    }
     gClassSet = set;
 }
 
@@ -465,7 +524,7 @@ static NSArray<NSString *> *kJoinedLabels, *kLocationLabels, *kSkipLabels;
 
 static void TPInitLabels(void) {
     if (kJoinedLabels) return;
-    kJoinedLabels   = @[@"Joined", @"已加入", @"加入日期", @"加入時間", @"参加日", @"가입일", @"가입 날짜", @"Se unió", @"Inscrit(e)"];
+    kJoinedLabels   = @[@"Joined", @"Date joined", @"已加入", @"加入日期", @"加入時間", @"加入时间", @"参加日", @"가입일", @"가입 날짜", @"Se unió", @"Inscrit(e)"];
     kLocationLabels = @[@"Based in", @"所在地點", @"所在地", @"所在地区", @"위치", @"거주지", @"Ubicación"];
     kSkipLabels     = @[@"Name", @"名稱", @"名称", @"名前", @"이름",
                         @"Former usernames", @"Previous usernames", @"先前的用戶名稱", @"先前的使用者名稱", @"先前的用户名称", @"以前のユーザーネーム", @"이전 사용자 이름",
@@ -513,17 +572,63 @@ static BOOL TPLooksLikeMonth(NSString *v) {
     return [v rangeOfString:@"(?<![0-9A-Za-z])(19|20)\\d{2}(?![0-9A-Za-z])" options:NSRegularExpressionSearch].length > 0;
 }
 
+static NSString *TPJoinOrdinal(NSString *value) {
+    NSString *s = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (!s.length || s.length > 24) return nil;
+    if ([s rangeOfString:@"^(?:[#＃][0-9]+(?:[,，.\u00a0\u202f ][0-9]{3})*|[0-9]+(?:[.,][0-9]+)?\\s*[KMBkmb萬万億亿]\\s*[+＋])$" options:NSRegularExpressionSearch].location != NSNotFound)
+        return s;
+    return nil;
+}
+
+static NSDictionary *TPJoinText(NSString *value) {
+    NSRange dot = [value rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"·•"]];
+    NSString *month = dot.location == NSNotFound ? value : [value substringToIndex:dot.location];
+    month = [month stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (!TPLooksLikeMonth(month)) return nil;
+    NSString *number = dot.location == NSNotFound ? nil : TPJoinOrdinal([value substringFromIndex:NSMaxRange(dot)]);
+    return number ? @{@"joined": month, @"number": number} : @{@"joined": month};
+}
+
 static NSString *TPMonthFromTimestamp(double t) {
     if (t > 1e12) t /= 1000;
     if (t < 1.0e9 || t > 4.0e9) return nil;
     NSDateFormatter *f = [NSDateFormatter new];
     f.locale = NSLocale.currentLocale;
+    f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     f.dateFormat = [NSDateFormatter dateFormatFromTemplate:@"yMMMM" options:0 locale:f.locale];
     return [f stringFromDate:[NSDate dateWithTimeIntervalSince1970:t]];
 }
 
+static NSDictionary *TPJoinInfoForUser(id user) {
+    if (!user) return nil;
+    NSMutableDictionary *info = [NSMutableDictionary dictionary];
+    SEL joinedSelector = NSSelectorFromString(@"textPostAppJoinedTime");
+    id joined = [user respondsToSelector:joinedSelector] ? ((id (*)(id, SEL))objc_msgSend)(user, joinedSelector) : nil;
+    if ([joined respondsToSelector:@selector(integerValue)]) {
+        NSString *month = TPMonthFromTimestamp((double)[joined integerValue]);
+        if (month) info[@"joined"] = month;
+    }
+    SEL labelSelector = NSSelectorFromString(@"textPostAppJoinerNumberLabel");
+    id label = [user respondsToSelector:labelSelector] ? ((id (*)(id, SEL))objc_msgSend)(user, labelSelector) : nil;
+    if ([label isKindOfClass:NSString.class] && [label length] && [label length] <= 24) info[@"number"] = label;
+    if (!info[@"number"]) {
+        SEL numberSelector = NSSelectorFromString(@"textPostAppJoinerNumber");
+        id number = [user respondsToSelector:numberSelector] ? ((id (*)(id, SEL))objc_msgSend)(user, numberSelector) : nil;
+        if ([number respondsToSelector:@selector(integerValue)] && [number integerValue] > 0) {
+            NSNumberFormatter *f = [NSNumberFormatter new];
+            f.numberStyle = NSNumberFormatterDecimalStyle;
+            f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+            f.usesGroupingSeparator = YES;
+            f.groupingSize = 3;
+            info[@"number"] = [@"#" stringByAppendingString:[f stringFromNumber:@([number integerValue])]];
+        }
+    }
+    return info.count ? info : nil;
+}
+
 static NSDictionary *TPParseState(NSDictionary<NSString *, NSString *> *st) {
-    NSString *location = nil, *joined = nil;
+    NSString *location = nil;
+    NSDictionary *join = nil;
     BOOL countryHidden = [st[@"about_this_profile_country_visibility"] isEqualToString:@"0"];
     for (NSString *name in st) {
         NSString *v = st[name], *n = name.lowercaseString;
@@ -534,19 +639,21 @@ static NSDictionary *TPParseState(NSDictionary<NSString *, NSString *> *st) {
     for (NSString *name in st) {
         NSString *v = st[name], *n = name.lowercaseString;
         if (!([n containsString:@"join"] || [n containsString:@"date"] || [n containsString:@"creat"])) continue;
-        if (TPLooksLikeMonth(v)) { joined = v; break; }
-        double t = v.doubleValue;
-        NSString *m = TPMonthFromTimestamp(t);
-        if (m) { joined = m; break; }
+        if ([n containsString:@"number"] || [n containsString:@"ordinal"]) continue;
+        join = TPJoinText(v);
+        if (join) break;
+        if ([v rangeOfString:@"^[0-9]{10}(?:[0-9]{3})?$" options:NSRegularExpressionSearch].location != NSNotFound) {
+            NSString *month = TPMonthFromTimestamp(v.doubleValue);
+            if (month) { join = @{@"joined": month}; break; }
+        }
     }
-    if (!joined) for (NSString *name in st) if (TPLooksLikeMonth(st[name])) { joined = st[name]; break; }
-    if (joined) {
-        NSRange dot = [joined rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"·•"]];
-        if (dot.location != NSNotFound) joined = [[joined substringToIndex:dot.location] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+    if (!join) for (NSString *name in st) {
+        if ([name.lowercaseString containsString:@"number"] || [name.lowercaseString containsString:@"ordinal"]) continue;
+        join = TPJoinText(st[name]);
+        if (join) break;
     }
-    NSMutableDictionary *r = [NSMutableDictionary dictionary];
+    NSMutableDictionary *r = [join mutableCopy] ?: [NSMutableDictionary dictionary];
     if (location.length) r[@"location"] = location;
-    if (joined.length) r[@"joined"] = joined;
     return r;
 }
 
@@ -590,15 +697,21 @@ static NSDictionary *TPParseStrings(NSArray<NSString *> *strings) {
             if (TPIsLabel(t)) break;
             NSString *v = TPCleanValue(t);
             if (!v) continue;
-            if (isJoined && !TPLooksLikeMonth(v)) continue;
+            NSDictionary *rowJoin = isJoined ? TPJoinText(v) : nil;
+            if (isJoined && !rowJoin) continue;
             if (isLocation && ([v hasSuffix:@"dp"] || [v hasSuffix:@"sp"] || [v hasPrefix:@"#"] || [v hasPrefix:@"("] ||
                                [@[@"column", @"row", @"visible", @"gone", @"semibold", @"normal", @"bold", @"center", @"start", @"end"] containsObject:v])) continue;
             if (isJoined && !joined) {
-                NSRange dot = [v rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"·•"]];
-                joined = [(dot.location != NSNotFound ? [v substringToIndex:dot.location] : v)
-                          stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
-                if (dot.location != NSNotFound)
-                    number = [[v substringFromIndex:dot.location + 1] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+                joined = rowJoin[@"joined"];
+                number = rowJoin[@"number"];
+                BOOL separator = NO;
+                for (NSUInteger k = j + 1; !number && k < strings.count && k <= j + 6; k++) {
+                    NSString *span = [strings[k] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+                    if ([span hasPrefix:@"␟style:"]) continue;
+                    if ([span isEqualToString:@"·"] || [span isEqualToString:@"•"]) { separator = YES; continue; }
+                    if (separator) number = TPJoinOrdinal(span);
+                    break;
+                }
             } else if (isLocation && !location) {
                 location = v;
             }
@@ -612,7 +725,8 @@ static NSDictionary *TPParseStrings(NSArray<NSString *> *strings) {
     if (username.length) r[@"u"] = username;
     if (fullName.length && fullName.length <= 60) r[@"n"] = fullName;
     if (fromState[@"location"]) r[@"location"] = fromState[@"location"];
-    if (!r[@"joined"] && fromState[@"joined"]) r[@"joined"] = fromState[@"joined"];
+    if (!joined && fromState[@"joined"]) r[@"joined"] = fromState[@"joined"];
+    if (!number && [r[@"joined"] isEqualToString:fromState[@"joined"]] && fromState[@"number"]) r[@"number"] = fromState[@"number"];
     if ([st[@"about_this_profile_country_visibility"] isEqualToString:@"0"] ||
         [@[@"未分享", @"Not shared", @"未分享地點", @"共有されていません", @"공유되지 않음"] containsObject:r[@"location"] ?: @""]) {
         [r removeObjectForKey:@"location"];
@@ -643,7 +757,7 @@ static BOOL TPLooksRateLimited(NSArray<NSString *> *strings, BOOL success) {
     [gQueue addObject:pk];
     [gPending addObject:pk];
     while (gQueue.count > kQueueMax) { [gPending removeObject:gQueue.firstObject]; [gQueue removeObjectAtIndex:0]; }
-    [self pump];
+    if (!gPumpScheduled) [self pump];
 }
 
 static void TPPauseForRateLimit(NSString *why) {
@@ -719,21 +833,7 @@ static void TPFinish(NSUInteger token) {
     [TPAuthorInfo pump];
 }
 
-// Runs on the callback thread: validate and retain whatever the fetcher handed us right away.
-static NSArray *TPCollectArgs(void *a, void *b, void *c, NSString **shapeOut) {
-    NSMutableArray *objs = [NSMutableArray array];
-    NSMutableString *shape = [NSMutableString string];
-    void *args[3] = { a, b, c };
-    for (int i = 0; i < 3; i++) {
-        id o = TPAsObject(args[i]);
-        [shape appendFormat:@"%@%@", i ? @", " : @"", o ? NSStringFromClass([o class]) : (args[i] ? @"<raw>" : @"nil")];
-        if (o) [objs addObject:o];
-    }
-    *shapeOut = shape;
-    return objs;
-}
-
-static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BOOL success, NSArray *objs, NSString *shape) {
+static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BOOL success, NSArray *objs, NSString *shape, NSDictionary *nativeJoin) {
     if (token != gToken || !gInFlight) return;
     NSMutableArray<NSString *> *strings = [NSMutableArray array];
     NSMutableSet *visited = [NSMutableSet set];
@@ -798,13 +898,15 @@ static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BO
         for (NSString *k in [st.allKeys sortedArrayUsingSelector:@selector(compare:)]) [kv addObject:[NSString stringWithFormat:@"%@=%@", k, st[k]]];
         [TPAuthorInfo log:[@"  state: " stringByAppendingString:[kv componentsJoinedByString:@", "]]];
     }
-    NSDictionary *info = success ? TPParseStrings(strings) : nil;
-    if (info.count) {
+    NSMutableDictionary *info = success ? [TPParseStrings(strings) mutableCopy] : [NSMutableDictionary dictionary];
+    if (!info[@"joined"] && nativeJoin[@"joined"]) info[@"joined"] = nativeJoin[@"joined"];
+    if (!info[@"number"] && nativeJoin[@"number"]) info[@"number"] = nativeJoin[@"number"];
+    if (TPHasAuthorDetails(info)) {
         gEmptyStreak = 0;
         gSuccessCount++;
         [[TPPrefs defaults] setInteger:variant forKey:kVariantKey];
         [TPAuthorInfo log:[NSString stringWithFormat:@"  -> %@ / %@ / %@", info[@"location"] ?: @"-", info[@"joined"] ?: @"-", info[@"number"] ?: @"-"]];
-        TPStore(pk, info[@"location"], info[@"joined"], info[@"number"], [info[@"hidden"] boolValue], NO, info);
+        TPStore(pk, info[@"location"], info[@"joined"], info[@"number"], [info[@"hidden"] boolValue], !success, info);
     } else {
         gEmptyStreak++;
         NSString *sample = [strings componentsJoinedByString:@" | "];
@@ -829,10 +931,11 @@ static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BO
         return;
     }
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-    if (now - gLastRequest < kDelay) {
+    NSTimeInterval delay = TPIsThreads410() ? kLegacyDelay : kDelay;
+    if (now - gLastRequest < delay) {
         if (gPumpScheduled) return;
         gPumpScheduled = YES;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((kDelay - (now - gLastRequest) + 0.05) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((delay - (now - gLastRequest) + 0.05) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             gPumpScheduled = NO;
             [self pump];
         });
@@ -866,6 +969,12 @@ static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BO
 
     Class F = objc_getClass("BKSharedAsyncActionDataFetcher");
     SEL sel = NSSelectorFromString(@"fetchWithObjectSet:appID:params:timeoutOverride:successHandler:errorHandler:callbackQueue:");
+    BOOL useLegacyRoot = NO;
+    if (!F || ![F respondsToSelector:sel]) {
+        F = objc_getClass("BKDataFetchGraphQL");
+        sel = NSSelectorFromString(@"fetchRootAppWithObjectSet:appID:params:purpose:cacheTTL:successHandler:errorHandler:callbackQueue:");
+        useLegacyRoot = F && [F respondsToSelector:sel];
+    }
     if (!F || ![F respondsToSelector:sel]) {
         static BOOL logged;
         if (!logged) { logged = YES; [self log:@"BKSharedAsyncActionDataFetcher not available"]; }
@@ -879,31 +988,38 @@ static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BO
     if ([self infoForPk:pk]) { [self pump]; return; }
     // Scrolled away while waiting: don't spend a request (and the 1.5 s gap) on it. If it comes
     // back on screen it is queued again.
-    if (!TPPkOnScreen(pk)) { [self pump]; return; }
+    if (!TPPkOnScreen(pk)) { TPRequeueVisible(); [self pump]; return; }
 
-    TPBuildClassSet();
     gInFlight = YES;
     gInFlightPk = pk;
     gLastRequest = now;
     NSUInteger token = ++gToken;
     NSInteger variant = [[TPPrefs defaults] integerForKey:kVariantKey];
     gSessionCount++;
-    NSDictionary *params = TPParams(pk, variant);
+    NSDictionary *params = useLegacyRoot
+        ? @{ @"target_user_id": @(pk.longLongValue), @"referer_type": @"TextPostAppProfileOverflow" }
+        : TPParams(pk, variant);
+    NSDictionary *nativeJoin = TPIsThreads410() ? TPHeaderJoinInfo(pk) : nil;
 
-    void (^ok)(void *, void *, void *) = ^(void *a, void *b, void *c) {
-        NSString *shape = nil;
-        NSArray *objs = TPCollectArgs(a, b, c, &shape);
-        dispatch_async(dispatch_get_main_queue(), ^{ TPHandleResult(token, pk, variant, YES, objs, shape); });
+    void (^ok)(id, id) = ^(id result, id status) {
+        NSArray *objs = result ? @[result] : @[];
+        NSString *shape = [NSString stringWithFormat:@"%@, %@", result ? NSStringFromClass([result class]) : @"nil", status ? NSStringFromClass([status class]) : @"nil"];
+        dispatch_async(dispatch_get_main_queue(), ^{ TPHandleResult(token, pk, variant, YES, objs, shape, nativeJoin); });
     };
-    void (^fail)(void *, void *, void *) = ^(void *a, void *b, void *c) {
-        NSString *shape = nil;
-        NSArray *objs = TPCollectArgs(a, b, c, &shape);
-        dispatch_async(dispatch_get_main_queue(), ^{ TPHandleResult(token, pk, variant, NO, objs, shape); });
+    void (^fail)(id) = ^(id error) {
+        NSArray *objs = error ? @[error] : @[];
+        NSString *shape = error ? NSStringFromClass([error class]) : @"nil";
+        dispatch_async(dispatch_get_main_queue(), ^{ TPHandleResult(token, pk, variant, NO, objs, shape, nativeJoin); });
     };
 
     @try {
         gSelfCall = YES;
-        ((void (*)(id, SEL, id, id, id, id, id, id, id))objc_msgSend)(F, sel, os, kAppID, params, nil, ok, fail, dispatch_get_main_queue());
+        if (useLegacyRoot) {
+            // 410's bottom sheet is a root-app query; its callback returns the parsed bundle JSON.
+            ((void (*)(id, SEL, id, id, id, long long, unsigned long long, id, id, id))objc_msgSend)(F, sel, os, kLegacyAppID, params, 1, 3600, ok, fail, dispatch_get_main_queue());
+        } else {
+            ((void (*)(id, SEL, id, id, id, id, id, id, id))objc_msgSend)(F, sel, os, kAppID, params, nil, ok, fail, dispatch_get_main_queue());
+        }
         gSelfCall = NO;
     } @catch (NSException *e) {
         gSelfCall = NO;
@@ -964,32 +1080,43 @@ static id TPIvarObject(id obj, const char *name) {
 }
 
 static NSString *TPHeaderPk(UIView *contentView) {
+    id viewModel = TPIvarObject(contentView, "viewModel");
+    id user = viewModel ? TPIvarObject(viewModel, "user") : nil;
+    SEL pkSelector = NSSelectorFromString(@"pk");
+    id value = [user respondsToSelector:pkSelector] ? ((id (*)(id, SEL))objc_msgSend)(user, pkSelector) : nil;
+    if ([value isKindOfClass:[NSString class]] && TPIsDigits(value)) return value;
     id pic = TPIvarObject(contentView, "profilePictureView");
-    if (!pic) return nil;
-    Ivar iv = class_getInstanceVariable(object_getClass(pic), "userPk");
-    if (!iv) return nil;
-    NSString *pk = TPSwiftString((const char *)(__bridge void *)pic + ivar_getOffset(iv));
+    NSString *pk = nil;
+    if (pic) {
+        Ivar iv = class_getInstanceVariable(object_getClass(pic), "userPk");
+        if (iv) pk = TPSwiftString((const char *)(__bridge void *)pic + ivar_getOffset(iv));
+    }
     return TPIsDigits(pk) ? pk : nil;
 }
+
++ (NSString *)pkForHeader:(UIView *)contentView { return TPHeaderPk(contentView); }
 
 #pragma mark - Badge
 
 // The header's title is the author's handle. Some About-this-profile layouts have no Name row, so
 // the handle seen here fills the gap (Location Stats needs it to open the profile).
-static NSString *TPTitleText(UIView *v, int depth) {
+static NSAttributedString *TPTitleText(UIView *v, int depth) {
     if (!v || depth > 4) return nil;
-    if ([v isKindOfClass:[UILabel class]]) return ((UILabel *)v).attributedText.string ?: ((UILabel *)v).text;
+    if ([v isKindOfClass:[UILabel class]]) {
+        UILabel *label = (UILabel *)v;
+        return label.attributedText ?: [[NSAttributedString alloc] initWithString:label.text ?: @"" attributes:@{ NSFontAttributeName: label.font }];
+    }
     if ([v respondsToSelector:@selector(attributedText)]) {
         id t = [(id)v attributedText];
-        if ([t isKindOfClass:[NSAttributedString class]]) return [t string];
+        if ([t isKindOfClass:[NSAttributedString class]]) return t;
     }
-    for (UIView *s in v.subviews) { NSString *t = TPTitleText(s, depth + 1); if (t.length) return t; }
+    for (UIView *s in v.subviews) { NSAttributedString *t = TPTitleText(s, depth + 1); if (t.length) return t; }
     return nil;
 }
 
 static void TPNoteHeaderName(NSString *pk, UIView *title) {
     if (!pk.length) return;
-    NSString *t = [TPTitleText(title, 0) stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    NSString *t = [TPTitleText(title, 0).string stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     // The title can carry a verified mark or other trailing text; keep the leading handle.
     NSRange r = [t ?: @"" rangeOfString:@"^[A-Za-z0-9._]{1,30}" options:NSRegularExpressionSearch];
     if (r.location == NSNotFound) return;
@@ -1009,27 +1136,73 @@ static void TPNoteHeaderName(NSString *pk, UIView *title) {
 static const void *kBadgeKey = &kBadgeKey;
 static NSHashTable *gBadges;
 
+static void TPInvalidateAuthorHeader(UIView *host) {
+    if (!host.window) return;
+    UIView *v = host;
+    while (v && ![v isKindOfClass:UICollectionViewCell.class]) v = v.superview;
+    UICollectionViewCell *cell = (UICollectionViewCell *)v;
+    while (v && ![v isKindOfClass:UICollectionView.class]) v = v.superview;
+    UICollectionView *cv = (UICollectionView *)v;
+    NSIndexPath *path = cell ? [cv indexPathForCell:cell] : nil;
+    if (!path) return;
+    for (id adapter in @[cv.dataSource ?: (id)NSNull.null, cv.delegate ?: (id)NSNull.null]) {
+        SEL section = NSSelectorFromString(@"sectionControllerForSection:");
+        if (![adapter respondsToSelector:section]) continue;
+        id sc = ((id (*)(id, SEL, NSInteger))objc_msgSend)(adapter, section, path.section);
+        SEL collection = NSSelectorFromString(@"collectionContext");
+        id context = [sc respondsToSelector:collection] ? ((id (*)(id, SEL))objc_msgSend)(sc, collection) : nil;
+        SEL invalidate = NSSelectorFromString(@"invalidateLayoutForSectionController:completion:");
+        if ([context respondsToSelector:invalidate])
+            ((void (*)(id, SEL, id, id))objc_msgSend)(context, invalidate, sc, nil);
+        break;
+    }
+}
+
 // Headers that scrolled in while the queue was full were dropped; once it drains, pick up
 // whatever is still on screen without info.
+static BOOL TPHeaderVisible(UIView *host) {
+    UIWindow *window = host.window;
+    if (!window || host.hidden || host.alpha < 0.05) return NO;
+    CGRect visible = window.bounds;
+    for (UIView *v = host.superview; v && v != window; v = v.superview) {
+        if (v.hidden || v.alpha < 0.05) return NO;
+        if (v.clipsToBounds) visible = CGRectIntersection(visible, [v convertRect:v.bounds toView:window]);
+    }
+    CGRect frame = [host convertRect:host.bounds toView:window];
+    return !CGRectIsEmpty(frame) && CGRectIntersectsRect(visible, frame);
+}
+
 static BOOL TPPkOnScreen(NSString *pk) {
-    BOOL known = NO;
     for (TPAuthorBadgeLabel *b in gBadges.allObjects) {
         if (![b.pk isEqualToString:pk]) continue;
-        known = YES;
-        UIView *host = b.host;
-        UIWindow *w = host.window;
-        if (!w) continue;
-        CGRect r = [host convertRect:host.bounds toView:w];
-        if (CGRectIntersectsRect(CGRectInset(w.bounds, 0, -120), r)) return YES;   // a little margin
+        if (TPHeaderVisible(b.host)) return YES;
     }
-    return !known;   // not from a feed header we track: don't second-guess it
+    return NO;
+}
+
+static NSDictionary *TPHeaderJoinInfo(NSString *pk) {
+    for (TPAuthorBadgeLabel *badge in gBadges.allObjects) {
+        UIView *host = badge.host;
+        if (![badge.pk isEqualToString:pk]) continue;
+        id model = TPIvarObject(host, "viewModel");
+        id user = TPIvarObject(model, "user");
+        SEL selector = NSSelectorFromString(@"pk");
+        id authorPk = [user respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(user, selector) : nil;
+        if (![authorPk isKindOfClass:NSString.class] || ![authorPk isEqualToString:pk]) continue;
+        NSDictionary *info = TPJoinInfoForUser(user);
+        if (info.count) return info;
+    }
+    return nil;
 }
 
 static void TPRequeueVisible(void) {
+    BOOL scheduled = gPumpScheduled;
+    gPumpScheduled = YES;
     for (TPAuthorBadgeLabel *b in gBadges.allObjects) {
         UIView *host = b.host;
-        if (b.pk.length && host.window && ![TPAuthorInfo infoForPk:b.pk]) [TPAuthorInfo requestPk:b.pk];
+        if (b.pk.length && TPHeaderVisible(host) && ![TPAuthorInfo infoForPk:b.pk]) [TPAuthorInfo requestPk:b.pk];
     }
+    gPumpScheduled = scheduled;
 }
 
 // "台灣" / "Australia" / "澳大利亞" -> 🇹🇼 / 🇦🇺. Names come from Threads in the app's language, so
@@ -1190,12 +1363,23 @@ static NSAttributedString *TPBadgeText(NSDictionary *info, UIFont *font, UIColor
     return ceil([UIFont systemFontOfSize:12].lineHeight) + 12;
 }
 
++ (CGFloat)extraHeaderHeightForPk:(NSString *)pk {
+    CGFloat extra = [self extraHeaderHeight];
+    if (extra <= 0) return 0;
+    NSDictionary *info = [self infoForPk:pk];
+    BOOL visible = ([TPPrefs boolForKey:TPKeyAuthorLocation] && ([info[@"location"] length] || [info[@"hidden"] boolValue])) ||
+                   ([TPPrefs boolForKey:TPKeyAuthorJoined] && [info[@"joined"] length]) ||
+                   ([TPPrefs boolForKey:TPKeyAuthorNewBadge] && [self isNewAccount:info[@"joined"]]) ||
+                   ([TPPrefs boolForKey:TPKeyAuthorDefaultName] && [self isDefaultUsername:info[@"u"]]);
+    return visible ? extra : 0;
+}
+
 + (void)layoutBadgeInHeader:(UIView *)contentView {
     TPAuthorBadgeLabel *badge = objc_getAssociatedObject(contentView, kBadgeKey);
     if (![self enabled]) { badge.hidden = YES; return; }
 
     NSString *pk = TPHeaderPk(contentView);
-    UIView *title = TPIvarObject(contentView, "titleLabel");
+    UIView *title = TPIvarObject(contentView, "titleLabel") ?: TPIvarObject(contentView, "$__lazy_storage_$_titleLabel");
     if (!pk || ![title isKindOfClass:[UIView class]] || title.superview == nil) { badge.hidden = YES; return; }
 
     if (!badge) {
@@ -1212,7 +1396,7 @@ static NSAttributedString *TPBadgeText(NSDictionary *info, UIFont *font, UIColor
     NSDictionary *info = [self infoForPk:pk];
     if (!info) {
         badge.hidden = YES;
-        if (contentView.window) [self requestPk:pk];
+        if (TPHeaderVisible(contentView)) [self requestPk:pk];
         return;
     }
     UIFont *font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
@@ -1256,7 +1440,7 @@ static NSAttributedString *TPBadgeText(NSDictionary *info, UIFont *font, UIColor
     };
 
     CGRect frame;
-    CGFloat extra = [TPAuthorInfo extraHeaderHeight];
+    CGFloat extra = [TPAuthorInfo extraHeaderHeightForPk:pk];
     if (extra > 0) {
         // Own line under the name (and the wrapped timestamp, if any).
         CGFloat y = CGRectGetMaxY(tf) + 4;
@@ -1272,7 +1456,8 @@ static NSAttributedString *TPBadgeText(NSDictionary *info, UIFont *font, UIColor
         if (w <= 0) { badge.hidden = YES; return; }
         frame = CGRectMake(limit - w, round(top + (bottom - top - h) / 2), w, h);
     } else {
-        CGFloat used = [title sizeThatFits:tf.size].width;
+        NSAttributedString *titleText = TPTitleText(title, 0);
+        CGFloat used = titleText.length ? ceil([titleText boundingRectWithSize:tf.size options:NSStringDrawingUsesLineFragmentOrigin context:nil].size.width) : [title sizeThatFits:tf.size].width;
         if (!(used > 0) || !isfinite(used) || used > tf.size.width) used = tf.size.width;
         CGFloat x = tf.origin.x + used + 6;
         CGFloat limit = rightLimit(tf.origin.y, CGRectGetMaxY(tf));

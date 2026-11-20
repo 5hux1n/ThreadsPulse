@@ -421,3 +421,5 @@
 "You're on %@" = "현재 버전: %@";
 "Skip This Version" = "이 버전 건너뛰기";
 "Later" = "나중에";
+"A message was unsent" = "메시지 전송이 취소되었습니다";
+"Modified and optimized: By %@" = "수정 및 최적화: By %@";

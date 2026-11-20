@@ -9,9 +9,12 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <malloc/malloc.h>
+#import <dlfcn.h>
 #import "TPPrefs.h"
+#import "TPNotificationPrefs.h"
 #import "TPURLCleaner.h"
 #import "TPDownloader.h"
+#import "TPMusicCompat.h"
 #import "TPSettingsViewController.h"
 #import "TPLocalization.h"
 #import "TPUI.h"
@@ -98,12 +101,30 @@ static NSArray *TPCleanItems(NSArray *items) {
     if ([TPPrefs boolForKey:TPKeyBlockAds]) { TPDebug(TPL(@"Blocked ad insertion")); return; }
     %orig;
 }
+// Threads 410 added a validation-result parameter to the insertion callback.
+- (void)adInsertionHandler:(id)handler shouldTryToInsertSponsoredItem:(id)item
+          atInsertionIndex:(long long)index focusedIndex:(long long)focused
+          validationResultString:(id)validation insertionContext:(id)ctx {
+    if ([TPPrefs boolForKey:TPKeyBlockAds]) { TPDebug(TPL(@"Blocked ad insertion")); return; }
+    %orig;
+}
 - (void)receivedSponsoredItems:(id)items intentAwareData:(id)data {
     if ([TPPrefs boolForKey:TPKeyBlockAds]) return;
     %orig;
 }
 - (void)adPlatformDidDeliverSponsoredItem:(id)item atAdRequestIndex:(long long)index {
     if ([TPPrefs boolForKey:TPKeyBlockAds]) return;
+    %orig;
+}
+%end
+
+// Synchronous feed delivery calls the Swift manager directly, then uses this ObjC handoff.
+%hook IGAdInsertionHandler
+- (void)deliverSponsoredItemsWithPosts:(id)posts deliveryContext:(unsigned long long)context
+        containerModule:(id)module surfaceExtraLoggingDicts:(id)surface
+        extraLoggingDict:(id)extra requestMetadata:(id)metadata
+        adRequestExtraInfo:(id)requestInfo acpContext:(id)acp {
+    if ([TPPrefs boolForKey:TPKeyBlockAds]) { TPDebug(TPL(@"Blocked ad insertion")); return; }
     %orig;
 }
 %end
@@ -143,6 +164,51 @@ static NSArray *TPCleanItems(NSArray *items) {
         [out addObject:nd];
     }
     %orig(out);
+    gTPOwnPasteboardChange = [(UIPasteboard *)self changeCount];
+}
+- (void)setItems:(NSArray<NSDictionary<NSString *, id> *> *)items options:(NSDictionary *)options {
+    if (![TPPrefs boolForKey:TPKeyStripTracking]) {
+        %orig;
+        gTPOwnPasteboardChange = [(UIPasteboard *)self changeCount];
+        return;
+    }
+    NSMutableArray *clean = [NSMutableArray arrayWithCapacity:items.count];
+    for (NSDictionary *item in items) {
+        NSMutableDictionary *entry = [NSMutableDictionary dictionaryWithCapacity:item.count];
+        [item enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
+            if ([value isKindOfClass:[NSURL class]]) entry[key] = [TPURLCleaner cleanURL:value];
+            else if ([value isKindOfClass:[NSString class]]) entry[key] = [TPURLCleaner cleanString:value];
+            else entry[key] = value;
+        }];
+        [clean addObject:entry];
+    }
+    %orig(clean, options);
+    gTPOwnPasteboardChange = [(UIPasteboard *)self changeCount];
+}
+%end
+
+// 410 writes copied links through its concrete pasteboard implementation.
+%hook _UIConcretePasteboard
+- (void)setURL:(NSURL *)url {
+    %orig([TPURLCleaner cleanURL:url]);
+    gTPOwnPasteboardChange = [(UIPasteboard *)self changeCount];
+}
+- (void)setString:(NSString *)string {
+    %orig([TPURLCleaner cleanString:string]);
+    gTPOwnPasteboardChange = [(UIPasteboard *)self changeCount];
+}
+- (void)setItems:(NSArray<NSDictionary<NSString *, id> *> *)items {
+    NSMutableArray *clean = [NSMutableArray arrayWithCapacity:items.count];
+    for (NSDictionary *item in items) {
+        NSMutableDictionary *entry = [NSMutableDictionary dictionaryWithCapacity:item.count];
+        [item enumerateKeysAndObjectsUsingBlock:^(NSString *key, id value, BOOL *stop) {
+            if ([value isKindOfClass:[NSURL class]]) entry[key] = [TPURLCleaner cleanURL:value];
+            else if ([value isKindOfClass:[NSString class]]) entry[key] = [TPURLCleaner cleanString:value];
+            else entry[key] = value;
+        }];
+        [clean addObject:entry];
+    }
+    %orig(clean);
     gTPOwnPasteboardChange = [(UIPasteboard *)self changeCount];
 }
 %end
@@ -505,8 +571,14 @@ static NSSet<NSValue *> *TPClassFamily(NSString *baseName) {
     Class base = NSClassFromString(baseName);
     if (!base) return [NSSet set];
     NSMutableSet<NSValue *> *set = [NSMutableSet set];
+    [set addObject:[NSValue valueWithPointer:(__bridge const void *)base]];
+    typedef Class __unsafe_unretained *(*TPCopyClasses)(unsigned int *);
+    static TPCopyClasses copyClasses;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ copyClasses = (TPCopyClasses)dlsym(RTLD_DEFAULT, "objc_copyRealizedClassList"); });
+    if (!copyClasses) return set;
     unsigned int n = 0;
-    Class *all = objc_copyClassList(&n);
+    Class __unsafe_unretained *all = copyClasses(&n);
     for (unsigned int i = 0; i < n; i++) {
         for (Class k = all[i]; k; k = class_getSuperclass(k)) {
             if (k == base) { [set addObject:[NSValue valueWithPointer:(__bridge const void *)all[i]]]; break; }
@@ -1231,18 +1303,10 @@ static void TPDownloadLightboxVideos(UIView *host, BOOL all) {
 // and follows the fade of Threads' own top controls.
 static const void *kTPLBBarBtnKey = &kTPLBBarBtnKey;
 static const void *kTPLBHostKey = &kTPLBHostKey;
+static const void *kTPLBCloseKey = &kTPLBCloseKey;
+static const void *kTPLBMoreKey = &kTPLBMoreKey;
 
 static UIView *TPLBFindMoreButton(UIView *root, UIView *skip, BOOL wantClose);
-
-static CGFloat TPLBSubtreeOpacity(UIView *v, int depth) {
-    CALayer *l = v.layer.presentationLayer ?: v.layer;
-    if (v.hidden || l.hidden) return 0;
-    CGFloat own = l.opacity;
-    if (depth > 5 || !v.subviews.count || own <= 0.01) return own;
-    CGFloat best = 0;
-    for (UIView *c in v.subviews) best = MAX(best, TPLBSubtreeOpacity(c, depth + 1));
-    return own * best;
-}
 
 @interface TPLBFollower : NSObject
 @property (nonatomic, weak) UIView *source;   // Threads' "⋯" (or another top control)
@@ -1269,22 +1333,11 @@ static CGPoint TPLBDrawOffset(UIView *v) {
 
 static BOOL TPLBDesiredCenter(UIView *src, BOOL isClose, UIView *b, UIView *root, CGPoint *out);
 
-// Any position/size/transform animation on the source or its ancestors (lightbox open/close).
-static BOOL TPLBChainAnimating(UIView *v) {
-    for (int i = 0; v && i < 20; v = v.superview, i++) {
-        for (NSString *k in v.layer.animationKeys) {
-            NSString *l = k.lowercaseString;
-            if ([l containsString:@"position"] || [l containsString:@"bounds"] || [l containsString:@"transform"] || [l containsString:@"frame"]) return YES;
-        }
-    }
-    return NO;
-}
-
 @implementation TPLBFollower
 - (void)start {
     if (self.link) return;
     self.link = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick)];
-    self.link.preferredFramesPerSecond = 60;
+    self.link.preferredFramesPerSecond = 30;
     [self.link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
 }
 - (void)tick {
@@ -1300,17 +1353,9 @@ static BOOL TPLBChainAnimating(UIView *v) {
         self.source = s;
         if (!s) { if (t.alpha > 0) t.alpha = 0; return; }
     }
-    // Threads fades its top controls with layer animations, sometimes on an inner view of the
-    // button rather than the button itself, so read what's on screen: the presentation-layer
-    // opacity between the button and the container we share, times the most visible path down
-    // through the button's own subviews. (The shared container's own fade applies to us already.)
-    CGFloat a = s.window ? 1 : 0;
-    for (UIView *v = s.superview; v && a > 0 && v != t.superview; v = v.superview) {
-        CALayer *l = v.layer.presentationLayer ?: v.layer;
-        a *= (v.hidden || l.hidden) ? 0 : l.opacity;
-        if (v == r) break;
-    }
-    a *= TPLBSubtreeOpacity(s, 0);
+    // Keep the per-frame path cheap while the lightbox is animating. The source button already
+    // carries the effective fade, so avoid recursively walking its presentation-layer subtree.
+    CGFloat a = (s.window && !s.hidden) ? s.alpha : 0;
 
     // Recompute where we belong from the source's current geometry every frame, so a top bar that
     // moves or settles after we were placed is followed (nothing is cached or accumulated).
@@ -1322,9 +1367,7 @@ static BOOL TPLBChainAnimating(UIView *v) {
         if (fabs(c.x - t.center.x) > 0.25 || fabs(c.y - t.center.y) > 0.25) t.center = c;
     } else self.stable = 0;
     // Threads' top bar can still be moving into place right after the lightbox opens (or while it
-    // closes). Stay invisible until the position has held for ~0.15 s and nothing up the source's
-    // chain is animating, then fade in over ~0.15 s. Avoids ever showing a misplaced button.
-    if (TPLBChainAnimating(s)) self.stable = MIN(self.stable, 0);
+    // closes). Stay invisible until the position has held for ~0.15 s, then fade in.
     const NSInteger settle = 9, fade = 9;
     CGFloat k = self.stable < settle ? 0 : MIN(1.0, (CGFloat)(self.stable - settle + 1) / fade);
     a *= k;
@@ -1416,6 +1459,31 @@ static BOOL TPCellIsCentered(UIView *cell) {
 }
 
 static const void *kTPLBMenusKey = &kTPLBMenusKey;
+static const void *kTPLBLongPressKey = &kTPLBLongPressKey;
+
+@interface TPUI (TPHoldMenu)
++ (void)tp_showMenu:(NSArray<TPMenuItem *> *)items from:(UIView *)src;
+@end
+
+@interface TPLBLongPressHandler : NSObject
+@property (nonatomic, weak) UIView *host;
+@property (nonatomic, weak) UIButton *button;
+- (void)pressed:(UILongPressGestureRecognizer *)g;
+@end
+
+@implementation TPLBLongPressHandler
+- (void)pressed:(UILongPressGestureRecognizer *)g {
+    if (g.state != UIGestureRecognizerStateBegan) return;
+    UIView *host = self.host;
+    UIButton *button = self.button;
+    if (!host || !button) return;
+    NSArray *menus = objc_getAssociatedObject(button, kTPLBMenusKey);
+    if (![menus isKindOfClass:[NSArray class]] || menus.count < 2) return;
+    BOOL video = [host isKindOfClass:objc_getClass("_TtC11BCNLightbox20BCNLightboxVideoCell")];
+    NSArray *items = video ? menus[1] : menus[0];
+    if (items.count) [TPUI tp_showMenu:items from:g.view ?: host];
+}
+@end
 
 // Long-press menu for the page on screen: this item first, then "all images" / "all videos" for
 // whatever the post actually contains.
@@ -1487,8 +1555,21 @@ static void TPEnsureLightboxButton(UIView *host) {
     // Threads' "✕", and the "⋯" on its row. Video pages have no visible "⋯" (Threads keeps one
     // there at alpha 0): sit in its place and follow the "✕" instead.
     CGFloat safeTop = root.safeAreaInsets.top;
-    UIView *close = TPLBFindMoreButton(root, b, YES);
-    UIView *more = isVideo ? nil : TPLBFindMoreButton(root, b, NO);
+    UIView *close = objc_getAssociatedObject(vc, kTPLBCloseKey);
+    if (!close || close == b || !close.window || ![close isDescendantOfView:root]) {
+        close = TPLBFindMoreButton(root, b, YES);
+        objc_setAssociatedObject(vc, kTPLBCloseKey, close, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    UIView *more = nil;
+    if (!isVideo) {
+        more = objc_getAssociatedObject(vc, kTPLBMoreKey);
+        if (!more || more == b || !more.window || ![more isDescendantOfView:root]) {
+            more = TPLBFindMoreButton(root, b, NO);
+            objc_setAssociatedObject(vc, kTPLBMoreKey, more, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    } else {
+        objc_setAssociatedObject(vc, kTPLBMoreKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
     if (more == close) more = nil;
 
     // Fixed size: resizing the button after creation leaves its inner circle at the old size.
@@ -1541,6 +1622,22 @@ static void TPEnsureLightboxButton(UIView *host) {
     if (f.followClose != isVideo) { f.followClose = isVideo; f.source = nil; }
     f.source = more ?: close;
     [f start];
+
+    // The original feature is a long-press on the full-screen media itself. The old build only
+    // attached the menu to the small top-bar button, so pressing the image appeared to do nothing.
+    // UIImageView defaults to non-interactive; attach to the page cell without changing image behavior.
+    UIView *touchView = host;
+    TPLBLongPressHandler *target = objc_getAssociatedObject(touchView, kTPLBLongPressKey);
+    if (!target) {
+        target = [TPLBLongPressHandler new];
+        UILongPressGestureRecognizer *gesture = [[UILongPressGestureRecognizer alloc] initWithTarget:target action:@selector(pressed:)];
+        gesture.minimumPressDuration = 0.55;
+        gesture.cancelsTouchesInView = NO;
+        [touchView addGestureRecognizer:gesture];
+        objc_setAssociatedObject(touchView, kTPLBLongPressKey, target, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    target.host = host;
+    target.button = b;
 }
 
 %group Images
@@ -1582,6 +1679,7 @@ static BOOL gTPApplyingDefault;       // ThreadsPulse is applying the default sp
 static __weak id gTPLockedPlayer;     // player locked at 2x
 static UIButton *gTPLockButton;
 static TPLockButtonMode gTPLockMode;
+static const void *kTPLockContentKey = &kTPLockContentKey;
 
 static UIView *TPVideoViewForPlayer(id player) {
     UIView *v = ((TPWeakBox *)objc_getAssociatedObject(player, kTPPlayerViewKey)).object;
@@ -1606,8 +1704,16 @@ static void TPStyleLockButton(UIButton *b, TPLockButtonMode mode) {
         NSFontAttributeName: [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold] }];
     CGPoint center = b.center;
     BOOL placed = b.superview != nil;
-    b.configuration = c;
-    [b sizeToFit];
+    UIButton *visual = objc_getAssociatedObject(b, kTPLockContentKey);
+    if (!visual) {
+        visual = [UIButton buttonWithType:UIButtonTypeSystem];
+        objc_setAssociatedObject(b, kTPLockContentKey, visual, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    visual.configuration = c;
+    [visual sizeToFit];
+    b.bounds = (CGRect){ CGPointZero, visual.bounds.size };
+    TPSetCaptureProtectedContent(visual, b);
+    b.accessibilityLabel = TPL(title);
     if (placed) b.center = center;
     gTPLockMode = mode;
 }
@@ -2271,12 +2377,14 @@ static const void *kTPGestureKey3 = &kTPGestureKey3;
 %group Menu
 
 static NSString *const kTPEntryID = @"ThreadsPulseEntry";
+static const void *kTPEntryContentKey = &kTPEntryContentKey;
 
 static void TPTintEntryButton(UIButton *b) {
-    if (![b isKindOfClass:[UIButton class]] || !b.configuration) return;
-    UIButtonConfiguration *cfg = b.configuration;
+    UIButton *visual = objc_getAssociatedObject(b, kTPEntryContentKey);
+    if (!visual.configuration) return;
+    UIButtonConfiguration *cfg = visual.configuration;
     cfg.baseForegroundColor = [TPUI accentIcon];
-    b.configuration = cfg;
+    visual.configuration = cfg;
 }
 
 %hook _TtC11BCNSettings25BCNSettingsViewController
@@ -2303,12 +2411,17 @@ static void TPTintEntryButton(UIButton *b) {
         return m;
     };
     __weak UIViewController *wvc = vc;
-    UIButton *b = [UIButton buttonWithConfiguration:cfg primaryAction:[UIAction actionWithHandler:^(UIAction *a) {
+    UIButton *visual = [UIButton buttonWithConfiguration:cfg primaryAction:nil];
+    [visual sizeToFit];
+    UIButton *b = [UIButton buttonWithType:UIButtonTypeSystem];
+    b.frame = visual.bounds;
+    objc_setAssociatedObject(b, kTPEntryContentKey, visual, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    TPSetCaptureProtectedContent(visual, b);
+    [b addAction:[UIAction actionWithHandler:^(UIAction *a) {
         if (wvc) [TPSettingsViewController present];
-    }]];
+    }] forControlEvents:UIControlEventTouchUpInside];
     b.accessibilityIdentifier = kTPEntryID;
     b.accessibilityLabel = @"ThreadsPulse";
-    [b sizeToFit];
     __weak UIButton *wb = b;
     [[NSNotificationCenter defaultCenter] addObserverForName:TPThemeDidChangeNotification object:nil
                                                        queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
@@ -2583,6 +2696,12 @@ static NSNumber *TPKeepFeedThreshold(NSNumber *orig) {
 }
 %end
 
+%hook _TtC21BCNRootViewController21BCNRootViewController
+- (void)didWarmStartWithTimeSinceBackground:(double)backgrounded {
+    %orig(TPShouldKeepFeed() ? 0.0 : backgrounded);
+}
+%end
+
 %hook _TtC30IGFeedRefreshInstructionsStore30IGFeedRefreshInstructionsStore
 - (NSNumber *)warmStartRefreshInterval                   { return TPKeepFeedThreshold(%orig); }
 - (NSNumber *)warmStartRefreshIntervalOnPeak             { return TPKeepFeedThreshold(%orig); }
@@ -2667,6 +2786,36 @@ static BOOL TPShouldBlockTabRefresh(void) {
     return YES;
 }
 
+static BOOL TPIsLegacyHomeButton(id button) {
+    if ([button isKindOfClass:[UIGestureRecognizer class]]) button = [(UIGestureRecognizer *)button view];
+    if (![button isKindOfClass:[UIView class]]) return NO;
+    for (UIView *v = [(UIView *)button superview]; v; v = v.superview) {
+        if (![v isKindOfClass:objc_getClass("IGTabBar")]) continue;
+        SEL selector = sel_registerName("buttons");
+        NSArray *buttons = [v respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(v, selector) : nil;
+        return [buttons isKindOfClass:[NSArray class]] && buttons.firstObject == button;
+    }
+    return NO;
+}
+
+static UIScrollView *TPRefreshScrollView(id control) {
+    Ivar iv = class_getInstanceVariable(object_getClass(control), "_scrollView");
+    id scroll = iv ? object_getIvar(control, iv) : nil;
+    return [scroll isKindOfClass:[UIScrollView class]] ? scroll : nil;
+}
+
+static BOOL TPBlockMainFeedPull(id control) {
+    if (![TPPrefs boolForKey:TPKeyNoPullRefresh]) return NO;
+    UIScrollView *scroll = TPRefreshScrollView(control);
+    if (!scroll || !TPIsMainFeedScrollView(scroll)) return NO;
+    SEL selector = sel_registerName("refreshState");
+    if (![control respondsToSelector:selector] || ((NSInteger (*)(id, SEL))objc_msgSend)(control, selector) != 0) return NO;
+    CGFloat top = TPTopOffset(scroll);
+    if (scroll.contentOffset.y < top && (scroll.isTracking || scroll.isDragging || scroll.isDecelerating))
+        scroll.contentOffset = CGPointMake(scroll.contentOffset.x, top);
+    return YES;
+}
+
 %group LegacyTabFallback
 
 %hook _TtC11BCNMainFeed25BCNMainFeedViewController
@@ -2724,6 +2873,29 @@ static CFAbsoluteTime gTPSuppressTabSelectUntil = 0;
 static BOOL TPTabSelectSuppressed(void) { return CFAbsoluteTimeGetCurrent() < gTPSuppressTabSelectUntil; }
 
 %group HomeFeedControls
+%hook IGRefreshControl
+- (void)scrollViewDidScroll { if (TPBlockMainFeedPull(self)) return; %orig; }
+- (void)scrollViewDidEndDragging { if (TPBlockMainFeedPull(self)) return; %orig; }
+%end
+
+%hook _TtC21BCNRootViewController21BCNRootViewController
+- (void)didTapTabBarButton:(id)button {
+    if (TPIsLegacyHomeButton(button) && (TPTabSelectSuppressed() || TPShouldBlockHomeReselect())) return;
+    %orig;
+}
+- (void)didLongPressTabBarButton:(UIGestureRecognizer *)press {
+    if (![TPPrefs boolForKey:TPKeyHomeLongPress] || ![press isKindOfClass:[UIGestureRecognizer class]]
+        || !TPIsLegacyHomeButton(press.view)) { %orig; return; }
+    if (press.state == UIGestureRecognizerStateBegan) {
+        gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + 10;
+        [TPUI hapticLight];
+        [TPSettingsViewController present];
+    } else if (press.state == UIGestureRecognizerStateEnded || press.state == UIGestureRecognizerStateCancelled
+               || press.state == UIGestureRecognizerStateFailed) {
+        gTPSuppressTabSelectUntil = CFAbsoluteTimeGetCurrent() + 0.6;
+    }
+}
+%end
 
 %hook _TtC21BCNRootViewController25BCNLegacyTabBarController
 - (void)didTapTabBarButton:(id)button       { TPMarkLegacyTabTap(); %orig; }
@@ -2828,6 +3000,23 @@ static BOOL TPTreeContainsUserRecs(UIViewController *vc, int depth) {
     SEL sel = sel_registerName("setTabBarMinimizeBehavior:");
     if ([TPPrefs boolForKey:TPKeyPinTabBar] && [(id)self respondsToSelector:sel])
         ((void (*)(id, SEL, NSInteger))objc_msgSend)((id)self, sel, 1);
+}
+%end
+
+%end
+
+// 410 sends scrolling offsets and the matching fade through these native root methods.
+// Keep their state updates; leave navigation visibility and layout entirely native.
+%group LegacyPinTabBar
+
+%hook _TtC21BCNRootViewController21BCNRootViewController
+- (void)moveDownTabBarToOffset:(double)offset percentTransitioned:(double)percent {
+    if ([TPPrefs boolForKey:TPKeyPinTabBar]) { %orig(0.0, 0.0); return; }
+    %orig;
+}
+- (void)setBarButtonAlpha:(double)alpha {
+    if ([TPPrefs boolForKey:TPKeyPinTabBar]) { %orig(1.0); return; }
+    %orig;
 }
 %end
 
@@ -3274,6 +3463,17 @@ static BOOL TPOpenExternally(id url) {
 }
 %end
 
+%hook _TtC14BCNLinkHandler18BCNLinkHandlerImpl
+- (void)handleLinkWithURL:(id)url containerModule:(id)module presenter:(id)presenter {
+    if (TPOpenExternally(url)) return;
+    %orig;
+}
+- (void)handleLinkWithURL:(id)url rawURL:(id)rawURL linkProtectionMetadata:(id)metadata mediaPk:(id)pk mediaAuthorPk:(id)authorPk linkTapLocation:(long long)location containerModule:(id)module sponsoredPostInfo:(id)info rankingInfoToken:(id)token presenter:(id)presenter contextualLoggingParameters:(id)parameters clickSource:(unsigned long long)source {
+    if (TPOpenExternally(url)) return;
+    %orig;
+}
+%end
+
 %end
 
 // Profile header buttons are lazy properties of BCNProfileViewController:
@@ -3567,6 +3767,25 @@ static void TPRecordWatermark(NSString *k, id ms) {
     }
 }
 
+static BOOL TPHoldMessageUntilSeen(id model, dispatch_block_t send) {
+    Ivar iv = model && [TPPrefs boolForKey:TPKeyNoSeen] ? class_getInstanceVariable(object_getClass(model), "_outgoingMessagePayload") : NULL;
+    id payload = iv ? object_getIvar(model, iv) : nil;
+    NSString *key = payload ? TPThreadKey([TPDownloader safeValue:payload key:@"threadFbid"]) : nil;
+    BOOL hold = NO;
+    if (key.length) @synchronized ([TPPrefs class]) { hold = CFAbsoluteTimeGetCurrent() - [gTPSeenSentAt[key] doubleValue] < 2; }
+    if (!hold) return NO;
+    TPDebug(TPL(@"Seen sent first, message follows"));
+    __block BOOL done = NO;
+    dispatch_block_t once = ^{ if (done) return; done = YES; send(); };
+    @synchronized ([TPPrefs class]) {
+        if (!gTPHeldMessages) gTPHeldMessages = [NSMutableDictionary dictionary];
+        if (!gTPHeldMessages[key]) gTPHeldMessages[key] = [NSMutableArray array];
+        [gTPHeldMessages[key] addObject:[once copy]];
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), once);
+    return YES;
+}
+
 static void TPSendSeenNow(NSString *k) {
     NSDictionary *args;
     @synchronized ([TPPrefs class]) { args = gTPLastReadArgs[k]; }
@@ -3677,28 +3896,27 @@ static void TPSendSeenNow(NSString *k) {
 // until the server accepts the Seen.
 %hook MDCoreSendService
 - (void)sendMutationWithAppDataModel:(id)model offlineThreadingId:(id)otid optimisticImages:(id)images syncGroupId:(int)group {
-    Ivar iv = model && [TPPrefs boolForKey:TPKeyNoSeen] ? class_getInstanceVariable(object_getClass(model), "_outgoingMessagePayload") : NULL;
-    id payload = iv ? object_getIvar(model, iv) : nil;
-    NSString *k = payload ? TPThreadKey([TPDownloader safeValue:payload key:@"threadFbid"]) : nil;
-    BOOL hold = NO;
-    if (k.length) @synchronized ([TPPrefs class]) { hold = CFAbsoluteTimeGetCurrent() - [gTPSeenSentAt[k] doubleValue] < 2; }
-    if (!hold) { %orig; return; }
-    TPDebug(TPL(@"Seen sent first, message follows"));
-    dispatch_block_t send = ^{ %orig(model, otid, images, group); };
-    __block BOOL done = NO;
-    dispatch_block_t once = ^{ if (done) return; done = YES; send(); };
-    @synchronized ([TPPrefs class]) {
-        if (!gTPHeldMessages) gTPHeldMessages = [NSMutableDictionary dictionary];
-        if (!gTPHeldMessages[k]) gTPHeldMessages[k] = [NSMutableArray array];
-        [gTPHeldMessages[k] addObject:[once copy]];
-    }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), once);
+    if (TPHoldMessageUntilSeen(model, ^{ %orig(model, otid, images, group); })) return;
+    %orig;
+}
+%end
+
+// 410 sends outgoing messages through its concrete Swift service subclass.
+%hook _TtC25BCNSlideMDCoreSendService25BCNSlideMDCoreSendService
+- (void)sendMutationWithAppDataModel:(id)model offlineThreadingId:(id)otid optimisticImages:(id)images {
+    if (TPHoldMessageUntilSeen(model, ^{ %orig(model, otid, images); })) return;
+    %orig;
 }
 %end
 
 // A reply is detected when Threads builds an outgoing message or a message action. Detecting it
 // in MDCoreSendService was wrong: most mutations there are thread updates such as reads.
 %hook BCNSlideOutgoingMessagePayload
+- (id)initWithOfflineThreadingId:(id)otid threadFbid:(id)fbid senderFbid:(id)sender sendDate:(id)date content:(id)content navChain:(id)chain forwardedMessageId:(id)fwd {
+    id me = %orig;
+    if (me && [TPPrefs boolForKey:TPKeyNoSeen]) TPAllowSeenAfterReply(fbid);
+    return me;
+}
 - (id)initWithOfflineThreadingId:(id)otid threadFbid:(id)fbid senderFbid:(id)sender sendDate:(id)date content:(id)content navChain:(id)chain forwardedMessageId:(id)fwd sendAttribution:(id)attr promptSessionId:(id)ps qnaQuestionId:(id)qid qnaQuestion:(id)q {
     id me = %orig;
     if (me && [TPPrefs boolForKey:TPKeyNoSeen]) {
@@ -3718,18 +3936,26 @@ static void TPSendSeenNow(NSString *k) {
 %end
 
 static const void *kTPSeenButtonKey = &kTPSeenButtonKey;
+static const void *kTPSeenIconKey = &kTPSeenIconKey;
 
 static void TPSetSeenButtonState(UIButton *b, BOOL showsSeen) {
-    [b setImage:[UIImage systemImageNamed:showsSeen ? @"eye" : @"eye.slash"
+    UIImageView *icon = objc_getAssociatedObject(b, kTPSeenIconKey);
+    icon.image = [[UIImage systemImageNamed:showsSeen ? @"eye" : @"eye.slash"
                          withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium]]
-       forState:UIControlStateNormal];
+                   imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     b.tintColor = showsSeen ? [TPUI accentIcon] : UIColor.secondaryLabelColor;
     b.accessibilityValue = TPL(showsSeen ? @"This chat shows Seen" : @"This chat hides Seen");
 }
 
 static UIViewController *TPChatViewControllerOf(UIView *v) {
     Class chat = objc_getClass("_TtC21BCNSlideMessageListUI33BCNSlideMessageListViewController");
-    for (UIResponder *r = v; r; r = r.nextResponder) if (chat && [r isKindOfClass:chat]) return (UIViewController *)r;
+    for (UIResponder *r = v; r; r = r.nextResponder) {
+        if (chat && [r isKindOfClass:chat]) return (UIViewController *)r;
+        if ([r isKindOfClass:[UINavigationController class]]) {
+            UIViewController *visible = ((UINavigationController *)r).visibleViewController;
+            if (chat && [visible isKindOfClass:chat]) return visible;
+        }
+    }
     return nil;
 }
 
@@ -3744,6 +3970,11 @@ static NSString *TPChatKeyOf(UIViewController *chat) {
 // BCNSlideMessageListNavBarTitleView so it appears and transitions with the title bar.
 static UIButton *TPMakeSeenButton(void) {
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
+    btn.frame = CGRectMake(0, 0, 36, 36);
+    UIImageView *icon = [[UIImageView alloc] initWithFrame:btn.bounds];
+    icon.contentMode = UIViewContentModeCenter;
+    objc_setAssociatedObject(btn, kTPSeenIconKey, icon, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    TPSetCaptureProtectedContent(icon, btn);
     objc_setAssociatedObject(btn, kTPSeenButtonKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     btn.accessibilityLabel = TPL(@"Seen for This Chat");
     TPSetSeenButtonState(btn, NO);
@@ -3762,6 +3993,46 @@ static UIButton *TPMakeSeenButton(void) {
     }] forControlEvents:UIControlEventTouchUpInside];
     return btn;
 }
+
+static const void *kTPSeenBarItemKey = &kTPSeenBarItemKey;
+
+static NSArray<UIBarButtonItem *> *TPSeenBarItems(UINavigationItem *item, NSArray<UIBarButtonItem *> *items) {
+    UIView *title = item.titleView;
+    Class titleClass = objc_getClass("_TtC21BCNSlideMessageListUI34BCNSlideMessageListNavBarTitleView");
+    if (!titleClass || ![title isKindOfClass:titleClass] ||
+        class_getInstanceVariable(object_getClass(title), "$__lazy_storage_$_moreButton")) return items;
+    UIBarButtonItem *eye = objc_getAssociatedObject(title, kTPSeenBarItemKey);
+    if (![TPPrefs boolForKey:TPKeyNoSeen]) {
+        if (!eye || ![items containsObject:eye]) return items;
+        NSMutableArray *remaining = [items mutableCopy];
+        [remaining removeObject:eye];
+        return remaining;
+    }
+    if (!eye) {
+        UIButton *button = TPMakeSeenButton();
+        button.frame = CGRectMake(0, 0, 36, 36);
+        eye = [[UIBarButtonItem alloc] initWithCustomView:button];
+        objc_setAssociatedObject(title, kTPSeenBarItemKey, eye, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    NSString *key = TPChatKeyOf(TPChatViewControllerOf(title));
+    BOOL shows = TPChatShowsSeen(key);
+    if (key.length && title.window) { gTPOpenChatKey = key; gTPOpenChatShowsSeen = shows; }
+    TPSetSeenButtonState((UIButton *)eye.customView, shows);
+    if ([items containsObject:eye]) return items;
+    return [(items ?: @[]) arrayByAddingObject:eye];
+}
+
+%hook UINavigationItem
+- (void)setRightBarButtonItems:(NSArray *)items animated:(BOOL)animated {
+    %orig(TPSeenBarItems(self, items), animated);
+}
+- (void)setTitleView:(UIView *)titleView {
+    %orig;
+    NSArray *items = ((UINavigationItem *)self).rightBarButtonItems;
+    NSArray *updated = TPSeenBarItems((UINavigationItem *)self, items);
+    if (updated != items) [self setRightBarButtonItems:updated animated:NO];
+}
+%end
 
 %hook _TtC21BCNSlideMessageListUI34BCNSlideMessageListNavBarTitleView
 - (void)layoutSubviews {
@@ -3788,7 +4059,15 @@ static UIButton *TPMakeSeenButton(void) {
 }
 - (void)didMoveToWindow {
     %orig;
-    if (!((UIView *)self).window) gTPOpenChatShowsSeen = NO;
+    UIView *title = (UIView *)self;
+    if (!title.window) { gTPOpenChatShowsSeen = NO; return; }
+    UIBarButtonItem *eye = objc_getAssociatedObject(title, kTPSeenBarItemKey);
+    if (!eye) return;
+    NSString *key = TPChatKeyOf(TPChatViewControllerOf(title));
+    if (!key.length) return;
+    gTPOpenChatKey = key;
+    gTPOpenChatShowsSeen = TPChatShowsSeen(key);
+    TPSetSeenButtonState((UIButton *)eye.customView, gTPOpenChatShowsSeen);
 }
 %end
 %end
@@ -3857,6 +4136,22 @@ static void TPRememberUnsent(id deletePayload) {
         [[NSUserDefaults standardUserDefaults] setObject:[gTPUnsent copy] forKey:kTPUnsentKey];
     }
     TPRefreshMessageCells();
+}
+
+static id TPFilterUnsentCommands(id result) {
+    Class resultClass = objc_getClass("MDCoreDeltaApplicationResult");
+    Ivar iv = resultClass && [result isKindOfClass:resultClass] ? class_getInstanceVariable(resultClass, "_mutationCommands_commands") : NULL;
+    NSArray *commands = iv ? object_getIvar(result, iv) : nil;
+    if (![commands isKindOfClass:[NSArray class]]) return result;
+    NSMutableArray *kept = [NSMutableArray array];
+    for (id command in commands) {
+        id payload = TPDeleteCommandPayload(command);
+        if (!payload) { [kept addObject:command]; continue; }
+        if (payload != (id)kCFNull) TPRememberUnsent(payload);
+    }
+    if (kept.count == commands.count) return result;
+    SEL make = NSSelectorFromString(@"mutationCommandsWithCommands:");
+    return [resultClass respondsToSelector:make] ? ((id (*)(id, SEL, id))objc_msgSend)(resultClass, make, kept) : result;
 }
 
 static BOOL TPIsUnsentMessageId(NSString *mid) {
@@ -3938,21 +4233,15 @@ static void TPUpdateUnsentLabel(UIView *cell) {
     Ivar nameIv = class_getInstanceVariable(object_getClass(self), "_wrappedTypeName");
     NSString *name = nameIv ? object_getIvar(self, nameIv) : nil;
     if (![name isKindOfClass:[NSString class]] || ![name containsString:@"DeleteMessage"]) return r;
-    Class resultCls = objc_getClass("MDCoreDeltaApplicationResult");
-    Ivar iv = resultCls && [r isKindOfClass:resultCls] ? class_getInstanceVariable(resultCls, "_mutationCommands_commands") : NULL;
-    NSArray *cmds = iv ? object_getIvar(r, iv) : nil;
-    if (![cmds isKindOfClass:[NSArray class]]) return r;
-    NSMutableArray *kept = [NSMutableArray array];
-    for (id cmd in cmds) {
-        id payload = TPDeleteCommandPayload(cmd);
-        if (!payload) { [kept addObject:cmd]; continue; }
-        if (payload != (id)kCFNull) TPRememberUnsent(payload);
-    }
-    if (kept.count == cmds.count) return r;
-    SEL make = NSSelectorFromString(@"mutationCommandsWithCommands:");
-    if (![resultCls respondsToSelector:make]) return r;
-    TPDebug(TPL(@"Unsent message kept"));
-    return ((id (*)(id, SEL, id))objc_msgSend)(resultCls, make, kept);
+    return TPFilterUnsentCommands(r);
+}
+%end
+
+%hook MDCoreDeleteMessageDeltaApplicator
+- (id)mutationCommandsForDelta:(id)delta authoritativeThread:(id)thread requestedState:(id)state currentUserFbid:(id)fbid {
+    id result = %orig;
+    if (![TPPrefs boolForKey:TPKeyKeepUnsent]) return result;
+    return TPFilterUnsentCommands(result);
 }
 %end
 
@@ -3987,47 +4276,63 @@ static void TPUpdateUnsentLabel(UIView *cell) {
 // Which row is a header is only known once its cell is built, so remember it there (per section
 // controller) and have the section re-measured once.
 static const void *kTPHeaderRowsKey = &kTPHeaderRowsKey;
+static const void *kTPHeaderPksKey = &kTPHeaderPksKey;
+
+static UIView *TPAuthorHeaderView(UICollectionViewCell *cell) {
+    static Class contentClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ contentClass = objc_getClass("_TtC21BCNFeedItemHeaderCell32BCNFeedItemHeaderCellContentView"); });
+    if (!contentClass) return cell; // 410 keeps its title and view model on the cell itself.
+    return TPFindView(cell, contentClass, 6);
+}
+
+static void TPRefreshAuthorSection(id sc) {
+    __weak id weakSC = sc;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        id s = weakSC;
+        id context = [s respondsToSelector:@selector(collectionContext)] ? [s performSelector:@selector(collectionContext)] : nil;
+        SEL invalidate = NSSelectorFromString(@"invalidateLayoutForSectionController:completion:");
+        if ([context respondsToSelector:invalidate])
+            ((void (*)(id, SEL, id, id))objc_msgSend)(context, invalidate, s, nil);
+    });
+}
 
 // A taller header row makes Threads centre its content vertically, pushing the name down into the
 // new space. Give the content view back its natural height (top-aligned) so the extra line sits
 // below it, where the author info goes.
-static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
+static CGFloat TPHeaderCellExtraHeight(UICollectionViewCell *cell) {
     UIView *v = cell.superview;
     while (v && ![v isKindOfClass:[UICollectionView class]]) v = v.superview;
     UICollectionView *cv = (UICollectionView *)v;
     NSIndexPath *ip = cv ? [cv indexPathForCell:cell] : nil;
-    if (!ip) return NO;
+    if (!ip) return 0;
     id adapter = nil;
     for (id cand in @[cv.dataSource ?: (id)NSNull.null, cv.delegate ?: (id)NSNull.null])
         if ([cand respondsToSelector:@selector(sectionControllerForSection:)]) { adapter = cand; break; }
     id sc = adapter ? [adapter sectionControllerForSection:ip.section] : nil;
     NSIndexSet *rows = sc ? objc_getAssociatedObject(sc, kTPHeaderRowsKey) : nil;
-    return [rows containsIndex:(NSUInteger)ip.item];
+    NSDictionary *pks = sc ? objc_getAssociatedObject(sc, kTPHeaderPksKey) : nil;
+    return [rows containsIndex:(NSUInteger)ip.item] ? [TPAuthorInfo extraHeaderHeightForPk:pks[@(ip.item)]] : 0;
 }
 
 %hook _TtC21BCNFeedItemHeaderCell21BCNFeedItemHeaderCell
 - (void)layoutSubviews {
     %orig;
-    CGFloat extra = [TPAuthorInfo extraHeaderHeight];
-    if (extra <= 0) return;
     UICollectionViewCell *cell = (UICollectionViewCell *)self;
-    if (!TPHeaderCellIsExtended(cell)) return;
-    static Class contentCls;
-    if (!contentCls) contentCls = objc_getClass("_TtC21BCNFeedItemHeaderCell32BCNFeedItemHeaderCellContentView");
-    NSMutableArray *stack = [NSMutableArray arrayWithObject:cell];
-    while (stack.count) {
-        UIView *v = stack.lastObject; [stack removeLastObject];
-        if (contentCls && [v isKindOfClass:contentCls]) {
-            CGRect f = v.frame;
-            CGFloat natural = cell.bounds.size.height - extra - f.origin.y;
-            if (f.size.height > natural + 1 && natural > 20) {
-                f.size.height = natural;
-                v.frame = f;
-                [v layoutIfNeeded];
-            }
-            break;
+    UIView *header = TPAuthorHeaderView(cell);
+    if (header == cell) {
+        [TPAuthorInfo layoutBadgeInHeader:header];
+        return;
+    }
+    CGFloat extra = TPHeaderCellExtraHeight(cell);
+    if (extra > 0 && header) {
+        CGRect f = header.frame;
+        CGFloat natural = cell.bounds.size.height - extra - f.origin.y;
+        if (f.size.height > natural + 1 && natural > 20) {
+            f.size.height = natural;
+            header.frame = f;
+            [header layoutIfNeeded];
         }
-        for (UIView *s in v.subviews) [stack addObject:s];
     }
 }
 %end
@@ -4035,12 +4340,12 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
 %hook IGListAdapter
 - (CGSize)sizeForItemAtIndexPath:(NSIndexPath *)path {
     CGSize r = %orig;
-    CGFloat extra = [TPAuthorInfo extraHeaderHeight];
-    if (extra > 0 && r.height > 0) {
+    if (r.height > 0 && [TPAuthorInfo extraHeaderHeight] > 0) {
         id sc = [self sectionControllerForSection:path.section];
         NSIndexSet *rows = sc ? objc_getAssociatedObject(sc, kTPHeaderRowsKey) : nil;
         if ([rows containsIndex:(NSUInteger)path.item]) {
-            r.height += extra;
+            NSDictionary *pks = objc_getAssociatedObject(sc, kTPHeaderPksKey);
+            r.height += [TPAuthorInfo extraHeaderHeightForPk:pks[@(path.item)]];
         }
     }
     return r;
@@ -4049,24 +4354,24 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
     UICollectionViewCell *cell = %orig;
     static Class headerCls;
     if (!headerCls) headerCls = objc_getClass("_TtC21BCNFeedItemHeaderCell21BCNFeedItemHeaderCell");
+    id sc = [self sectionControllerForSection:path.section];
+    if (!sc) return cell;
+    NSMutableIndexSet *rows = objc_getAssociatedObject(sc, kTPHeaderRowsKey);
+    NSMutableDictionary *pks = objc_getAssociatedObject(sc, kTPHeaderPksKey);
+    NSString *oldPk = pks[@(path.item)];
+    CGFloat oldExtra = [TPAuthorInfo extraHeaderHeightForPk:oldPk];
     if (headerCls && [cell isKindOfClass:headerCls]) {
-        id sc = [self sectionControllerForSection:path.section];
-        if (!sc) return cell;
-        NSMutableIndexSet *rows = objc_getAssociatedObject(sc, kTPHeaderRowsKey);
         if (!rows) { rows = [NSMutableIndexSet indexSet]; objc_setAssociatedObject(sc, kTPHeaderRowsKey, rows, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
-        if (![rows containsIndex:(NSUInteger)path.item]) {
-            [rows addIndex:(NSUInteger)path.item];
-            if ([TPAuthorInfo extraHeaderHeight] > 0) {
-                __weak id weakSC = sc;
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    id s = weakSC;
-                    id ctx = [s respondsToSelector:@selector(collectionContext)] ? [s performSelector:@selector(collectionContext)] : nil;
-                    SEL inv = NSSelectorFromString(@"invalidateLayoutForSectionController:completion:");
-                    if (ctx && [ctx respondsToSelector:inv])
-                        ((void (*)(id, SEL, id, id))objc_msgSend)(ctx, inv, s, nil);
-                });
-            }
-        }
+        if (!pks) { pks = [NSMutableDictionary dictionary]; objc_setAssociatedObject(sc, kTPHeaderPksKey, pks, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+        NSString *pk = [TPAuthorInfo pkForHeader:TPAuthorHeaderView(cell)];
+        BOOL changed = ![rows containsIndex:(NSUInteger)path.item] || ((oldPk || pk) && ![oldPk isEqualToString:pk]);
+        if (pk) pks[@(path.item)] = pk; else [pks removeObjectForKey:@(path.item)];
+        [rows addIndex:(NSUInteger)path.item];
+        if (changed && (oldExtra > 0 || [TPAuthorInfo extraHeaderHeightForPk:pk] > 0)) TPRefreshAuthorSection(sc);
+    } else if ([rows containsIndex:(NSUInteger)path.item]) {
+        [rows removeIndex:(NSUInteger)path.item];
+        [pks removeObjectForKey:@(path.item)];
+        if (oldExtra > 0) TPRefreshAuthorSection(sc);
     }
     return cell;
 }
@@ -4130,6 +4435,14 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
 %end
 
 %hook IGBloksAsyncActionHandler
+- (id)initWithAppID:(id)appID params:(id)params props:(id)props context:(id)context successHandler:(id)ok errorHandler:(id)err {
+    id r = %orig;
+    @try {
+        id os = [context respondsToSelector:@selector(objectSet)] ? [context performSelector:@selector(objectSet)] : nil;
+        if (os) [TPAuthorInfo noteObjectSet:os source:@"AsyncActionHandlerProps"];
+    } @catch (__unused NSException *e) {}
+    return r;
+}
 - (id)initWithAppID:(id)appID params:(id)params context:(id)context successHandler:(id)ok errorHandler:(id)err {
     id r = %orig;
     @try {
@@ -4158,9 +4471,30 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
 
 %end
 
+%group MusicCompat
+%hook IGMedia
+- (BOOL)updateWithDictionary:(id)dictionary {
+    BOOL changed = %orig;
+    TPMusicUpdateMedia(self, dictionary);
+    return changed;
+}
+%end
+%hook _TtC21BCNFeedNestedPostCell34BCNFeedDeletedQuotedAttachmentCell
+- (void)layoutSubviews {
+    %orig;
+    TPMusicLayoutCell((UIView *)self);
+}
+%end
+%end
+
 %ctor {
     @autoreleasepool {
+        if (![NSProcessInfo.processInfo.processName isEqualToString:@"Threads"]) return;
         TPSideloadFixInstall();
+        NSString *appVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+        if ([[appVersion componentsSeparatedByString:@"."].firstObject isEqualToString:@"410"]) {
+            %init(MusicCompat);
+        }
         for (NSString *old in @[@"tp_last_logout", @"tp_logout_history", @"tp_logout_keychain"])
             [[TPPrefs defaults] removeObjectForKey:old];
         // 1.30 added "With Year" as option 2; "With Seconds" moved from 2 to 3.
@@ -4185,6 +4519,11 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
         gTPUserRecsClass = objc_getClass("_TtC22BCNUserRecommendations36BCNUserRecommendationsViewController");
         %init(HideFollowSuggest);
         %init(PinTabBar);
+        Class legacyTabRoot = objc_getClass("_TtC21BCNRootViewController21BCNRootViewController");
+        if (class_getInstanceMethod(legacyTabRoot, @selector(moveDownTabBarToOffset:percentTransitioned:)) &&
+            class_getInstanceMethod(legacyTabRoot, @selector(setBarButtonAlpha:))) {
+            %init(LegacyPinTabBar);
+        }
         %init(HideFeedSuggestions);
         %init(BlockScreenshotDetection);
         %init(BlockAnalytics);
@@ -4213,6 +4552,7 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
+            TPNotificationPrefsWriteKeepUnsent([TPPrefs boolForKey:TPKeyKeepUnsent]);
             // Coming back from another app the UI is already there, so check almost at once
             // (shorter still for Auto-open). On a cold launch, wait for Threads to build its UI first.
             static BOOL launched;
@@ -4249,5 +4589,6 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
                 [TPUpdateChecker checkAutomatically];
             });
         }];
+        TPNotificationPrefsWriteKeepUnsent([TPPrefs boolForKey:TPKeyKeepUnsent]);
     }
 }

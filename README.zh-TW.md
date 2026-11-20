@@ -2,9 +2,22 @@
 
 [English](README.md) | **繁體中文**
 
-Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.31.0**
+Threads（`com.burbn.barcelona`）的 iOS 增強插件。相容版本：**1.31.0+16**，基於 [h4x_0x30vm 的 ThreadsPulse 1.31.0](https://github.com/mumuisdog/ThreadsPulse)。
 
-不需要越獄：用 GitHub Actions 就能編譯出注入好的 Threads IPA，再用自己的簽名工具安裝。
+本分支保留原作者功能，加入 Threads 410、456 的相容修正，支援 **iOS 15 及以上**。
+
+[下載 1.31.0+16](https://github.com/5hux1n/ThreadsPulse/releases/tag/1.31.0%2B16) · [所有版本](https://github.com/5hux1n/ThreadsPulse/releases)
+
+| 套件 | 適用環境 |
+|---|---|
+| `ThreadsPulse_1.31.0+16_arm64.deb` | Rootless（無根越獄） |
+| `ThreadsPulse_1.31.0+16_arm64e.deb` | RootHide |
+
+使用越獄套件管理器安裝對應的 DEB。TrollFools 請匯入 Rootless（`arm64`）DEB 整包，不需要另外匯入語言資源包。
+
+插件內建的更新檢查仍跟隨原作者專案；本分支的相容版本請從本倉庫 Releases 下載。
+
+需要側載 IPA 時，請參考下方的本機注入命令。Actions 說明保留作為上游流程參考。
 
 ## 功能
 
@@ -75,7 +88,7 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.31.0
 
 ---
 
-## 用 GitHub Actions 自己編譯 IPA（免越獄，推薦）
+## 上游 IPA 編譯流程（參考）
 
 ### 事前準備
 
@@ -130,51 +143,44 @@ Threads（`com.burbn.barcelona`）的 iOS 增強插件。目前版本：**1.31.0
 
 ## 其他編譯方式
 
-### GitHub Actions：只編譯插件（Build）
+### 預先編譯的套件
 
-推送到 `main`／`master`、開 Pull Request，或在 Actions 選 **Build** → **Run workflow**，會產出：
-
-| 檔案 | 用途 |
-|---|---|
-| `ThreadsPulse_TrollFools_<版本>.zip` | TrollFools 或自行注入用：`ThreadsPulse.dylib`、`ThreadsPulse.bundle`（Safari 延伸功能只放在 sideload 版 IPA） |
-| `ThreadsPulse_rootless_<版本>.deb` | 無根越獄（Dopamine／palera1n rootless） |
-| `ThreadsPulse_rootful_<版本>.deb` | 有根越獄 |
-| `ThreadsPulse_roothide_<版本>.deb` | Roothide 越獄（Dopamine roothide、Bootstrap） |
-
-推送 `v` 開頭的標籤會自動建立 Release 並附上這四個檔案（不含 Threads 本體）：
-
-```bash
-git tag v1.31.0
-git push origin v1.31.0
-```
+請在 [Releases](https://github.com/5hux1n/ThreadsPulse/releases) 下載 Rootless、RootHide 兩種 DEB。本分支的發佈套件使用 Xcode 16 在本機編譯，不使用上游 Actions 的套件產出矩陣。
 
 ### 本機編譯
 
-需要 [Theos](https://theos.dev)（macOS 或 Linux 皆可）。
+需要 macOS、Xcode 16、Python 3 與 [Theos](https://theos.dev)。RootHide 套件使用 [RootHide Theos](https://github.com/roothide/theos) 編譯。
 
 ```bash
 export THEOS=~/theos
 make FINALPACKAGE=1            # 只產生 dylib：.theos/obj/ThreadsPulse.dylib
-make package FINALPACKAGE=1    # 產生 .deb（越獄用）
+make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless    # 產生 Rootless .deb
 make -C OpenThreadsSafariExtension FINALPACKAGE=1   # Safari 延伸功能 → OpenThreadsSafariExtension/.theos/obj/
 
 # 注入已解密的 IPA（只需要 Python 3 與 zip / unzip）
-BUNDLE="layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle"
 # sideload 版
-python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib -b "$BUNDLE" \
+python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib \
   --appex OpenThreadsSafariExtension/.theos/obj/OpenThreadsSafariExtension.appex -o sideload.ipa
 # noplugins 版
-python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib -b "$BUNDLE" \
+python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib \
   --no-plugins -o noplugins.ipa
 ```
 
-- 無根越獄：把 `Makefile` 裡 `THEOS_PACKAGE_SCHEME = rootless` 取消註解。
+RootHide 請使用對應的 Theos：
+
+```bash
+THEOS=~/theos-roothide make clean THEOS_PACKAGE_SCHEME=roothide
+THEOS=~/theos-roothide make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide
+```
+
+兩種套件輸出到 `dist/`，分別為 `ThreadsPulse_<版本>_arm64.deb` 與 `ThreadsPulse_<版本>_arm64e.deb`。
+
 - 使用 Logos `internal` generator，以 ObjC runtime 直接 hook，**不依賴 CydiaSubstrate／ElleKit**，注入 IPA 時不需要另外附上。
-- 版本號只在 `TPVersion.h` 定義（`ThreadsPulse.bundle/Info.plist` 請一併更新）；編譯用的 iOS SDK 與最低支援版本在 workflow 的 `SDK_VERSION`、`MIN_IOS`。
+- 顯示版本號在 `TPVersion.h` 定義；語系資訊位於 `resources/localization/Info.plist`。編譯用的 iOS SDK 與最低支援版本在 workflow 的 `SDK_VERSION`、`MIN_IOS`。
 
 ### `inject_ipa.py` 做了什麼
 
-1. 解開 IPA，把 `ThreadsPulse.dylib` 放進 `Threads.app/Frameworks/`、`ThreadsPulse.bundle` 放進 `Threads.app/`。
+1. 解開 IPA，把 `ThreadsPulse.dylib` 放進 `Threads.app/Frameworks/`。目前版本已內嵌翻譯；可選的 `--bundle` 參數保留給仍需要獨立 `ThreadsPulse.bundle` 的舊版使用。
 2. 在 Threads 主程式加入一個 `LC_LOAD_DYLIB` 載入指令（`@executable_path/Frameworks/ThreadsPulse.dylib`），已經有就略過。
 3. 檢查是否已解密（`LC_ENCRYPTION_INFO_64` 的 `cryptid`），未解密會直接停止。
 4. `--appex`：把延伸功能放進 `PlugIns/`（會去掉裡面原有的簽名資料）；`--no-plugins`：移除 `PlugIns/`、`Extensions/`、`Watch/`。
@@ -215,7 +221,7 @@ ThreadsPulse/
 │   └── workflows/
 │       ├── build.yml               編譯插件（zip／deb）
 │       └── build-ipa.yml           編譯並注入 IPA
-└── layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/
+└── resources/localization/         編譯時內嵌至 ThreadsPulse.dylib
     ├── Info.plist
     ├── en.lproj/Localizable.strings
     ├── zh-Hant.lproj/Localizable.strings
@@ -228,7 +234,7 @@ ThreadsPulse/
 
 - 程式裡一律用 `TPL(@"English text")`，**英文原文就是 key**；找不到翻譯時直接顯示英文。
 - 內建語言：英文（`en`）、繁體中文（`zh-Hant`）、簡體中文（`zh-Hans`）、日文（`ja`）、韓文（`ko`）。預設跟隨系統語言（其他語言顯示英文），也可在設定頁最上方的「語言」指定。
-- 新增語言：複製 `en.lproj` 改名（例如 `fr.lproj`）並翻譯，到 `Info.plist` 的 `CFBundleLocalizations` 加上語言代碼，再把它加進語言選單（`TPSettingsViewController.m`）與 `TPLocalization.m`。
+- 翻譯原始檔位於 `resources/localization/`；編譯時由 `scripts/generate-localization.py` 嵌入 dylib，不需要獨立的 `.bundle`。新增語言：複製 `en.lproj` 改名（例如 `fr.lproj`）並翻譯，到 `Info.plist` 的 `CFBundleLocalizations` 加上語言代碼，再更新語言選單（`TPSettingsViewController.m`）、`TPLocalization.m` 與產生器的支援語言對應。
 - 簡體中文、日文、韓文的翻譯歡迎母語使用者協助修正。
 
 ## 實作重點
@@ -291,5 +297,7 @@ Threads 更新後，部分功能可能會暫時失效（不會閃退）。開啟
 ## 作者
 
 h4x_0x30vm · [Ko-fi](https://ko-fi.com/mumuisdog)
+
+二改最佳化：[Junhong](https://mjh.im/)
 
 © 2026 h4x_0x30vm，保留所有權利。

@@ -11,17 +11,6 @@ static UIColor *TPCapsuleBG(void) { return UIColor.blackColor; }
 static UIColor *TPCapsuleBorder(void) { return [UIColor colorWithWhite:1 alpha:0.10]; }
 static UIColor *TPMuted(void) { return [UIColor colorWithRed:0.557 green:0.557 blue:0.576 alpha:1]; }  // #8E8E93
 
-// A container whose contents can be left out of screenshots ("Hide Buttons in Screenshots").
-static UIView *TPHolder(CGRect frame) {
-    UIView *h = [TPPrefs boolForKey:TPKeyHideInCaptures] ? TPCaptureProtectedView() : nil;
-    if (!h) h = [UIView new];
-    h.frame = frame;
-    h.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    h.userInteractionEnabled = NO;
-    h.clipsToBounds = NO;
-    return h;
-}
-
 @implementation TPCapsule {
     UIView *_pill, *_pillContent;
     UILabel *_pillLabel;
@@ -77,7 +66,6 @@ static void TPLayoutCapsules(BOOL animated) {
     up.direction = UISwipeGestureRecognizerDirectionUp;
     [_pill addGestureRecognizer:up];
 
-    UIView *holder = TPHolder(_pill.bounds);
     _pillContent = [[UIView alloc] initWithFrame:_pill.bounds];
     _pillContent.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _pillContent.backgroundColor = TPCapsuleBG();
@@ -105,8 +93,7 @@ static void TPLayoutCapsules(BOOL animated) {
     _mark.hidden = YES;
     [_pillContent addSubview:_mark];
 
-    [holder addSubview:_pillContent];
-    [_pill addSubview:holder];
+    TPSetCaptureProtectedContent(_pillContent, _pill);
 
     [sCapsules addObject:self];
     [self refreshPill];
@@ -230,7 +217,6 @@ static void TPLayoutCapsules(BOOL animated) {
     }
     for (UIView *v in _card.subviews) [v removeFromSuperview];
 
-    UIView *holder = TPHolder(_card.bounds);
     UIView *content = [[UIView alloc] init];
     content.backgroundColor = TPCapsuleBG();
     content.layer.cornerRadius = 16;
@@ -300,10 +286,8 @@ static void TPLayoutCapsules(BOOL animated) {
     CGRect f = _card.frame;
     f.size = CGSizeMake(kCardW, h);
     _card.frame = f;
-    holder.frame = _card.bounds;
     content.frame = _card.bounds;
-    [holder addSubview:content];
-    [_card addSubview:holder];
+    TPSetCaptureProtectedContent(content, _card);
 
     if (isNew) {
         TPLayoutCapsules(NO);

@@ -421,3 +421,5 @@
 "You're on %@" = "You're on %@";
 "Skip This Version" = "Skip This Version";
 "Later" = "Later";
+"Modified and optimized: By %@" = "Modified and optimized: By %@";
+"A message was unsent" = "A message was unsent";

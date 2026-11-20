@@ -421,3 +421,5 @@
 "You're on %@" = "当前版本：%@";
 "Skip This Version" = "跳过此版本";
 "Later" = "稍后";
+"A message was unsent" = "一条消息已被撤回";
+"Modified and optimized: By %@" = "二改优化：By %@";

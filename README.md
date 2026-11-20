@@ -2,9 +2,22 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
-An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.31.0**
+An iOS tweak for Threads (`com.burbn.barcelona`). Compatibility build: **1.31.0+16**, based on [ThreadsPulse 1.31.0 by h4x_0x30vm](https://github.com/mumuisdog/ThreadsPulse).
 
-No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using GitHub Actions, then install it with your own signing tool.
+This fork retains the upstream features and adds compatibility fixes for Threads 410 and 456. Requires **iOS 15 or later**.
+
+[Download 1.31.0+16](https://github.com/5hux1n/ThreadsPulse/releases/tag/1.31.0%2B16) · [All releases](https://github.com/5hux1n/ThreadsPulse/releases)
+
+| Package | Environment |
+|---|---|
+| `ThreadsPulse_1.31.0+16_arm64.deb` | Rootless |
+| `ThreadsPulse_1.31.0+16_arm64e.deb` | RootHide |
+
+Install the matching DEB with your jailbreak package manager. For TrollFools, import the Rootless (`arm64`) DEB. No separate language resource bundle is required.
+
+The built-in update checker follows the upstream project. Use this fork's Releases page for compatibility builds.
+
+For IPA sideloading, see the local injection commands below. The Actions instructions describe the upstream workflow.
 
 ## Features
 
@@ -75,7 +88,7 @@ No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using
 
 ---
 
-## Build your own IPA with GitHub Actions (no jailbreak, recommended)
+## Upstream IPA build workflow (reference)
 
 ### What you need
 
@@ -130,51 +143,44 @@ After installing, go to **Settings › Apps › Safari › Extensions** (on iOS 
 
 ## Other ways to build
 
-### GitHub Actions: tweak only (Build)
+### Prebuilt packages
 
-Pushing to `main` / `master`, opening a pull request, or running **Build** → **Run workflow** in Actions produces:
-
-| File | Use |
-|---|---|
-| `ThreadsPulse_TrollFools_<version>.zip` | For TrollFools or manual injection: `ThreadsPulse.dylib` and `ThreadsPulse.bundle` (the Safari extension is only included in the sideload IPA) |
-| `ThreadsPulse_rootless_<version>.deb` | Rootless jailbreak (Dopamine / palera1n rootless) |
-| `ThreadsPulse_rootful_<version>.deb` | Rootful jailbreak |
-| `ThreadsPulse_roothide_<version>.deb` | Roothide jailbreak (Dopamine roothide, Bootstrap) |
-
-Pushing a tag that starts with `v` also creates a Release with these four files (Threads itself is not included):
-
-```bash
-git tag v1.31.0
-git push origin v1.31.0
-```
+Download the Rootless and RootHide DEBs from [Releases](https://github.com/5hux1n/ThreadsPulse/releases). These packages are built locally with Xcode 16. The upstream Actions packaging matrix is not used for this compatibility fork's releases.
 
 ### Build locally
 
-Requires [Theos](https://theos.dev) (macOS or Linux).
+Requires macOS, Xcode 16, Python 3 and [Theos](https://theos.dev). Use the [RootHide Theos fork](https://github.com/roothide/theos) for RootHide packages.
 
 ```bash
 export THEOS=~/theos
 make FINALPACKAGE=1            # dylib only: .theos/obj/ThreadsPulse.dylib
-make package FINALPACKAGE=1    # .deb (jailbreak)
+make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless    # Rootless .deb
 make -C OpenThreadsSafariExtension FINALPACKAGE=1   # Safari extension → OpenThreadsSafariExtension/.theos/obj/
 
 # Inject into a decrypted IPA (only needs Python 3 and zip / unzip)
-BUNDLE="layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle"
 # sideload variant
-python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib -b "$BUNDLE" \
+python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib \
   --appex OpenThreadsSafariExtension/.theos/obj/OpenThreadsSafariExtension.appex -o sideload.ipa
 # noplugins variant
-python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib -b "$BUNDLE" \
+python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib \
   --no-plugins -o noplugins.ipa
 ```
 
-- Rootless jailbreak: uncomment `THEOS_PACKAGE_SCHEME = rootless` in the `Makefile`.
+For RootHide, build with its own Theos installation:
+
+```bash
+THEOS=~/theos-roothide make clean THEOS_PACKAGE_SCHEME=roothide
+THEOS=~/theos-roothide make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide
+```
+
+Both packages are written to `dist/` as `ThreadsPulse_<version>_arm64.deb` and `ThreadsPulse_<version>_arm64e.deb`.
+
 - Uses the Logos `internal` generator to hook through the ObjC runtime directly, so it **doesn't depend on CydiaSubstrate / ElleKit** and nothing extra needs to be injected.
-- The version number is defined only in `TPVersion.h` (also update `ThreadsPulse.bundle/Info.plist`). The iOS SDK and minimum iOS version are set by `SDK_VERSION` and `MIN_IOS` in the workflows.
+- The displayed version number is defined in `TPVersion.h`; language metadata is in `resources/localization/Info.plist`. The iOS SDK and minimum iOS version are set by `SDK_VERSION` and `MIN_IOS` in the workflows.
 
 ### What `inject_ipa.py` does
 
-1. Unpacks the IPA and copies `ThreadsPulse.dylib` into `Threads.app/Frameworks/` and `ThreadsPulse.bundle` into `Threads.app/`.
+1. Unpacks the IPA and copies `ThreadsPulse.dylib` into `Threads.app/Frameworks/`. Current builds embed their translations; the optional `--bundle` argument retains support for older builds that need a separate `ThreadsPulse.bundle`.
 2. Adds an `LC_LOAD_DYLIB` load command (`@executable_path/Frameworks/ThreadsPulse.dylib`) to the Threads executable, skipping it if already there.
 3. Checks that the app is decrypted (`cryptid` in `LC_ENCRYPTION_INFO_64`) and stops if it isn't.
 4. `--appex` copies an extension into `PlugIns/` (removing any signing data inside it); `--no-plugins` removes `PlugIns/`, `Extensions/` and `Watch/`.
@@ -215,7 +221,7 @@ ThreadsPulse/
 │   └── workflows/
 │       ├── build.yml               Builds the tweak (zip / deb)
 │       └── build-ipa.yml           Builds and injects the IPA
-└── layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/
+└── resources/localization/         Embedded into ThreadsPulse.dylib at build time
     ├── Info.plist
     ├── en.lproj/Localizable.strings
     ├── zh-Hant.lproj/Localizable.strings
@@ -228,7 +234,7 @@ ThreadsPulse/
 
 - The code always uses `TPL(@"English text")`; **the English text is the key**, and it's shown as-is when no translation exists.
 - Included languages: English (`en`), Traditional Chinese (`zh-Hant`), Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`). By default the system language is used (anything else falls back to English); the Language row at the top of the settings can force one.
-- To add a language, copy `en.lproj` (for example to `fr.lproj`), translate it, add the language code to `CFBundleLocalizations` in `Info.plist`, and add it to the Language menu (`TPSettingsViewController.m`) and `TPLocalization.m`.
+- Translation sources live in `resources/localization/`; `scripts/generate-localization.py` embeds them into the dylib during the build, so no separate `.bundle` is needed. To add a language, copy `en.lproj` (for example to `fr.lproj`), translate it, add the language code to `CFBundleLocalizations` in `Info.plist`, and update the Language menu (`TPSettingsViewController.m`), `TPLocalization.m` and the generator's supported-language mapping.
 - Corrections to the Simplified Chinese, Japanese and Korean translations from native speakers are welcome.
 
 ## Implementation notes
@@ -291,5 +297,7 @@ Author Info (location, join date and new-account badge in the feed) draws on [le
 ## Author
 
 h4x_0x30vm · [Ko-fi](https://ko-fi.com/mumuisdog)
+
+Compatibility modifications: [Junhong](https://mjh.im/)
 
 © 2026 h4x_0x30vm. All rights reserved.

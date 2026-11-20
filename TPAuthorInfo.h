@@ -31,5 +31,7 @@ extern void (^TPAuthorOpenProfile)(NSString *username);    // set by the tweak: 
 
 // Feed header integration: call from the header content view's layoutSubviews.
 + (void)layoutBadgeInHeader:(UIView *)contentView;
++ (NSString *)pkForHeader:(UIView *)contentView;
 + (CGFloat)extraHeaderHeight;                     // added under the name in "own line" mode, else 0
++ (CGFloat)extraHeaderHeightForPk:(NSString *)pk;  // reserve a row only after displayable data arrives
 @end

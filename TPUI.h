@@ -4,8 +4,8 @@ UIWindow *TPKeyWindow(void);
 UIViewController *TPTopViewController(void);
 // The download button the user last tapped, so follow-up menus can appear next to it.
 void TPSetMenuAnchor(UIView *view);
-// A view whose contents iOS leaves out of screenshots and recordings (nil if unavailable).
-UIView *TPCaptureProtectedView(void);
+// Protect only visual content; the host keeps its layout, accessibility and touch handling.
+void TPSetCaptureProtectedContent(UIView *content, UIView *host);
 UIView *TPMenuAnchor(void);
 
 @interface TPMenuItem : NSObject
