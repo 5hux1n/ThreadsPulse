@@ -1,6 +1,6 @@
 # ThreadsPulse
 
-[English](README.md) | **繁體中文**
+[English](README.md) | **繁體中文** | [简体中文](README.zh-CN.md)
 
 Threads（`com.burbn.barcelona`）的 iOS 增強插件。相容版本：**1.31.0+16**，基於 [h4x_0x30vm 的 ThreadsPulse 1.31.0](https://github.com/mumuisdog/ThreadsPulse)。
 

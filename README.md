@@ -1,6 +1,6 @@
 # ThreadsPulse
 
-**English** | [繁體中文](README.zh-TW.md)
+**English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 
 An iOS tweak for Threads (`com.burbn.barcelona`). Compatibility build: **1.31.0+16**, based on [ThreadsPulse 1.31.0 by h4x_0x30vm](https://github.com/mumuisdog/ThreadsPulse).
 
