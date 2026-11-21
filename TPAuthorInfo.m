@@ -89,7 +89,7 @@ static NSMutableString *gDiag;
 + (void)pump;
 @end
 
-static BOOL TPPkOnScreen(NSString *pk);
+static CGFloat TPPkDistance(NSString *pk);
 
 @implementation TPAuthorInfo
 
@@ -873,13 +873,20 @@ static void TPHandleResult(NSUInteger token, NSString *pk, NSInteger variant, BO
         return;
     }
 
-    NSString *pk = gQueue.lastObject;   // newest first: whatever is on screen now
-    [gQueue removeLastObject];
+    // On screen first, newest first; otherwise the nearest author just below the screen (read
+    // ahead, so it is usually ready by the time it scrolls in). Authors that scrolled away are
+    // dropped without spending a request; they are queued again if they come back.
+    NSString *pk = nil;
+    CGFloat best = CGFLOAT_MAX;
+    for (NSString *q in [gQueue copy]) {
+        CGFloat dist = [self infoForPk:q] ? -1 : TPPkDistance(q);
+        if (dist < 0) { [gQueue removeObject:q]; [gPending removeObject:q]; continue; }
+        if (dist < best || (dist == best && dist == 0)) { best = dist; pk = q; }   // later = newer wins ties on screen
+    }
+    if (!pk) return;
+    if (best > 0) [self log:[NSString stringWithFormat:@"read ahead pk=%@ (%.0fpt below)", pk, best]];
+    [gQueue removeObject:pk];
     [gPending removeObject:pk];
-    if ([self infoForPk:pk]) { [self pump]; return; }
-    // Scrolled away while waiting: don't spend a request (and the 1.5 s gap) on it. If it comes
-    // back on screen it is queued again.
-    if (!TPPkOnScreen(pk)) { [self pump]; return; }
 
     TPBuildClassSet();
     gInFlight = YES;
@@ -1011,18 +1018,24 @@ static NSHashTable *gBadges;
 
 // Headers that scrolled in while the queue was full were dropped; once it drains, pick up
 // whatever is still on screen without info.
-static BOOL TPPkOnScreen(NSString *pk) {
+// 0 when the author's header is on screen (with a small margin), how far below the screen it is
+// when it's within the next screen (read ahead), or -1 when it's elsewhere (scrolled away).
+static CGFloat TPPkDistance(NSString *pk) {
     BOOL known = NO;
+    CGFloat best = -1;
     for (TPAuthorBadgeLabel *b in gBadges.allObjects) {
         if (![b.pk isEqualToString:pk]) continue;
         known = YES;
         UIView *host = b.host;
         UIWindow *w = host.window;
-        if (!w) continue;
+        if (!w || host.hidden) continue;
         CGRect r = [host convertRect:host.bounds toView:w];
-        if (CGRectIntersectsRect(CGRectInset(w.bounds, 0, -120), r)) return YES;   // a little margin
+        CGFloat h = w.bounds.size.height;
+        if (CGRectIntersectsRect(CGRectInset(w.bounds, 0, -120), r)) return 0;
+        CGFloat below = CGRectGetMinY(r) - h;
+        if (below > 0 && below <= h && (best < 0 || below < best)) best = below;
     }
-    return !known;   // not from a feed header we track: don't second-guess it
+    return known ? best : 0;   // not from a feed header we track: don't second-guess it
 }
 
 static void TPRequeueVisible(void) {
