@@ -2,7 +2,7 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
-An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.31.0**
+An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.31.1**
 
 No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using GitHub Actions, then install it with your own signing tool.
 
@@ -144,8 +144,8 @@ Pushing to `main` / `master`, opening a pull request, or running **Build** → *
 Pushing a tag that starts with `v` also creates a Release with these four files (Threads itself is not included):
 
 ```bash
-git tag v1.31.0
-git push origin v1.31.0
+git tag v1.31.1
+git push origin v1.31.1
 ```
 
 ### Build locally
