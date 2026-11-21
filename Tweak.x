@@ -2397,6 +2397,10 @@ static void TPOpenClipboardLinkSilently(BOOL silent) {
     TPOpenInThreads([TPURLCleaner cleanURL:url]);
 }
 
+// Last time the keyboard came up over a sheet (the add-account / login screens are such a sheet).
+static CFAbsoluteTime gTPSheetKeyboardAt = 0;
+static BOOL gTPKeyboardVisible = NO;
+
 static void TPCheckClipboardForced(BOOL force) {
     if (![TPPrefs boolForKey:TPKeyClipboardLinks]) return;
     UIPasteboard *pb = UIPasteboard.generalPasteboard;
@@ -2412,8 +2416,14 @@ static void TPCheckClipboardForced(BOOL force) {
         if (![found containsObject:UIPasteboardDetectionPatternProbableWebURL]) return;
         dispatch_async(dispatch_get_main_queue(), ^{
             if ([TPPrefs integerForKey:TPKeyClipboardMode] == 1) {
-                TPOpenClipboardLinkSilently(YES);
-                return;
+                // Never jump away from a screen being filled in (login, posting, replying): the
+                // keyboard is up or a sheet covers the app. Show the prompt instead, so the link
+                // is one tap away once done.
+                UIViewController *root = UIApplication.sharedApplication.keyWindow.rootViewController;
+                if (!gTPKeyboardVisible && !root.presentedViewController) {
+                    TPOpenClipboardLinkSilently(YES);
+                    return;
+                }
             }
             [TPHUD bannerWithText:TPL(@"Link copied") symbol:@"link" action:TPL(@"Open")
                          position:[TPPrefs integerForKey:TPKeyBannerPosition]
@@ -2439,6 +2449,14 @@ static void TPFireReadyCheck(void) {
     BOOL force = gTPWaitForce;
     gTPWaitForce = NO;
     gTPHomeVCAtRequest = nil;
+    // Logging in to a new account rebuilds the UI like a switch does. Don't open the copied link
+    // then: opening a post Threads associates with another of the user's accounts makes it switch
+    // straight back, undoing the login.
+    if (force && CFAbsoluteTimeGetCurrent() - gTPSheetKeyboardAt < 180) {
+        gTPSheetKeyboardAt = 0;
+        TPDebug(TPL(@"Account switched"));
+        return;
+    }
     if (force) TPDebug(TPL(@"Account switched"));
     TPCheckClipboardForced(force);
 }
@@ -2457,7 +2475,20 @@ static void TPCheckClipboardWhenHomeReady(BOOL force, BOOL needNewHome, double t
         return;
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (mine == gTPReadyGen) TPFireReadyCheck();
+        if (mine != gTPReadyGen) return;
+        // Adding or logging in to an account rebuilds the UI too, but shows the login screens
+        // instead of a home feed. Only open the link once a home feed is actually on screen:
+        // until then keep waiting for it (TPHomeFeedAppeared fires the check), and give up
+        // after a couple of minutes.
+        UIViewController *root = gTPHomeVC.viewIfLoaded.window.rootViewController;
+        BOOL homeReady = gTPHomeVC.viewIfLoaded.window && gTPHomeVC != gTPHomeVCAtRequest && !root.presentedViewController;
+        if (needNewHome && !homeReady) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                if (mine == gTPReadyGen && gTPWaitHome) { gTPWaitHome = NO; gTPWaitForce = NO; gTPHomeVCAtRequest = nil; }
+            });
+            return;
+        }
+        TPFireReadyCheck();
     });
 }
 
@@ -2512,6 +2543,7 @@ static void TPScheduleClipboardCheckAfterSwitch(void) {
 // in IGFeedRefreshInstructionsStore. Within the keep time all three report a short absence.
 // Pull to refresh and cold launches are unaffected.
 static CFAbsoluteTime gTPBackgroundedAt = 0;
+static BOOL gTPWentBackground = NO;   // the app really went to the background since it was last active
 
 static double TPKeepFeedLimitSeconds(void) {
     switch ([TPPrefs integerForKey:TPKeyKeepFeedLimit]) {
@@ -4206,10 +4238,21 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
             gTPBackgroundedAt = CFAbsoluteTimeGetCurrent();
+            gTPWentBackground = YES;
             [[TPPrefs defaults] setObject:TPSideloadFixStats() forKey:@"tp_sf_last_stats"];
             [[TPPrefs defaults] setInteger:gTPAnalyticsDropped forKey:@"tp_analytics_last_dropped"];
         }];
 
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillShowNotification
+                                                          object:nil queue:NSOperationQueue.mainQueue
+                                                      usingBlock:^(NSNotification *n) {
+            gTPKeyboardVisible = YES;
+            UIViewController *root = UIApplication.sharedApplication.keyWindow.rootViewController;
+            if (root.presentedViewController) gTPSheetKeyboardAt = CFAbsoluteTimeGetCurrent();
+        }];
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIKeyboardWillHideNotification
+                                                          object:nil queue:NSOperationQueue.mainQueue
+                                                      usingBlock:^(NSNotification *n) { gTPKeyboardVisible = NO; }];
         [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                           object:nil queue:NSOperationQueue.mainQueue
                                                       usingBlock:^(NSNotification *n) {
@@ -4219,6 +4262,11 @@ static BOOL TPHeaderCellIsExtended(UICollectionViewCell *cell) {
             BOOL cold = !launched;
             launched = YES;
             if (cold) { TPCheckClipboardWhenHomeReady(NO, NO, 3.0); return; }
+            // Face ID (e.g. for password AutoFill on the login screen), Control Center and
+            // system alerts also make the app inactive and active again without leaving it. Only
+            // coming back from another app counts.
+            if (!gTPWentBackground) return;
+            gTPWentBackground = NO;
             BOOL autoOpen = [TPPrefs integerForKey:TPKeyClipboardMode] == 1;
             double delay = autoOpen ? 0.15 : 0.35;
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
