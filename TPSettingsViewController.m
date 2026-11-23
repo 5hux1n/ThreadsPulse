@@ -247,7 +247,7 @@ static NSString *TPTimePreview(NSInteger mode) {
 }
 @end
 
-@interface TPSettingsViewController () <UIDocumentPickerDelegate>
+@interface TPSettingsViewController () <UIDocumentPickerDelegate, UITextViewDelegate>
 @end
 
 @implementation TPSettingsViewController {
@@ -752,15 +752,51 @@ static UIImage *TPSquareIconWith(NSString *symbol, UIColor *bg, UIColor *fg) {
 }
 
 - (NSString *)tableView:(UITableView *)tv titleForFooterInSection:(NSInteger)s {
-    if (self.isRoot) {
-        if (s != (NSInteger)TPRootGroups().count - 1) return nil;
-        NSString *f = [self sectionWithHeader:@"Donate"][@"footer"];
-        return [NSString stringWithFormat:@"%@\n\nMade by h4x_0x30vm", f.length ? TPL(f) : @""];
-    }
+    if (self.isRoot) return nil;
     if (s >= (NSInteger)_sections.count) return nil;
     NSString *f = _sections[s][@"footer"];
     if (!TPConditionMet(_sections[s][@"footerIf"])) return nil;
     return f.length ? TPL(f) : nil;
+}
+
+- (UIView *)tableView:(UITableView *)tv viewForFooterInSection:(NSInteger)s {
+    if (!self.isRoot || s != (NSInteger)TPRootGroups().count - 1) return nil;
+    NSString *f = [self sectionWithHeader:@"Donate"][@"footer"];
+    NSString *credit = [NSString stringWithFormat:TPL(@"Modified and optimized: By %@"), @"Junhong"];
+    NSString *text = [NSString stringWithFormat:@"%@\n\nMade by h4x_0x30vm\n%@", f.length ? TPL(f) : @"", credit];
+    NSMutableAttributedString *content = [[NSMutableAttributedString alloc] initWithString:text attributes:@{
+        NSFontAttributeName: [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote],
+        NSForegroundColorAttributeName: UIColor.secondaryLabelColor,
+    }];
+    [content addAttribute:NSLinkAttributeName value:[NSURL URLWithString:@"https://mjh.im/"]
+                    range:[text rangeOfString:@"Junhong" options:NSBackwardsSearch]];
+    UITableViewHeaderFooterView *footer = [[UITableViewHeaderFooterView alloc] initWithReuseIdentifier:nil];
+    UITextView *label = [UITextView new];
+    label.editable = NO;
+    label.selectable = YES;
+    label.scrollEnabled = NO;
+    label.backgroundColor = UIColor.clearColor;
+    label.textContainerInset = UIEdgeInsetsZero;
+    label.textContainer.lineFragmentPadding = 0;
+    label.adjustsFontForContentSizeCategory = YES;
+    label.attributedText = content;
+    label.linkTextAttributes = @{ NSForegroundColorAttributeName: TPAccentIcon() };
+    label.delegate = self;
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [footer.contentView addSubview:label];
+    UILayoutGuide *m = footer.contentView.layoutMarginsGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [label.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+        [label.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+        [label.topAnchor constraintEqualToAnchor:m.topAnchor],
+        [label.bottomAnchor constraintEqualToAnchor:m.bottomAnchor],
+    ]];
+    return footer;
+}
+
+- (BOOL)textView:(UITextView *)textView shouldInteractWithURL:(NSURL *)URL inRange:(NSRange)characterRange interaction:(UITextItemInteraction)interaction {
+    [self openLink:URL.absoluteString];
+    return NO;
 }
 
 static NSArray<NSArray *> *TPConditions(NSArray *cond) {

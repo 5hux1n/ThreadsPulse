@@ -90,7 +90,7 @@ def main():
     ap = argparse.ArgumentParser(description="Inject ThreadsPulse into a decrypted Threads IPA")
     ap.add_argument("-i", "--ipa", required=True, help="Decrypted Threads IPA")
     ap.add_argument("-d", "--dylib", required=True, help="ThreadsPulse.dylib")
-    ap.add_argument("-b", "--bundle", required=True, help="ThreadsPulse.bundle folder")
+    ap.add_argument("-b", "--bundle", help="Optional ThreadsPulse.bundle folder for older dylib builds")
     ap.add_argument("-o", "--output", required=True, help="Output IPA")
     ap.add_argument("--no-plugins", action="store_true",
                     help="Remove all extensions (widgets, share, etc.), for SideStore / AltStore free accounts")
@@ -126,8 +126,12 @@ def main():
         os.makedirs(frameworks, exist_ok=True)
         shutil.copy2(args.dylib, os.path.join(frameworks, "ThreadsPulse.dylib"))
         dst_bundle = os.path.join(app, "ThreadsPulse.bundle")
-        shutil.rmtree(dst_bundle, ignore_errors=True)
-        shutil.copytree(args.bundle, dst_bundle)
+        if os.path.islink(dst_bundle):
+            os.unlink(dst_bundle)
+        elif os.path.isdir(dst_bundle):
+            shutil.rmtree(dst_bundle)
+        if args.bundle:
+            shutil.copytree(args.bundle, dst_bundle)
 
         exe = os.path.join(app, info["CFBundleExecutable"])
         if patch_binary(exe, DYLIB_LOAD_PATH):

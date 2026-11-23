@@ -1,1 +1,1 @@
-{ Filter = { Bundles = ( "com.burbn.barcelona" ); }; }
+{ Filter = { Executables = ( "Threads", "BarcelonaNotificationExtension" ); }; }

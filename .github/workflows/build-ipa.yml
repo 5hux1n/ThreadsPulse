@@ -72,11 +72,10 @@ jobs:
         run: |
           set -e
           mkdir -p dist
-          BUNDLE="layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle"
           inject() {
             local name="$1"; shift
             python3 -I scripts/inject_ipa.py -i Threads.ipa \
-              -d .theos/obj/ThreadsPulse.dylib -b "$BUNDLE" \
+              -d .theos/obj/ThreadsPulse.dylib \
               -o "dist/$name.ipa" --github-output "$GITHUB_OUTPUT" "$@"
           }
           if [ "$VARIANT" = "both" ] || [ "$VARIANT" = "sideload" ]; then

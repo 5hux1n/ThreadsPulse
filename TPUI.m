@@ -87,43 +87,77 @@ static const void *kTPHoldKey = &kTPHoldKey;
 
 NSString *const TPThemeDidChangeNotification = @"TPThemeDidChangeNotification";
 
-// A view whose contents iOS leaves out of screenshots and screen recordings, taken from a
-// secure UITextField (the same mechanism that hides typed passwords). Returns nil if the
-// private canvas view isn't there on this iOS version, in which case buttons draw normally.
-UIView *TPCaptureProtectedView(void) {
-    UITextField *field = [UITextField new];
-    field.secureTextEntry = YES;
-    UIView *canvas = nil;
-    for (UIView *v in field.subviews)
-        if ([NSStringFromClass([v class]) containsString:@"CanvasView"]) { canvas = v; break; }
-    if (!canvas) return nil;
-    for (UIView *v in canvas.subviews) [v removeFromSuperview];
-    [canvas removeFromSuperview];
-    canvas.userInteractionEnabled = NO;
-    canvas.backgroundColor = UIColor.clearColor;
-    return canvas;
+// shortcut: UIKit's private canvas can change; revisit this lookup if a new iOS removes it.
+static UIView *TPFindSecureCanvas(UIView *view, NSUInteger depth) {
+    if ([NSStringFromClass(view.class) containsString:@"CanvasView"]) return view;
+    if (!depth) return nil;
+    for (UIView *child in view.subviews) {
+        UIView *canvas = TPFindSecureCanvas(child, depth - 1);
+        if (canvas) return canvas;
+    }
+    return nil;
 }
+
+@interface TPCaptureContainer : UIView
+@property (nonatomic, strong) UITextField *field;
+@property (nonatomic, strong) UIView *canvas;
+@end
+
+@implementation TPCaptureContainer
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (!(self = [super initWithFrame:frame])) return nil;
+    self.userInteractionEnabled = NO;
+    _field = [[UITextField alloc] initWithFrame:self.bounds];
+    _field.secureTextEntry = YES;
+    _field.userInteractionEnabled = NO;
+    _field.isAccessibilityElement = NO;
+    _field.backgroundColor = UIColor.clearColor;
+    _field.clipsToBounds = NO;
+    [self addSubview:_field];
+    [_field setNeedsLayout];
+    [_field layoutIfNeeded];
+    _canvas = TPFindSecureCanvas(_field, 4);
+    if (!_canvas) return nil;
+    // Keep the secure owner and its native hierarchy alive for the protected content.
+    _canvas.backgroundColor = UIColor.clearColor;
+    _canvas.userInteractionEnabled = NO;
+    _canvas.clipsToBounds = NO;
+    return self;
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    _field.frame = self.bounds;
+    [_field layoutIfNeeded];
+    _canvas.frame = [_canvas.superview convertRect:self.bounds fromView:self];
+}
+@end
 
 static const void *kTPButtonContentKey = &kTPButtonContentKey;
 static const void *kTPButtonSecureKey  = &kTPButtonSecureKey;
 
-// Puts the button's content inside or outside the capture-protected layer, per the setting.
-static void TPApplyCaptureProtection(UIButton *b) {
+// Puts visual content inside or outside the secure canvas, leaving the touch host intact.
+static void TPApplyCaptureProtection(UIView *b) {
     UIView *content = objc_getAssociatedObject(b, kTPButtonContentKey);
     if (!content) return;
-    UIView *secure = objc_getAssociatedObject(b, kTPButtonSecureKey);
+    TPCaptureContainer *secure = objc_getAssociatedObject(b, kTPButtonSecureKey);
     if ([TPPrefs boolForKey:TPKeyHideInCaptures]) {
         if (!secure) {
-            secure = TPCaptureProtectedView();
-            if (!secure) { if (content.superview != b) [b insertSubview:content atIndex:0]; return; }
-            secure.frame = b.bounds;
+            secure = [[TPCaptureContainer alloc] initWithFrame:CGRectMake(0, 0, 100, 100)];
+            if (!secure) {
+                content.frame = b.bounds;
+                if (content.superview != b) [b insertSubview:content atIndex:0];
+                return;
+            }
             secure.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             secure.clipsToBounds = NO;
             objc_setAssociatedObject(b, kTPButtonSecureKey, secure, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        content.frame = secure.bounds;
-        [secure addSubview:content];
+        secure.frame = b.bounds;
         if (secure.superview != b) [b insertSubview:secure atIndex:0];
+        [secure setNeedsLayout];
+        [secure layoutIfNeeded];
+        content.frame = secure.canvas.bounds;
+        if (content.superview != secure.canvas) [secure.canvas addSubview:content];
     } else {
         [secure removeFromSuperview];
         content.frame = b.bounds;
@@ -131,19 +165,25 @@ static void TPApplyCaptureProtection(UIButton *b) {
     }
 }
 
-// Live buttons, so a change to the setting applies to the ones already on screen.
-static NSHashTable<UIButton *> *sTPButtons;
-static void TPTrackButton(UIButton *b) {
+// Weak hosts let a setting change reach buttons and download capsules already on screen.
+static NSHashTable<UIView *> *sTPButtons;
+void TPSetCaptureProtectedContent(UIView *content, UIView *b) {
+    UIView *previous = objc_getAssociatedObject(b, kTPButtonContentKey);
+    if (previous && previous != content) [previous removeFromSuperview];
+    content.userInteractionEnabled = NO;
+    content.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    objc_setAssociatedObject(b, kTPButtonContentKey, content, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         sTPButtons = [NSHashTable weakObjectsHashTable];
         [NSNotificationCenter.defaultCenter addObserverForName:TPPrefsDidChangeNotification object:nil
                                                          queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
             if (![n.userInfo[@"key"] isEqual:TPKeyHideInCaptures]) return;
-            for (UIButton *x in sTPButtons.allObjects) TPApplyCaptureProtection(x);
+            for (UIView *x in sTPButtons.allObjects) TPApplyCaptureProtection(x);
         }];
     });
     [sTPButtons addObject:b];
+    TPApplyCaptureProtection(b);
 }
 
 static __weak UIView *sTPMenuAnchor;
@@ -268,9 +308,7 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
     [icon removeFromSuperview];
     [content addSubview:blur];
     [content addSubview:icon];
-    objc_setAssociatedObject(b, kTPButtonContentKey, content, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    TPApplyCaptureProtection(b);
-    TPTrackButton(b);
+    TPSetCaptureProtectedContent(content, b);
     b.accessibilityLabel = TPL(@"Download");
 
     __weak UIButton *wb = b;
@@ -308,7 +346,7 @@ static UIColor *TPDynamic(UIColor *light, UIColor *dark) {
 }
 
 + (void)tp_showMenu:(NSArray<TPMenuItem *> *)items from:(UIView *)src {
-    src.transform = CGAffineTransformIdentity;
+    if ([src isKindOfClass:UIButton.class]) src.transform = CGAffineTransformIdentity;
     [TPUI hapticLight];
 
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:nil message:nil

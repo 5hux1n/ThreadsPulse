@@ -1,5 +1,6 @@
 #import "TPPrefs.h"
 #import "TPVersion.h"
+#import "TPNotificationPrefs.h"
 
 NSString *const TPKeyBlockAds        = @"tp_block_ads";
 NSString *const TPKeyStripTracking   = @"tp_strip_tracking";
@@ -102,6 +103,7 @@ static NSInteger TPIntMax(NSString *key) {
 + (void)setBool:(BOOL)value forKey:(NSString *)key {
     if (!key.length) return;
     [[self defaults] setBool:value forKey:key];
+    if ([key isEqualToString:TPKeyKeepUnsent]) TPNotificationPrefsWriteKeepUnsent(value);
     [NSNotificationCenter.defaultCenter postNotificationName:TPPrefsDidChangeNotification object:nil userInfo:@{ @"key": key }];
 }
 + (NSInteger)integerForKey:(NSString *)key { return [[self defaults] integerForKey:key]; }
@@ -110,6 +112,7 @@ static NSInteger TPIntMax(NSString *key) {
 + (void)resetAll {
     for (NSString *k in TPBoolKeys()) [[self defaults] removeObjectForKey:k];
     for (NSString *k in TPIntKeys())  [[self defaults] removeObjectForKey:k];
+    TPNotificationPrefsWriteKeepUnsent(NO);
 }
 
 + (NSData *)exportJSONData {

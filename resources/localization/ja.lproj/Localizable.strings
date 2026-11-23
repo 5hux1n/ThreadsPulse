@@ -421,3 +421,5 @@
 "You're on %@" = "現在のバージョン：%@";
 "Skip This Version" = "このバージョンをスキップ";
 "Later" = "あとで";
+"A message was unsent" = "メッセージの送信が取り消されました";
+"Modified and optimized: By %@" = "改修・最適化：By %@";

@@ -1,0 +1,519 @@
+{
+  "schema_version": 1,
+  "snapshot_date": "2026-11-20",
+  "upstream_repository": "mumuisdog/ThreadsPulse",
+  "upstream_commit": "038d74022ee6df8ab1ac3062195c2a16a74d2d42",
+  "upstream_source_version": "1.31.0",
+  "local_version": "1.31.0+16",
+  "scope": "Source snapshot before this documentation task; excludes .git, .theos, .generated, dist, packages, build, __pycache__, .DS_Store and AppleDouble files. File hashes for READMEs and notification analysis are pre-documentation values. See post_snapshot_documentation_only_changes.",
+  "counts": {
+    "modified": 22,
+    "added": 34,
+    "removed": 6
+  },
+  "files": [
+    {
+      "path": ".github/workflows/build-ipa.yml",
+      "status": "modified",
+      "upstream_sha256": "8205321c84edb28ef308d8f2f1e4779f1b52c706f5269f091d82682c18e04f06",
+      "current_sha256": "69591f71f9998184100e1ced3a2bfeabaf23e618a4ede36c9fa48e4d8af1c3ac",
+      "upstream_bytes": 3883,
+      "current_bytes": 3783
+    },
+    {
+      "path": ".github/workflows/build.yml",
+      "status": "modified",
+      "upstream_sha256": "8b7bd29b4126c1257fbf71ed077f69b8df98d8e65138fd156362353435f7dab5",
+      "current_sha256": "8a35d89548d2c25863072c880d90deb5b751430cf7abf5ea30a781c7f0ad08d6",
+      "upstream_bytes": 2596,
+      "current_bytes": 2472
+    },
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "upstream_sha256": "d1bd273700264fe404934f3a12657d5799910d39a9cce8f2646e21bf4326bfa5",
+      "current_sha256": "46f72ae3b9a1f206738e9d7d6289b2a06df24c1ed5acf4911939dcf85474d84d",
+      "upstream_bytes": 74,
+      "current_bytes": 86
+    },
+    {
+      "path": "Makefile",
+      "status": "modified",
+      "upstream_sha256": "c5473de6f991204a5c19982c187483266d6dbd5d4e879e9406a141d4b8e3ad25",
+      "current_sha256": "3b056a3df2587daca3d2e1ded73aa45526b45db444bc25fa560b26a5e79c03c8",
+      "upstream_bytes": 862,
+      "current_bytes": 2237
+    },
+    {
+      "path": "README.md",
+      "status": "modified",
+      "upstream_sha256": "d0dd46e46deb1a659947908f64ce3e566c56b45064ccc6ab711a6800aafe8901",
+      "current_sha256": "4435b4e34e3ffe061d78bf704d71781309aafc78af9abb6d39088fce9de85582",
+      "upstream_bytes": 31190,
+      "current_bytes": 31470
+    },
+    {
+      "path": "README.zh-TW.md",
+      "status": "modified",
+      "upstream_sha256": "97a1ce0cf5bf023167d43e5d777a416e96aae1a8656e74e60d306f2cef72acef",
+      "current_sha256": "7d7384e5f60e269b9301bde092cfdb247ed7992c80519eb6698a396ee1e7bfc3",
+      "upstream_bytes": 29746,
+      "current_bytes": 29922
+    },
+    {
+      "path": "TPAuthorInfo.h",
+      "status": "modified",
+      "upstream_sha256": "a9534dfa015c042a57b7ef9777dbe3c228a2ece6b4a943d573a019ff1533995c",
+      "current_sha256": "033501e769c21d5db2e39d80ffffc26e7ee02d16fd958347040f2bc6e9bd9f00",
+      "upstream_bytes": 1885,
+      "current_bytes": 2038
+    },
+    {
+      "path": "TPAuthorInfo.m",
+      "status": "modified",
+      "upstream_sha256": "d83dae5ae9cc3f0e6534d0e3fd37c1b85672cc11b61e6c74ca3c6dc69ce93ece",
+      "current_sha256": "fc9ec0a614150f1d6515d166e849684bbc89c27cad2a04cea9d8057034bc1830",
+      "upstream_bytes": 65641,
+      "current_bytes": 75967
+    },
+    {
+      "path": "TPCapsule.m",
+      "status": "modified",
+      "upstream_sha256": "2aa13f6f62f40531c4356e4d9fe4aacc56b45529ccae0c90860d6e2637f4b1c3",
+      "current_sha256": "e06c45f87f006a8892e9178746f763ae87de5eeffd71ff54f97c8368f1dbad54",
+      "upstream_bytes": 16322,
+      "current_bytes": 15724
+    },
+    {
+      "path": "TPDownloader.m",
+      "status": "modified",
+      "upstream_sha256": "6f192899c51f37437d261ff9046636d5afc894ebdd9dc984d4cabfcb694fa840",
+      "current_sha256": "0d58c6134b200b12d7fa1803027c12847126fbd6f559d1ba8ffc3538e8395210",
+      "upstream_bytes": 109385,
+      "current_bytes": 110736
+    },
+    {
+      "path": "TPLocalization.m",
+      "status": "modified",
+      "upstream_sha256": "41c1dddc3e048d9e4b8c13bfc300cecd253034bd67f31aba03dd3e84fee7cc04",
+      "current_sha256": "6a5515c255a9ec86cb6cd1cebc394a8402eefda9808a184915829a6b8c3ed249",
+      "upstream_bytes": 3026,
+      "current_bytes": 1435
+    },
+    {
+      "path": "TPMusicAttachment.h",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "33b992c731e51ea549f8839f15693baad1ac6df9c8e0aa3c9491ea9dbccf31d6",
+      "upstream_bytes": null,
+      "current_bytes": 358
+    },
+    {
+      "path": "TPMusicAttachment.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "489077cd6861a433e878aaf38a4e0251e4fdc2465f0a834731fbc912025672db",
+      "upstream_bytes": null,
+      "current_bytes": 3344
+    },
+    {
+      "path": "TPMusicCompat.h",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "5eb0e1777683a94b1d8bf5cbe344d9b80449ddc5a73e319a9c5d3f220c1abb90",
+      "upstream_bytes": null,
+      "current_bytes": 124
+    },
+    {
+      "path": "TPMusicCompat.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "90ba28b8cf850632c6ef0a041a022fe6f9957fc243aa7a7aa4902a3e60886131",
+      "upstream_bytes": null,
+      "current_bytes": 5568
+    },
+    {
+      "path": "TPNotificationPrefs.h",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "8632fae88ab505c5b409f1aa9a1fe9e768de7877c6f302e0159c2a86a4c8fcb7",
+      "upstream_bytes": null,
+      "current_bytes": 351
+    },
+    {
+      "path": "TPNotificationPrefs.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "dcc717c4dc8328739222b69fea510556686dfa862aa2c76ba40e6f2076611a99",
+      "upstream_bytes": null,
+      "current_bytes": 2276
+    },
+    {
+      "path": "TPPrefs.m",
+      "status": "modified",
+      "upstream_sha256": "5dab099ddec51ee0bcc37abcadaa62072e08a1ea3d44e68c5e01752a1def00f8",
+      "current_sha256": "e7e04be4a58af2a57159bec91eb459985752ba1b25fa614550e3cc3d39bcb9e2",
+      "upstream_bytes": 8876,
+      "current_bytes": 9042
+    },
+    {
+      "path": "TPSettingsViewController.m",
+      "status": "modified",
+      "upstream_sha256": "aa978d5d610d3113b5c71a696164101c87c6459f96f1b7fd2cd579b35014c2e9",
+      "current_sha256": "7a09e4402f61d6a1975835e0ba0e3f08fb5c691a0ea48deb37e947f2431dd21d",
+      "upstream_bytes": 72718,
+      "current_bytes": 74711
+    },
+    {
+      "path": "TPUI.h",
+      "status": "modified",
+      "upstream_sha256": "7ef3340e9cca9d38099d187e30faf33bb94396ccd0c8489a5de3a68a71794ae6",
+      "current_sha256": "c7538d6aa602627318b32d374b9ebeaf1c806b94858f96e61771d4f8f7d86d89",
+      "upstream_bytes": 1731,
+      "current_bytes": 1760
+    },
+    {
+      "path": "TPUI.m",
+      "status": "modified",
+      "upstream_sha256": "ba8767e1188f623167bc19368090c987fa04a662561d3d0ea88781e2d146b2bb",
+      "current_sha256": "8c8aceca44c807e7e427e0caae19a643c15453ea9311980db9f982cf378fcb8d",
+      "upstream_bytes": 15980,
+      "current_bytes": 17389
+    },
+    {
+      "path": "TPVersion.h",
+      "status": "modified",
+      "upstream_sha256": "02b410e8c835b806f6198f01f15d9e6f21dbb1ddf06edcda0f3f9892bda5f029",
+      "current_sha256": "9426d0933471bc55b76925f5f7287f9fa7dfd972ad7cba53352ae091835f26a3",
+      "upstream_bytes": 29,
+      "current_bytes": 32
+    },
+    {
+      "path": "ThreadsPulse.plist",
+      "status": "modified",
+      "upstream_sha256": "7d9c65ba0d3859749cc6f41a5a73b0841732a4af69beaa74eb552b2cc4fffa8a",
+      "current_sha256": "b12179faabc932c6b57d7c80499baf9f1bcc370ac2e932309f9eeb8c778c9005",
+      "upstream_bytes": 55,
+      "current_bytes": 81
+    },
+    {
+      "path": "ThreadsPulseNotifications.x",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "b7e62eb174bab2e562b9c03ec1db2206b1ec7bc4ad2213e9f374052a27bb9734",
+      "upstream_bytes": null,
+      "current_bytes": 7607
+    },
+    {
+      "path": "Tweak.x",
+      "status": "modified",
+      "upstream_sha256": "42e623eb8530dcd5679c2a05054c36fbcef2ad77204a2014e57c883231434ce0",
+      "current_sha256": "2cea3df024da168ddec07538c29ded4f28155cc685ad739f2e724942001ba78b",
+      "upstream_bytes": 209234,
+      "current_bytes": 225558
+    },
+    {
+      "path": "control",
+      "status": "modified",
+      "upstream_sha256": "748f8e9f0a5762ff63ed3692435c54292413463ab378aebdd1e6958f2c1103fc",
+      "current_sha256": "39a7a553bb71c203acb4770fce057a6b9d981ce4ad546ef4a1372cace969edf6",
+      "upstream_bytes": 280,
+      "current_bytes": 259
+    },
+    {
+      "path": "docs/ads-410-456-analysis.md",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "59c41d2dd8d5afc020a78af162c6c96852fefca822d6715ce5b353f756ce516e",
+      "upstream_bytes": null,
+      "current_bytes": 2497
+    },
+    {
+      "path": "docs/capture-protection-analysis.md",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "e18b390dc11ed9786cd9ef750cfd7e73b85e1d1ed560b22dd024a25a5b96df69",
+      "upstream_bytes": null,
+      "current_bytes": 1525
+    },
+    {
+      "path": "docs/notification-unsend-analysis.md",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "ac9aa57c839eaa985a2f832435e8e0373d44f0aac2707fdc8950c79e1116c5b9",
+      "upstream_bytes": null,
+      "current_bytes": 10623
+    },
+    {
+      "path": "docs/pin-tab-bar-410-analysis.md",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "93fae976f814586646dfb9d0e07d5ba28bfae864a27afb1d337feb5659fee68a",
+      "upstream_bytes": null,
+      "current_bytes": 4990
+    },
+    {
+      "path": "layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/Info.plist",
+      "status": "removed",
+      "upstream_sha256": "8462c894de0d7c1330ee11100a593872c1a65472c14daa6822feae172b48586e",
+      "current_sha256": null,
+      "upstream_bytes": 729,
+      "current_bytes": null
+    },
+    {
+      "path": "layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/en.lproj/Localizable.strings",
+      "status": "removed",
+      "upstream_sha256": "ae4e7d2efdfa31da66a892d64d97c72f474ad98bc1533c50ee05c1484711af40",
+      "current_sha256": null,
+      "upstream_bytes": 24535,
+      "current_bytes": null
+    },
+    {
+      "path": "layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/ja.lproj/Localizable.strings",
+      "status": "removed",
+      "upstream_sha256": "c03500b4e970c33ed85c970d39ccfd6aa6e8fadbaa64782eee26e6835c32ae08",
+      "current_sha256": null,
+      "upstream_bytes": 30507,
+      "current_bytes": null
+    },
+    {
+      "path": "layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/ko.lproj/Localizable.strings",
+      "status": "removed",
+      "upstream_sha256": "7dfecc78adc10e7078aa81aa74622b26f6036a35bb8399d35c76784e66dc1cb9",
+      "current_sha256": null,
+      "upstream_bytes": 28452,
+      "current_bytes": null
+    },
+    {
+      "path": "layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/zh-Hans.lproj/Localizable.strings",
+      "status": "removed",
+      "upstream_sha256": "8e70c542aca7eff65fadccd9082e2ffa1561f49e56c8d4fd2b9606637c85add0",
+      "current_sha256": null,
+      "upstream_bytes": 24448,
+      "current_bytes": null
+    },
+    {
+      "path": "layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/zh-Hant.lproj/Localizable.strings",
+      "status": "removed",
+      "upstream_sha256": "f046e5adc7b6eaf21e6138b248c76e9a2eb4d8513ae49de8c2ccc067f7646ce9",
+      "current_sha256": null,
+      "upstream_bytes": 24547,
+      "current_bytes": null
+    },
+    {
+      "path": "resources/localization/Info.plist",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "8462c894de0d7c1330ee11100a593872c1a65472c14daa6822feae172b48586e",
+      "upstream_bytes": null,
+      "current_bytes": 729
+    },
+    {
+      "path": "resources/localization/en.lproj/Localizable.strings",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "d97ce5c9a81cfca7f3b8d7c5f2c324d86e323be03b01ee8952c9242271414d95",
+      "upstream_bytes": null,
+      "current_bytes": 24651
+    },
+    {
+      "path": "resources/localization/ja.lproj/Localizable.strings",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "647c2107f9e6109d6fbd1093e5a63241ed2238b306301af3493eac5e5436c4c3",
+      "upstream_bytes": null,
+      "current_bytes": 30651
+    },
+    {
+      "path": "resources/localization/ko.lproj/Localizable.strings",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "8f6de94d279896173016b71b04c155cb435fd4770c10eba71b59010ea419d8c1",
+      "upstream_bytes": null,
+      "current_bytes": 28587
+    },
+    {
+      "path": "resources/localization/zh-Hans.lproj/Localizable.strings",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "5015e82a4c6f98bcf6a81bd62830fb20e15fb810360bd7de1d81d86c81e394dc",
+      "upstream_bytes": null,
+      "current_bytes": 24559
+    },
+    {
+      "path": "resources/localization/zh-Hant.lproj/Localizable.strings",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "cd3f5a6f6af12e38d03fb169bd835565ab2ae6179233311146c39a944f7f628b",
+      "upstream_bytes": null,
+      "current_bytes": 24658
+    },
+    {
+      "path": "scripts/build-codecs.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "854c2c0236b931fdde67a6e64d53db6d074b4b45e2bd748044f0da7a69e1518a",
+      "upstream_bytes": null,
+      "current_bytes": 2577
+    },
+    {
+      "path": "scripts/generate-localization.py",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "5fc55896ba678f0e5365e3d9efc98e88e76330116e625b2b98e80bf298fc70dc",
+      "upstream_bytes": null,
+      "current_bytes": 3435
+    },
+    {
+      "path": "scripts/inject_ipa.py",
+      "status": "modified",
+      "upstream_sha256": "1dd73dfcde89a9d53e50579d949a916adee71459a634a38c3301b491660acc44",
+      "current_sha256": "d920f624868d9df12f211d06edb010164d87c43d86b85411cc7ae14b1c7d885c",
+      "upstream_bytes": 7561,
+      "current_bytes": 7614
+    },
+    {
+      "path": "scripts/test-ad-delivery.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "d8401236935fd9f64ef97a1de23da7cf02c3e1e0b792898f2809700991ba5b98",
+      "upstream_bytes": null,
+      "current_bytes": 1115
+    },
+    {
+      "path": "scripts/test-author-info.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "9c23053e81ce8b33b4a3ef4705c41d61c3994561462ed6c7080aa2a416f3bf35",
+      "upstream_bytes": null,
+      "current_bytes": 1571
+    },
+    {
+      "path": "scripts/test-capture-protection.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "cd7dfd595f7c7b449100dc382543f4126a6a0b427523b8daace3ceaf4497b5b0",
+      "upstream_bytes": null,
+      "current_bytes": 1196
+    },
+    {
+      "path": "scripts/test-localization.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "86d7a0b0a754d72a82277ce2a8003dc4f111351497fc117b7af4255c56e8704e",
+      "upstream_bytes": null,
+      "current_bytes": 3932
+    },
+    {
+      "path": "scripts/test-music-attachment.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "253fe71abda1a7691e3b7bfffff34acd6c3bf86fa15df4b794b62d60c1e03c2a",
+      "upstream_bytes": null,
+      "current_bytes": 286
+    },
+    {
+      "path": "scripts/test-notification-localization.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "27a79cc7240e6e4e51694db724ea02e641a017ded0986d7ddf3ecf80e71c4a0c",
+      "upstream_bytes": null,
+      "current_bytes": 2375
+    },
+    {
+      "path": "scripts/test-pin-tab-bar.sh",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "0e095995137e34b2e533fb6ad14bf3d0723c58fc6300e8f6b0a829b1e97f3da7",
+      "upstream_bytes": null,
+      "current_bytes": 1748
+    },
+    {
+      "path": "tests/ad-delivery.x",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "4d124f9d8fdb926e16c709e572f86962e632a48a55e86e90ca5e4fa801622fe8",
+      "upstream_bytes": null,
+      "current_bytes": 2535
+    },
+    {
+      "path": "tests/author-info.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "1a6d32a1e78ca2e4730c9ff280c6efcb357e81c4cdc930458689309c9268b11c",
+      "upstream_bytes": null,
+      "current_bytes": 6435
+    },
+    {
+      "path": "tests/capture-protection.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "cd048211b90457a6a50f6182d587276d50d01959d1c501fb8b10cdadb55dc9c2",
+      "upstream_bytes": null,
+      "current_bytes": 14987
+    },
+    {
+      "path": "tests/localization.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "9350b1864467b4fff70099ac9edaf0e51dc86d16276047bc3a04bb127cd4034f",
+      "upstream_bytes": null,
+      "current_bytes": 2727
+    },
+    {
+      "path": "tests/music-attachment.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "3852fa046814400db0950b6d0f3912af33da989b41f6c76f5efdfa4383b7c3c5",
+      "upstream_bytes": null,
+      "current_bytes": 2417
+    },
+    {
+      "path": "tests/notification-localization.x",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "eca1ea92c3ae4df2633efd34d74e0d7c1bd3546636798cd49d5814add5801666",
+      "upstream_bytes": null,
+      "current_bytes": 28915
+    },
+    {
+      "path": "tests/notification-prefs.m",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "ba9d0cbe8ab68587fef74a9563d1127530d045d92cb75bf44828240b3fa0ffe8",
+      "upstream_bytes": null,
+      "current_bytes": 5163
+    },
+    {
+      "path": "tests/pin-tab-bar.x",
+      "status": "added",
+      "upstream_sha256": null,
+      "current_sha256": "3038a701333396986a6e2fe0e54f352ebbbecf4f534dda7e0ad9506dc93bee62",
+      "upstream_bytes": null,
+      "current_bytes": 2164
+    },
+    {
+      "path": "vendor/dav1d/lib/libdav1d.a",
+      "status": "modified",
+      "upstream_sha256": "4af4f836e2c7f0ffa0f82253bdc95c220b79140142c18978dd8cf7f013f6c0b3",
+      "current_sha256": "1e66d968f933f66e4cca4587115420c6b97434773c86eec51047a4da8284e018",
+      "upstream_bytes": 1103512,
+      "current_bytes": 2167648
+    },
+    {
+      "path": "vendor/libvpx/lib/libvpx.a",
+      "status": "modified",
+      "upstream_sha256": "8b12b2c9728e21ded39d5d5484c570d2922594f5bdc35892e6b8355611bc918c",
+      "current_sha256": "500c33533da85b86d7cc374dabf88a304684052435778442eac4daf1be5686c4",
+      "upstream_bytes": 751688,
+      "current_bytes": 1429232
+    }
+  ],
+  "post_snapshot_documentation_only_changes": [
+    "docs/UPSTREAM_MIGRATION.md",
+    "docs/upstream-diff-1.31.0+16.json",
+    "README.md",
+    "README.zh-TW.md",
+    "docs/notification-unsend-analysis.md"
+  ]
+}

@@ -1,8 +1,10 @@
 # ThreadsPulse
 
-**English** | [繁體中文](README.zh-TW.md)
+**English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 
 An iOS tweak for Threads (`com.burbn.barcelona`). Current version: **1.31.1**
+
+> Local compatibility build: **1.31.1+5**. See the [repair inventory and upstream migration guide (中文)](docs/UPSTREAM_MIGRATION.md) for the frozen upstream baseline, every retained change, dependencies, and verification status. The feature list below includes upstream capabilities; it is not a device acceptance report.
 
 No jailbreak needed: build your own Threads IPA with ThreadsPulse injected using GitHub Actions, then install it with your own signing tool.
 
@@ -136,7 +138,7 @@ Pushing to `main` / `master`, opening a pull request, or running **Build** → *
 
 | File | Use |
 |---|---|
-| `ThreadsPulse_TrollFools_<version>.zip` | For TrollFools or manual injection: `ThreadsPulse.dylib` and `ThreadsPulse.bundle` (the Safari extension is only included in the sideload IPA) |
+| `ThreadsPulse_TrollFools_<version>.zip` | For TrollFools or manual injection: `ThreadsPulse.dylib`, with translations embedded and no separate `.bundle` required (the Safari extension is only included in the sideload IPA) |
 | `ThreadsPulse_rootless_<version>.deb` | Rootless jailbreak (Dopamine / palera1n rootless) |
 | `ThreadsPulse_rootful_<version>.deb` | Rootful jailbreak |
 | `ThreadsPulse_roothide_<version>.deb` | Roothide jailbreak (Dopamine roothide, Bootstrap) |
@@ -159,22 +161,21 @@ make package FINALPACKAGE=1    # .deb (jailbreak)
 make -C OpenThreadsSafariExtension FINALPACKAGE=1   # Safari extension → OpenThreadsSafariExtension/.theos/obj/
 
 # Inject into a decrypted IPA (only needs Python 3 and zip / unzip)
-BUNDLE="layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle"
 # sideload variant
-python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib -b "$BUNDLE" \
+python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib \
   --appex OpenThreadsSafariExtension/.theos/obj/OpenThreadsSafariExtension.appex -o sideload.ipa
 # noplugins variant
-python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib -b "$BUNDLE" \
+python3 scripts/inject_ipa.py -i Threads.ipa -d .theos/obj/ThreadsPulse.dylib \
   --no-plugins -o noplugins.ipa
 ```
 
 - Rootless jailbreak: uncomment `THEOS_PACKAGE_SCHEME = rootless` in the `Makefile`.
 - Uses the Logos `internal` generator to hook through the ObjC runtime directly, so it **doesn't depend on CydiaSubstrate / ElleKit** and nothing extra needs to be injected.
-- The version number is defined only in `TPVersion.h` (also update `ThreadsPulse.bundle/Info.plist`). The iOS SDK and minimum iOS version are set by `SDK_VERSION` and `MIN_IOS` in the workflows.
+- The displayed version number is defined in `TPVersion.h`; language metadata is in `resources/localization/Info.plist`. The iOS SDK and minimum iOS version are set by `SDK_VERSION` and `MIN_IOS` in the workflows.
 
 ### What `inject_ipa.py` does
 
-1. Unpacks the IPA and copies `ThreadsPulse.dylib` into `Threads.app/Frameworks/` and `ThreadsPulse.bundle` into `Threads.app/`.
+1. Unpacks the IPA and copies `ThreadsPulse.dylib` into `Threads.app/Frameworks/`. Current builds embed their translations; the optional `--bundle` argument retains support for older builds that need a separate `ThreadsPulse.bundle`.
 2. Adds an `LC_LOAD_DYLIB` load command (`@executable_path/Frameworks/ThreadsPulse.dylib`) to the Threads executable, skipping it if already there.
 3. Checks that the app is decrypted (`cryptid` in `LC_ENCRYPTION_INFO_64`) and stops if it isn't.
 4. `--appex` copies an extension into `PlugIns/` (removing any signing data inside it); `--no-plugins` removes `PlugIns/`, `Extensions/` and `Watch/`.
@@ -215,7 +216,7 @@ ThreadsPulse/
 │   └── workflows/
 │       ├── build.yml               Builds the tweak (zip / deb)
 │       └── build-ipa.yml           Builds and injects the IPA
-└── layout/Library/Application Support/ThreadsPulse/ThreadsPulse.bundle/
+└── resources/localization/         Embedded into ThreadsPulse.dylib at build time
     ├── Info.plist
     ├── en.lproj/Localizable.strings
     ├── zh-Hant.lproj/Localizable.strings
@@ -228,7 +229,7 @@ ThreadsPulse/
 
 - The code always uses `TPL(@"English text")`; **the English text is the key**, and it's shown as-is when no translation exists.
 - Included languages: English (`en`), Traditional Chinese (`zh-Hant`), Simplified Chinese (`zh-Hans`), Japanese (`ja`) and Korean (`ko`). By default the system language is used (anything else falls back to English); the Language row at the top of the settings can force one.
-- To add a language, copy `en.lproj` (for example to `fr.lproj`), translate it, add the language code to `CFBundleLocalizations` in `Info.plist`, and add it to the Language menu (`TPSettingsViewController.m`) and `TPLocalization.m`.
+- Translation sources live in `resources/localization/`; `scripts/generate-localization.py` embeds them into the dylib during the build, so no separate `.bundle` is needed. To add a language, copy `en.lproj` (for example to `fr.lproj`), translate it, add the language code to `CFBundleLocalizations` in `Info.plist`, and update the Language menu (`TPSettingsViewController.m`), `TPLocalization.m` and the generator's supported-language mapping.
 - Corrections to the Simplified Chinese, Japanese and Korean translations from native speakers are welcome.
 
 ## Implementation notes

@@ -421,3 +421,5 @@
 "You're on %@" = "目前版本：%@";
 "Skip This Version" = "略過此版本";
 "Later" = "稍後";
+"A message was unsent" = "一則訊息已被收回";
+"Modified and optimized: By %@" = "二改優化：By %@";
